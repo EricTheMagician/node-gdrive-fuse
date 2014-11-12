@@ -124,7 +124,6 @@ saveFolderTree = () ->
 
   fs.outputJsonSync "#{config.cacheLocation}/data/folderTree.json", toSave
 
-
 ####################################
 ###### Setting up the Client #######
 ####################################
@@ -228,3 +227,4 @@ Fibers () ->
 .run()
 
 module.exports.folderTree = folderTree
+module.exports.drive = drive
