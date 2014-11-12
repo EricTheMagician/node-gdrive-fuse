@@ -29,7 +29,8 @@ logger = new (winston.Logger)({
 
 #Create maps of name and files
 folderTree = new hashmap()
-folderTree.set( '/', )
+now = (new Date).getTime()
+folderTree.set('/', new GFolder(null, null, 'root',now, now,true, ['loading data']))
 idToPath = new hashmap()
 
 wait = Future.wait
@@ -50,7 +51,7 @@ fs.ensureDirSync( dataLocation )
 
 
 getPageFiles = Future.wrap (pageToken, cb) ->
-  drive.files.list { pageToken: pageToken, trashed: false, maxResults:500}, (err, resp) ->
+  drive.files.list { pageToken: pageToken, maxResults:500}, (err, resp) ->
     if err
       logger.log 'error', err
       cb(err)
@@ -66,13 +67,9 @@ getAllFiles = Future.wrap (cb) ->
   Fibers () ->
     data = getPageFiles(null).wait()
     items = items.concat(data.items)
-    if data.pageToken
-      while data.pageToken
-        oldData = data #save for parsing
-        data = getPageFiles(data.pageToken)
-
-        data = data.wait()
-        items = items.concat(data.items)
+    while data.pageToken
+      data = getPageFiles(data.pageToken).wait()
+      items = items.concat(data.items)
 
     cb(null, items)
 
@@ -83,10 +80,11 @@ parseFilesFolders = (items) ->
   files = []
   folders = []
   for i in items
-    if i.fileSize
-      files.push i
-    else
-      folders.push i
+    unless i.labels.trashed
+      if i.fileSize
+        files.push i
+      else
+        folders.push i
   return {files:files, folders:folders}
 
 refreshToken =  () ->
@@ -107,8 +105,12 @@ loadFolderTree = ->
       unless folderTree.has(pth.dirname(key))
         continue
 
+      #add to idToPath
+      idToPath.set(o.id,key)
+      idToPath.set(o.parentid, pth.basename(key))
+
       if o.size
-        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, new Date(o.ctime), new Date(o.mtime), o.permission )
+        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, parseInt(o.size), new Date(o.ctime), new Date(o.mtime), o.permission )
       else
         # keep track of the conversion of bitcasa path to real path
         idToPath.set o.path, key
@@ -177,7 +179,7 @@ Fibers () ->
 
     for f in data.folders
       if f.parents[0].isRoot
-        folderTree.set('/', new GFolder(f.parents[0].id, null, 'root',now,true))
+        folderTree.set('/', new GFolder(f.parents[0].id, null, 'root',now, now,true))
         idToPath.set(f.parents[0].id, '/')
         break
 
@@ -195,14 +197,16 @@ Fibers () ->
 
           #if the parent exists, get it
           parent = folderTree.get(parentPath)
-          #push this current folder to the parent's children list
 
-          if parent.children.indexOf(f.title) < 0
-            parent.children.push f.title
-
-          #set up the new folder
           path = pth.join(parentPath, f.title)
           idToPath.set( f.id, path)
+
+          #push this current folder to the parent's children list
+          if parent.children.indexOf(f.title) < 0
+            parent.children.push f.title
+          else
+            continue
+          #set up the new folder
           folderTree.set(path, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable ))
         else
           notFound.push f
@@ -211,13 +215,14 @@ Fibers () ->
     for f in data.files
       pid = f.parents[0].id
       parentPath = idToPath.get(pid)
-      parent = folderTree.get parentPath
-      if parent.children.indexOf(f.title) < 0
-        parent.children.push f.title
+      if parentPath
+        parent = folderTree.get parentPath
+        if parent.children.indexOf(f.title) < 0
+          parent.children.push f.title
 
 
-      path = pth.join parentPath, f.title
-      folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, f.fileSize, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
+        path = pth.join parentPath, f.title
+        folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
 
     saveFolderTree()
 .run()
