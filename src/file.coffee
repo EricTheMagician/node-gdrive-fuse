@@ -4,6 +4,15 @@ hashmap = require( 'hashmap' ).HashMap
 Fiber = require 'fibers'
 Future = require 'fibers/future'
 rest = require 'restler'
+winston = require 'winston'
+
+logger = new (winston.Logger)({
+    transports: [
+      new (winston.transports.Console)({ level: 'info' }),
+      new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
+    ]
+  })
+
 ######################################
 ######### Setup File Config ##########
 ######################################
@@ -59,24 +68,6 @@ class GFile
   @chunkSize: 1024*1024*16 #set default chunk size to 16. this should be changed at run time
 
   constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @permission) ->
-
-  # @recursive:  (client,file,rStart, rEnd) ->
-  #   rEnd = Math.min( Math.ceil(rEnd/GFile.chunkSize) * GFile.chunkSize, file.size)-1
-  #   basename = file.bitcasaBasename
-  #   if (rEnd + 1) <= file.size and rEnd > rStart
-  #     parentPath = client.bitcasaTree.get(pth.dirname(file.bitcasaPath))
-  #     filePath = pth.join(parentPath,file.name)
-  #     cache = pth.join(client.downloadLocation,"#{basename}-#{rStart}-#{rEnd}")
-  #     Fiber ->
-  #       unless client.exists(cache)
-  #         unless client.downloadTree.has("#{file.bitcasaBasename}-#{rStart}")
-  #           client.downloadTree.set("#{file.bitcasaBasename}-#{rStart}",1)
-  #           _callback = ->
-  #             client.downloadTree.remove("#{file.bitcasaBasename}-#{rStart}")
-  #           _fn = ->
-  #             client.download(client, file, file.bitcasaPath, file.name, rStart,rEnd,file.size, false , _callback)
-  #           setImmediate _fn
-  #     .run()
 
   @download = (url, start,end, size, cb ) ->
     rest.get url, {

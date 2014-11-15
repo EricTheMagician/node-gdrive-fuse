@@ -17,7 +17,7 @@ GFile = require("./file.coffee").GFile
 uploadTree = require("./folder.coffee").uploadTree
 logger = new (winston.Logger)({
     transports: [
-      new (winston.transports.Console)({ level: 'debug' }),
+      new (winston.transports.Console)({ level: 'info' }),
       new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
     ]
   })
