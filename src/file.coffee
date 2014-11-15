@@ -120,7 +120,7 @@ class GFile
     chunkStart = Math.floor((start)/GFile.chunkSize) * GFile.chunkSize
     chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1 #and make sure that it's not bigger than the actual file
     nChunks = (chunkEnd - chunkStart)/GFile.chunkSize
-    download = Future.wrap (cStart, cEnd,_cb) ->
+    _download =  (cStart, cEnd,_cb) ->
       #if file chunk already exists, just download it
       #else download it
       Fiber () ->
@@ -138,25 +138,26 @@ class GFile
           _cb(null, buffer)
         else
           unless downloadTree.has("#{file.id}-#{cStart}")
-              downloadTree.set("#{file.id}-#{cStart}", 1)
-              callback = (err, result)->
-                if err
-                  _cb(err)
-                  return null
-                downloadTree.remove("#{file.id}-#{cStart}")
-                fs.writeFileSync(path,result)
-                if result instanceof Buffer
-                  _cb(null, result.slice(cStart - _cStart, _cEnd - cEnd ))
-                else
-                  _cb(result)
-              GFile.download(file.downloadUrl, _cStart, _cEnd, file.size, callback)
+            downloadTree.set("#{file.id}-#{cStart}", 1)
+            callback = (err, result)->
+              if err
+                _cb(err)
+                return null
+              downloadTree.remove("#{file.id}-#{cStart}")
+              fs.writeFileSync(path,result)
+              if result instanceof Buffer
+                _cb(null, result.slice(cStart - _cStart, _cEnd - cEnd ))
+              else
+                _cb(result)
+            GFile.download(file.downloadUrl, _cStart, _cEnd, file.size, callback)
 
 
           else
             fn = ->
-              download(cStart, cEnd,_cb)
+              _download(cStart, cEnd,_cb)
             setTimeout fn, 1500
       .run()
+    download = Future.wrap _download
     if nChunks < 1
       Fiber( ->
         fiber = Fiber.current
@@ -164,7 +165,7 @@ class GFile
           fiber.run()
           return null
 
-        #only read ahead if the start is within the start of the chunk
+        #only read ahead if the start is within first 128kb of the chunk
         if readAhead
           if chunkStart <= start < chunkStart + 131072
             file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
@@ -184,40 +185,39 @@ class GFile
         cb( data )
 
       ).run()
-    # else if nChunks < 2
-    #   end1 = chunkStart + GFile.chunkSize - 1
-    #   start2 = chunkStart + GFile.chunkSize
-    #
-    #   Fiber( ->
-    #     fiber = Fiber.current
-    #     data1 = download( start, end1)
-    #     data2 = download( start2, end)
-    #
-    #     try #check that data1 does not have any connection error
-    #       data1 = data1.wait()
-    #     catch error
-    #       data1 = null
-    #
-    #     try #check that data1 does not have any connection error
-    #       data2 = data2.wait()
-    #     catch
-    #       data2 = null
-    #
-    #     if data1 == null or data1.buffer.length == 0
-    #       cb( new Buffer(0), 0, 0)
-    #       return
-    #     buffer1 = data1.buffer.slice(data1.start, data1.end)
-    #
-    #     if data2 == null or data2.buffer.length == 0
-    #       #since buffer1 is still good, just return that
-    #       cb( buffer1, 0, data1.buffer.length )
-    #       return
-    #     buffer2 = data2.buffer.slice(data2.start, data2.end)
-    #
-    #     buffer = Buffer.concat([buffer1, buffer2])
-    #     cb( buffer, 0, buffer.length )
-    #     return
-    #   ).run()
+    else if nChunks < 2
+      end1 = chunkStart + GFile.chunkSize - 1
+      start2 = chunkStart + GFile.chunkSize
+
+      Fiber( ->
+        fiber = Fiber.current
+        data1 = download( start, end1)
+        data2 = download( start2, end)
+
+        try #check that data1 does not have any connection error
+          data1 = data1.wait()
+        catch error
+          data1 = null
+
+        try #check that data1 does not have any connection error
+          data2 = data2.wait()
+        catch
+          data2 = null
+
+        buf1 = Buffer.isBuffer(data1)
+        buf2 = Buffer.isBuffer(data2)
+        if buf1 and buf2
+          cb(Buffer.concat([data1, data2]))
+          return null
+        else if buf1
+          cb data1
+          return null
+        else
+          cb( new Buffer(0) )
+          return null
+
+        return null
+      ).run()
     else
       logger.log("error", "number of chunks greater than 2 - (#{start}-#{end})");
       buffer = new Buffer(0)

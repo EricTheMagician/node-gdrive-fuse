@@ -25,7 +25,7 @@
     "limiter": "~1.0.5",
     "mmmagic": "^0.3.8",
     "node-cache": "^1.0.0",
-    "restler": "git://github.com/thejinx0r/restler#2117b6816865358047067809d618f457fe54fc69",
+    "restler": "git://github.com/mthx/restler#4cc136af9a089ef21013cdad6fdd68adebf92caa",
     "winston": "~0.7.3"
   },
   "engine": "node >= 0.10.0"
