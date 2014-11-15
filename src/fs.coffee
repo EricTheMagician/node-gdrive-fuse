@@ -8,6 +8,9 @@ pth = require 'path'
 f4js = require 'fuse4js'
 os = require 'os'
 MD5 = require 'MD5'
+Fiber = require 'fibers'
+Future = require 'fibers/future'
+
 
 client = require('./client.coffee')
 folderTree = client.folderTree
@@ -41,6 +44,22 @@ errnoMap =
     EINVAL: 22,
     ESPIPE: 29,
     ENOTEMPTY: 39
+
+writeFile = Future.wrap(fs.writeFile)
+open = Future.wrap(fs.open)
+read = Future.wrap(fs.read,5)
+write = Future.wrap fs.write
+stat = Future.wrap(fs.stat)
+writeFile = Future.wrap(fs.writeFile)
+
+#since fs.exists does not return an error, wrap it using an error
+exists = Future.wrap (path, cb) ->
+  fs.exists path, (success)->
+    cb(null,success)
+
+close = Future.wrap (path,cb) ->
+  fs.close path, (err) ->
+    cb(err, true)
 
 ###############################################
 ####### Filesystem Helper Functions ###########
@@ -397,6 +416,8 @@ release = (path, fd, cb) ->
           logger.log "error", "failed to upload \"#{path}\". Retrying"
           parent.upload uploadTree.get(path), callback
         else
+          uploadedFile = pth.join(uploadLocation, uploadTree.get(path))
+
           logger.log 'info', "successfully uploaded #{path}"
           uploadTree.remove path
           file = folderTree.get path
@@ -406,6 +427,24 @@ release = (path, fd, cb) ->
           file.ctime = (new Date(file.createdDate)).getTime()
           file.mtime =  (new Date(file.modifiedDate)).getTime()
           client.saveFolderTree()
+
+          #move the file to download folder after finished uploading
+          fd = open(uploadedFile, 'r').wait()
+          buffer = new Buffer(GFile.chunkSize)
+          start = 0
+          while start < file.size
+            end = Math.min(start + GFile.chunkSize - 1, file.size - 1)
+            size = Math.min(GFile.chunkSize, file.size - start)
+
+            ofd = open(pth.join(config.cacheLocation, data, "#{fild.id}-#{start}-#{end}"))
+            read(fd, buffer, 0, size, start).wait()
+            ofd = ofd.wait()
+            write(ofd, buffer, 0, size, 0).wait()
+            close( ofd )
+            start += GFile.chunkSize
+
+          close(fd)
+
       parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), callback
       return null
 

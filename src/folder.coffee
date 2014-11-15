@@ -34,6 +34,7 @@ refreshToken =  () ->
 writeFile = Future.wrap(fs.writeFile)
 open = Future.wrap(fs.open)
 read = Future.wrap(fs.read,5)
+write = Future.wrap fs.write
 stat = Future.wrap(fs.stat)
 writeFile = Future.wrap(fs.writeFile)
 
