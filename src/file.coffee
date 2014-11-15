@@ -16,7 +16,7 @@ fs.ensureDirSync downloadLocation
 
 #upload location
 uploadLocation = pth.join config.cacheLocation, 'upload'
-fs.ensureDirSync downloadLocation
+fs.ensureDirSync uploadLocation
 
 downloadTree = new hashmap()
 

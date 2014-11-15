@@ -1,10 +1,11 @@
 fs = require 'fs-extra'
 Fiber = require 'fibers'
 Future = require 'fibers/future'
-rest = require 'rest'
+rest = require 'restler'
 pth = require 'path'
 mmm = require('mmmagic')
-
+winston = require 'winston'
+hashmap = require('hashmap').HashMap
 
 logger = new (winston.Logger)({
     transports: [
@@ -27,13 +28,13 @@ refreshToken =  () ->
 
 
 ######################################
-######### Wrap fs functions ##########
+########## Wrap functions ############
 ######################################
 
 writeFile = Future.wrap(fs.writeFile)
 open = Future.wrap(fs.open)
 read = Future.wrap(fs.read,5)
-stats = Future.wrap(fs.stat)
+stat = Future.wrap(fs.stat)
 writeFile = Future.wrap(fs.writeFile)
 
 #since fs.exists does not return an error, wrap it using an error
@@ -47,6 +48,10 @@ close = Future.wrap (path,cb) ->
 
 Magic = mmm.Magic;
 magic = new Magic(mmm.MAGIC_MIME_TYPE)
+detectFile = Future.wrap ( file,cb ) ->
+  magic.detectFile(file, cb)
+
+uploadTree = new hashmap()
 
 ############################################
 ######### Upload Helper Functions ##########
@@ -193,16 +198,17 @@ class GFolder
       ctime: new Date(@ctime)
     cb(0,attr)
 
-  upload: (filePath, cb) =>
+  upload: (fileName, filePath, cb) =>
     folder = @
     Fiber ->
 
       mime = detectFile(filePath).wait()
+      console.log "mime type:", mime
       fsize = stat(filePath).wait().size;
       buffer = new Buffer(GFolder.uploadChunkSize)
 
       logger.log 'debug', "getting upload link to upload #{filePath}"
-      location = getUploadResumableLink( folder.id, pth.basename(filePath), mime ).wait()
+      location = getUploadResumableLink( folder.id, fileName, fsize, mime ).wait()
 
       logger.log 'debug', "starting to upload files"
       fd = open(filePath, 'r').wait()
@@ -222,3 +228,4 @@ class GFolder
 
 
 module.exports.GFolder = GFolder
+module.exports.uploadTree = uploadTree

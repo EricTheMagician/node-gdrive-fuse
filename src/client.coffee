@@ -11,6 +11,7 @@ NodeCache = require 'node-cache'
 pth = require 'path'
 GFolder = require("./folder.coffee").GFolder
 GFile = require("./file.coffee").GFile
+uploadTree = require("./folder.coffee").uploadTree
 #read input config
 config = fs.readJSONSync 'config.json'
 
@@ -286,7 +287,7 @@ Fibers () ->
 .run()
 
 module.exports.folderTree = folderTree
+module.exports.saveFolderTree = saveFolderTree
 module.exports.drive = drive
 module.exports.loadChanges = loadChanges
 module.exports.refreshToken = refreshToken
-module.exports.config = config
