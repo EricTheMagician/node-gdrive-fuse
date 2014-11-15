@@ -45,13 +45,18 @@ drive = google.drive({ version: 'v2' })
 dataLocation = pth.join config.cacheLocation, 'data'
 fs.ensureDirSync( dataLocation )
 
+largestChangeId = 1;
 ####################################
 ####### Client Functions ###########
 ####################################
 
 
 getPageFiles = Future.wrap (pageToken, cb) ->
-  drive.files.list { pageToken: pageToken, maxResults:500}, (err, resp) ->
+  opts =
+    fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,parents(id,isRoot),shared,title,userPermission),nextPageToken"
+    maxResults: 500
+    pageToken: pageToken
+  drive.files.list opts, (err, resp) ->
     if err
       logger.log 'error', err
       cb(err)
@@ -70,7 +75,7 @@ getAllFiles = Future.wrap (cb) ->
     while data.pageToken
       data = getPageFiles(data.pageToken).wait()
       items = items.concat(data.items)
-
+    getLargestChangeId().wait()
     cb(null, items)
 
 
@@ -116,6 +121,11 @@ loadFolderTree = ->
         idToPath.set o.path, key
         folderTree.set key, new GFolder(o.id, o.parentid, o.name, new Date(o.ctime), new Date(o.mtime), o.permission, o.children)
 
+    changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
+    fs.readJson changeFile, (err, data) ->
+      largestChangeId = data.largestChangeId
+      loadChanges()
+
 saveFolderTree = () ->
   toSave = {}
   for key in folderTree.keys()
@@ -124,6 +134,53 @@ saveFolderTree = () ->
 
   fs.outputJsonSync "#{config.cacheLocation}/data/folderTree.json", toSave
 
+getLargestChangeId = Future.wrap (cb)->
+  opts =
+    fields: "largestChangeId"
+  callback = (err, res) ->
+    unless err
+      res.largestChangeId = parseInt(res.largestChangeId) + 1
+      largestChangeId = res.largestChangeId
+      fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", res
+    cb(err, res)
+  drive.changes.list opts, callback
+
+loadPageChange =  Future.wrap (pageToken, startChangeId, cb) ->
+
+  opts =
+    maxResults: 1000
+    startChangeId: startChangeId
+    nextPageToken:pageToken
+
+
+  drive.changes.list opts, (err, res) ->
+    unless err
+      data =
+        items: res.items
+        largestChangeId: res.largestChangeId
+        pageToken: res.nextPageToken
+      cb(err, data)
+    else
+      cb(err)
+
+
+loadChanges = Future.wrap (cb) ->
+  id = largestChangeId
+  items = []
+  Fibers () ->
+    data = loadPageChange(null,id).wait()
+    items = items.concat data.items
+    largestChangeId = data.largestChangeId
+
+    while data.pageToken
+      data = loadPageChange(data.pageToken,id).wait()
+      items = items.concat data.items
+
+    cb(null, items)
+    if id != largestChangeId
+      fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId:largestChangeId}
+
+  .run()
 ####################################
 ###### Setting up the Client #######
 ####################################
@@ -196,7 +253,6 @@ Fibers () ->
 
           #if the parent exists, get it
           parent = folderTree.get(parentPath)
-
           path = pth.join(parentPath, f.title)
           idToPath.set( f.id, path)
 
@@ -224,7 +280,13 @@ Fibers () ->
         folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
 
     saveFolderTree()
+
+  # loadChanges()
+  # console.log getLargestChangeId().wait()
 .run()
 
 module.exports.folderTree = folderTree
 module.exports.drive = drive
+module.exports.loadChanges = loadChanges
+module.exports.refreshToken = refreshToken
+module.exports.config = config

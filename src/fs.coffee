@@ -24,6 +24,7 @@ logger = new (winston.Logger)({
 #read input config
 config = fs.readJSONSync 'config.json'
 GFile.chunkSize = config.chunkSize
+GFolder.uploadChunkSize = config.uploadChunkSize
 
 #http://lxr.free-electrons.com/source/include/uapi/asm-generic/errno-base.h#L23
 errnoMap =
