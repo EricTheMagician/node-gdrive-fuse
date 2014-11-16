@@ -49,17 +49,17 @@ errnoMap =
 
 writeFile = Future.wrap(fs.writeFile)
 fsopen = Future.wrap(fs.open)
-read = Future.wrap(fs.read,5)
-write = Future.wrap fs.write
-stat = Future.wrap(fs.stat)
+fsread = Future.wrap(fs.read,5)
+fswrite = Future.wrap fs.write
+fsstat = Future.wrap(fs.stat)
 writeFile = Future.wrap(fs.writeFile)
 
 #since fs.exists does not return an error, wrap it using an error
-exists = Future.wrap (path, cb) ->
+fsexists = Future.wrap (path, cb) ->
   fs.exists path, (success)->
     cb(null,success)
 
-close = Future.wrap (path,cb) ->
+fsclose = Future.wrap (path,cb) ->
   fs.close path, (err) ->
     cb(err, true)
 
@@ -241,7 +241,7 @@ read = (path, offset, len, buf, fh, cb) ->
 #  *     A positive value represents the number of bytes actually written.
 #  */
 write = (path, offset, len, buf, fd, cb) ->
-  logger.log "debug", "writing to file #{path} - offset: #{offset}, length: #{len}"
+  # logger.log "debug", "writing to file #{path} - offset: #{offset}, length: #{len}"
   fs.write fd, buf, 0, len, offset, (err, bytesWritten, buffer) ->
     if (err)
       return cb(-errnoMap[err.code])
@@ -423,14 +423,14 @@ uploadCallback = (path) ->
         end = Math.min(start + GFile.chunkSize - 1, file.size - 1)
         size = Math.min(GFile.chunkSize, file.size - start)
 
-        ofd = fsopen(pth.join(config.cacheLocation, 'data', "#{file.id}-#{start}-#{end}"),'w')
-        read(fd, buffer, 0, size, start).wait()
+        ofd = fsopen(pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}"),'w')
+        fsread(fd, buffer, 0, size, start).wait()
         ofd = ofd.wait()
-        write(ofd, buffer, 0, size, 0).wait()
+        fswrite(ofd, buffer, 0, size, 0).wait()
         close( ofd )
         start += GFile.chunkSize
 
-      close(fd).wait()
+      fsclose(fd).wait()
       fs.unlink uploadedFile, (err)->
         if err
           logger.log "error", "unable to remove file #{uploadedFile}"
