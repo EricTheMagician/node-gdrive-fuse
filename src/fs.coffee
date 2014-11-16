@@ -409,10 +409,10 @@ uploadCallback = (path) ->
         file.downloadUrl = result.downloadUrl
         file.id = result.id
         file.size = parseInt(result.fileSize)
-        file.ctime = (new Date(file.createdDate)).getTime()
-        file.mtime =  (new Date(file.modifiedDate)).getTime()
+        file.ctime = (new Date(result.createdDate)).getTime()
+        file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
-        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.ctime)).getTime(), (new Date(result.mtime)).getTime(), true)
+        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)
 
       client.saveFolderTree()
 
