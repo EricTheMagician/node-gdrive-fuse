@@ -100,7 +100,7 @@ _getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
       if resp.statusCode == 401
         console.log "refreshing access token"
         refreshToken()
-        _getUploadResumableLink(fileSize, mime, cb)
+        _getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
       else if resp.statusCode == 200
         cb(null, resp.headers.location)
       else

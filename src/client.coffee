@@ -238,6 +238,7 @@ Fibers () ->
       if f.parents[0].isRoot
         folderTree.set('/', new GFolder(f.parents[0].id, null, 'root',now, now,true))
         idToPath.set(f.parents[0].id, '/')
+        logger.log "debug", "root node found"
         break
 
     # google does not return the list of files and folders in a particular order.
@@ -248,6 +249,10 @@ Fibers () ->
       notFound = []
 
       for f in data.folders
+        unless f.parents == undefined
+          logger.log "error", "folder.parents is undefined"
+          logger.log "error", f
+          continue 
         pid = f.parents[0].id #parent id
         parentPath = idToPath.get(pid)
         if parentPath

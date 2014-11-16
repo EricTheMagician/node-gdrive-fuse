@@ -1,4 +1,4 @@
-fs = require 'fs'
+fs = require 'fs-extra'
 winston = require 'winston'
 memoize = require 'memoizee'
 pth = require 'path'
