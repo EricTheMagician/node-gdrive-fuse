@@ -55,7 +55,7 @@ largestChangeId = 1;
 
 getPageFiles = Future.wrap (pageToken, cb) ->
   opts =
-    fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,parents(id,isRoot),shared,title,userPermission),nextPageToken"
+    fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission),nextPageToken"
     maxResults: 500
     pageToken: pageToken
   drive.files.list opts, (err, resp) ->
