@@ -15,9 +15,11 @@ Future = require 'fibers/future'
 client = require('./client.coffee')
 folderTree = client.folderTree
 drive = client.drive
-GFolder = require("./folder.coffee").GFolder
+folder = require("./folder.coffee")
+uploadTree = folder.uploadTree
+GFolder = folder.GFolder
+saveUploadTree = folder.saveUploadTree
 GFile = require("./file.coffee").GFile
-uploadTree = require("./folder.coffee").uploadTree
 logger = new (winston.Logger)({
     transports: [
       new (winston.transports.Console)({ level: 'info' }),
@@ -157,6 +159,7 @@ open = (path, flags, cb) ->
           cache = MD5(path)
           folderTree.set path, file
           uploadTree.set path, cache
+          saveUploadTree()
 
           if parent.children.indexOf(name) < 0
             parent.children.push name
@@ -349,6 +352,7 @@ create = (path, mode, cb) ->
 
       logger.log "debug", "setting upload Tree"
       uploadTree.set path, cache
+      saveUploadTree()
 
       now = (new Date).getTime()
       logger.log "debug", "adding #{path} to folderTree"
@@ -420,6 +424,7 @@ release = (path, fd, cb) ->
 
           logger.log 'info', "successfully uploaded #{path}"
           uploadTree.remove path
+          saveUploadTree()
           file = folderTree.get path
           file.downloadUrl = result.downloadUrl
           file.id = result.id

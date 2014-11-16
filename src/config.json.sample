@@ -5,7 +5,7 @@
   "email": "user email address",
   "mountPoint": "/tmp/mnt",
   "chunkSize": 8388608,
-  "uploadChunkSize": 16777216,
+  "uploadChunkSize": 8388608,
   "advancedChunks": 5,
   "cacheLocation": "/tmp/node-gdrive",
   "maxCacheSize": 747520

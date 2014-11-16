@@ -227,6 +227,19 @@ class GFolder
 
     .run()
 
+#load upload Tree
+if fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json'))
+  fs.readJson pth.join(config.cacheLocation, 'data','uploadTree.json'), (err, data) ->
+    for key in Object.keys(data)
+      uploadTree.set key, data[key]
+
 
 module.exports.GFolder = GFolder
 module.exports.uploadTree = uploadTree
+module.exports.saveUploadTree = ->
+  toSave = {}
+  for key in uploadTree.keys()
+    value = folderTree.get key
+    toSave[key] = value
+
+  fs.outputJsonSync pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave
