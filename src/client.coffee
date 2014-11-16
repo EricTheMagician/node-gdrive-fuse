@@ -252,8 +252,8 @@ Fibers () ->
       notFound = []
 
       for f in data.folders
-        if f.parents[0] == undefined
-          logger.log "error", "folder.parents is undefined"
+        if f.parents == undefined or f.parents.length == 0 
+          logger.log "error", "folder.parents is undefined or empty"
           logger.log "error", f
           continue
         pid = f.parents[0].id #parent id
