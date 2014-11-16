@@ -150,8 +150,9 @@ loadPageChange =  Future.wrap (pageToken, startChangeId, cb) ->
 
   opts =
     maxResults: 1000
-    startChangeId: startChangeId
-    nextPageToken:pageToken
+    startChangeId:  startChangeId
+    nextPageToken:  pageToken
+    trashed:        false
 
 
   drive.changes.list opts, (err, res) ->
