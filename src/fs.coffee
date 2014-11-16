@@ -145,7 +145,7 @@ open = (path, flags, cb) ->
            if file.size == 0
             cb 0, null
            else
-             cb -errnoMap.ENOENT
+             cb -errnoMap.EACCESS
         else
           cb -errnoMap.EISDIR
         return null
@@ -174,16 +174,6 @@ open = (path, flags, cb) ->
         else
           cb -errnoMap.EPERM
           return null
-
-
-
-        if folderTree.get(path) instanceof GFile
-          cb(0,null)# // we don't return a file handle, so fuse4js will initialize it to 0
-        else
-          cb -errnoMap.EISDIR
-        return null
-
-
 
       cb(-errnoMap.ENOENT)
       return null
@@ -413,13 +403,17 @@ uploadCallback = (path) ->
 
       logger.log 'info', "successfully uploaded #{path}"
       uploadTree.remove path
-      saveUploadTree()
-      file = folderTree.get path
-      file.downloadUrl = result.downloadUrl
-      file.id = result.id
-      file.size = parseInt(result.fileSize)
-      file.ctime = (new Date(file.createdDate)).getTime()
-      file.mtime =  (new Date(file.modifiedDate)).getTime()
+      saveUploadTree()      
+      if folderTree.has path
+        file = folderTree.get path
+        file.downloadUrl = result.downloadUrl
+        file.id = result.id
+        file.size = parseInt(result.fileSize)
+        file.ctime = (new Date(file.createdDate)).getTime()
+        file.mtime =  (new Date(file.modifiedDate)).getTime()
+      else
+        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.ctime)).getTime(), (new Date(result.mtime)).getTime(), true)
+
       client.saveFolderTree()
 
       #move the file to download folder after finished uploading
