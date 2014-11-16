@@ -119,7 +119,7 @@ readdir = (path, cb) ->
 open = (path, flags, cb) ->
   err = 0 # assume success
   flag = flags & 3
-  logger.log "debug", "opening file #{path} - flags: #{flags}/#{flag}"
+  logger.log "silly", "opening file #{path} - flags: #{flags}/#{flag}"
   parent = folderTree.get pth.dirname(path)
   switch flag
     when 0 #read only
@@ -214,6 +214,7 @@ read = (path, offset, len, buf, fh, cb) ->
       catch error
         logger.log( "error", "failed reading: #{error}")
         cb(-errnoMap.EIO)
+        return null
 
     #make sure that we are only reading a file
     file = folderTree.get(path)
@@ -233,22 +234,28 @@ read = (path, offset, len, buf, fh, cb) ->
 # /*
 #  * Handler for the write() system call.
 #  * path: the path to the file
-#  * offset: the file offset to write to
+#  * position: the file offset to write to
 #  * len: the number of bytes to write
 #  * buf: the Buffer to read data from
 #  * fd:  the optional file handle originally returned by open(), or 0 if it wasn't
 #  * cb: a callback of the form cb(err), where err is the Posix return code.
 #  *     A positive value represents the number of bytes actually written.
 #  */
-write = (path, offset, len, buf, fd, cb) ->
-  # logger.log "debug", "writing to file #{path} - offset: #{offset}, length: #{len}"
-  fs.write fd, buf, 0, len, offset, (err, bytesWritten, buffer) ->
+write = (path, position, len, buf, fd, cb) ->
+  # logger.log "debug", "writing to file #{path} - position: #{position}, length: #{len}"
+  file = folderTree.get path  
+  size = file.size
+  fs.write fd, buf, 0, len, position, (err, bytesWritten, buffer) ->
     if (err)
       return cb(-errnoMap[err.code])
+
+    #it is simportant to update the file size as we copy in to it. sometimes, cp and mv will check the progress by scanning the filesystem
+    if size < position + len 
+      file.size = position + len
     cb(bytesWritten)
 
-# flush = (buf, cb) ->
-#   return cb(0)
+flush = (buf, cb) ->
+  return cb(0)
 
 # /*
 #  * Handler for the mkdir() system call.
@@ -427,7 +434,7 @@ uploadCallback = (path) ->
         fsread(fd, buffer, 0, size, start).wait()
         ofd = ofd.wait()
         fswrite(ofd, buffer, 0, size, 0).wait()
-        close( ofd )
+        fsclose( ofd )
         start += GFile.chunkSize
 
       fsclose(fd).wait()
@@ -443,7 +450,7 @@ uploadCallback = (path) ->
 #  * cb: a callback of the form cb(err), where err is the Posix return code.
 #  */
 release = (path, fd, cb) ->
-  logger.log "debug", "closing file #{path}"
+  logger.silly "closing file #{path}"
   if uploadTree.has path
     logger.log "debug", "#{path} was in the upload tree"
 
@@ -476,7 +483,6 @@ statfs= (cb) ->
         favail: 1000000,
         fsid: 1000000,
         flag: 0,
-        namemax: 64
     })
 
 flush = (cb) ->

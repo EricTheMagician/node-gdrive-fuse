@@ -102,7 +102,6 @@ refreshToken =  () ->
 loadFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
   now = Date.now()
-  folderTree.set('/', 'root')
 
   fs.readJson jsonFile, (err, data) ->
     for key in Object.keys(data)

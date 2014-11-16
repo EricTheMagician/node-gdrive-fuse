@@ -186,6 +186,7 @@ class GFile
 
       ).run()
     else if nChunks < 2
+      logger.log "debug", "number of chunks is 2"
       end1 = chunkStart + GFile.chunkSize - 1
       start2 = chunkStart + GFile.chunkSize
 
