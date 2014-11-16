@@ -115,7 +115,6 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
     bytesRead = read(fd,buffer,0,buffer.length, start).wait()
     bytesRead =  bytesRead[0]
     end = start + bytesRead - 1
-    console.log "bytes read:", bytesRead
     rest.put location, {
       headers:
         "Authorization": "Bearer #{config.accessToken.access_token}"
@@ -204,14 +203,13 @@ class GFolder
     Fiber ->
 
       mime = detectFile(filePath).wait()
-      console.log "mime type:", mime
       fsize = stat(filePath).wait().size;
       buffer = new Buffer(GFolder.uploadChunkSize)
 
-      logger.log 'debug', "getting upload link to upload #{filePath}"
+      logger.log 'debug', "getting upload link to upload #{fileName}"
       location = getUploadResumableLink( folder.id, fileName, fsize, mime ).wait()
 
-      logger.log 'debug', "starting to upload files"
+      logger.log 'debug', "starting to upload file #{fileName}"
       fd = open(filePath, 'r').wait()
       start = 0
 
@@ -223,6 +221,7 @@ class GFolder
           start = fsize
           fs.closeSync(fd)
 
+      logger.log 'debug', "finished uploading #{fileName}"
       cb(null, result.result)
 
     .run()

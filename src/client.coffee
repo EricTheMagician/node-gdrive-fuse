@@ -9,7 +9,8 @@ rest = require 'restler'
 hashmap = require( 'hashmap' ).HashMap
 NodeCache = require 'node-cache'
 pth = require 'path'
-GFolder = require("./folder.coffee").GFolder
+folder = require("./folder.coffee")
+GFolder = folder.GFolder
 GFile = require("./file.coffee").GFile
 uploadTree = require("./folder.coffee").uploadTree
 #read input config

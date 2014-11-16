@@ -395,6 +395,46 @@ unlink = (path, cb) ->
     return null
 
 
+#function to create a callback for file uploading
+uploadCallback = (path) ->
+  return (err, result) ->
+    if err
+      logger.log "error", "failed to upload \"#{path}\". Retrying"
+      parent.upload uploadTree.get(path), callback
+    else
+      uploadedFile = pth.join(uploadLocation, uploadTree.get(path))
+
+      logger.log 'info', "successfully uploaded #{path}"
+      uploadTree.remove path
+      saveUploadTree()
+      file = folderTree.get path
+      file.downloadUrl = result.downloadUrl
+      file.id = result.id
+      file.size = parseInt(result.fileSize)
+      file.ctime = (new Date(file.createdDate)).getTime()
+      file.mtime =  (new Date(file.modifiedDate)).getTime()
+      client.saveFolderTree()
+
+      #move the file to download folder after finished uploading
+      fd = fsopen(uploadedFile, 'r').wait()
+      buffer = new Buffer(GFile.chunkSize)
+      start = 0
+      while start < file.size
+        end = Math.min(start + GFile.chunkSize - 1, file.size - 1)
+        size = Math.min(GFile.chunkSize, file.size - start)
+
+        ofd = fsopen(pth.join(config.cacheLocation, 'data', "#{file.id}-#{start}-#{end}"),'w')
+        read(fd, buffer, 0, size, start).wait()
+        ofd = ofd.wait()
+        write(ofd, buffer, 0, size, 0).wait()
+        close( ofd )
+        start += GFile.chunkSize
+
+      close(fd).wait()
+      fs.unlink uploadedFile, (err)->
+        if err
+          logger.log "error", "unable to remove file #{uploadedFile}"
+
 
 # /*
 #  * Handler for the release() system call.
@@ -415,43 +455,8 @@ release = (path, fd, cb) ->
       cb(0)
       #upload file once file is closed
       parent = folderTree.get pth.dirname(path)
-      callback = (err, result) ->
-        if err
-          logger.log "error", "failed to upload \"#{path}\". Retrying"
-          parent.upload uploadTree.get(path), callback
-        else
-          uploadedFile = pth.join(uploadLocation, uploadTree.get(path))
 
-          logger.log 'info', "successfully uploaded #{path}"
-          uploadTree.remove path
-          saveUploadTree()
-          file = folderTree.get path
-          file.downloadUrl = result.downloadUrl
-          file.id = result.id
-          file.size = parseInt(result.fileSize)
-          file.ctime = (new Date(file.createdDate)).getTime()
-          file.mtime =  (new Date(file.modifiedDate)).getTime()
-          client.saveFolderTree()
-
-          #move the file to download folder after finished uploading
-          fd = fsopen(uploadedFile, 'r').wait()
-          buffer = new Buffer(GFile.chunkSize)
-          start = 0
-          while start < file.size
-            end = Math.min(start + GFile.chunkSize - 1, file.size - 1)
-            size = Math.min(GFile.chunkSize, file.size - start)
-
-            ofd = fsopen(pth.join(config.cacheLocation, data, "#{fild.id}-#{start}-#{end}"))
-            read(fd, buffer, 0, size, start).wait()
-            ofd = ofd.wait()
-            write(ofd, buffer, 0, size, 0).wait()
-            close( ofd )
-            start += GFile.chunkSize
-
-          close(fd).wait()
-          fs.unlink(uploadedFile, ->)
-
-      parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), callback
+      parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), uploadCallback(path)
       return null
 
   else
@@ -491,6 +496,15 @@ handlers =
   write:      write
   unlink:     unlink
   rmdir:      rmdir
+
+#resume file uploading
+fn = ->
+  for path in uploadTree.keys()
+      if folderTree.has pth.dirname(path)
+        parent = folderTree.get pth.dirname(path)
+        parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), uploadCallback(path)
+setTimeout fn, 25000
+
 
 try
   logger.log "info", 'attempting to start f4js'
