@@ -48,7 +48,7 @@ errnoMap =
     ENOTEMPTY: 39
 
 writeFile = Future.wrap(fs.writeFile)
-open = Future.wrap(fs.open)
+fsopen = Future.wrap(fs.open)
 read = Future.wrap(fs.read,5)
 write = Future.wrap fs.write
 stat = Future.wrap(fs.stat)
@@ -434,21 +434,22 @@ release = (path, fd, cb) ->
           client.saveFolderTree()
 
           #move the file to download folder after finished uploading
-          fd = open(uploadedFile, 'r').wait()
+          fd = fsopen(uploadedFile, 'r').wait()
           buffer = new Buffer(GFile.chunkSize)
           start = 0
           while start < file.size
             end = Math.min(start + GFile.chunkSize - 1, file.size - 1)
             size = Math.min(GFile.chunkSize, file.size - start)
 
-            ofd = open(pth.join(config.cacheLocation, data, "#{fild.id}-#{start}-#{end}"))
+            ofd = fsopen(pth.join(config.cacheLocation, data, "#{fild.id}-#{start}-#{end}"))
             read(fd, buffer, 0, size, start).wait()
             ofd = ofd.wait()
             write(ofd, buffer, 0, size, 0).wait()
             close( ofd )
             start += GFile.chunkSize
 
-          close(fd)
+          close(fd).wait()
+          fs.unlink(uploadedFile, ->)
 
       parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), callback
       return null
