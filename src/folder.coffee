@@ -239,7 +239,7 @@ module.exports.uploadTree = uploadTree
 module.exports.saveUploadTree = ->
   toSave = {}
   for key in uploadTree.keys()
-    value = folderTree.get key
+    value = uploadTree.get key
     toSave[key] = value
 
   fs.outputJsonSync pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave

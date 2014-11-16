@@ -233,6 +233,8 @@ Fibers () ->
     items = getAllFiles().wait()
     data = parseFilesFolders items
     now = (new Date).getTime()
+    logger.log 'info', "Finished downloading folder structure from google"
+
 
     for f in data.folders
       if f.parents[0].isRoot
