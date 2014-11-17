@@ -127,7 +127,13 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
     }
     .on 'complete', (res,resp) ->
       if res instanceof Error
-        cb(err)
+        logger.error "There was an error with uploading data, retrying"
+        logger.error "#{res}"
+        end = getNewRangeEnd(location, fileSize).wait()
+        cb null, {
+          statusCode: resp.statusCode
+          rangeEnd: end
+        }
       else
         if resp.statusCode == 400 or resp.statusCode == 401
           refreshToken()
@@ -137,19 +143,6 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
         if resp.statusCode == 308 #success on resume
           md5Server = resp.headers["x-range-md5"]
           rangeEnd = getRangeEnd(resp.headers.range)
-          # if (rangeEnd - start + 1) == bytesRead
-          #   console.log "end expected"
-          #   md5Local = MD5(buffer)
-          # else
-          #   console.log "end different size"
-          #   md5Local = MD5(buffer.slice(0,end-start))
-          # console.log "server", md5Server
-          # console.log "local", md5Local
-          # console.log resp.headers
-          # console.log "end: #{rangeEnd}\tend?: #{rangeEnd-start+1}\tbytesRead: #{bytesRead}"
-
-          # if md5Server != md5Local #ma? fileSize, mime, fd, buffer, cb)
-          # else
           cb null, {
             statusCode: 308
             rangeEnd: rangeEnd
@@ -165,7 +158,7 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
           return null
 
         if resp.statusCode >= 500
-          end =getNewRangeEnd(location, fileSize).wait()
+          end = getNewRangeEnd(location, fileSize).wait()
           cb null, {
             statusCode: resp.statusCode
             rangeEnd: end
@@ -226,6 +219,8 @@ class GFolder
       unless result.result
         logger.error "result from file uploading was empty."
         logger.error result
+        cb(result )
+        return null
       cb(null, result.result)
 
     .run()
