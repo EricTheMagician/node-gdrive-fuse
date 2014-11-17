@@ -241,6 +241,12 @@ Fibers () ->
 
 
     for f in data.folders
+      #check to make sure that parents is defined.
+      if (!f.parents ) or f.parents.length == 0 
+        logger.log "error", "folder.parents is undefined or empty"
+        logger.log "error", f
+        continue
+
       if f.parents[0].isRoot
         folderTree.set('/', new GFolder(f.parents[0].id, null, 'root',now, now,true))
         idToPath.set(f.parents[0].id, '/')
