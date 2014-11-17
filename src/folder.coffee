@@ -126,11 +126,9 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
       if res instanceof Error
         cb(err)
       else
-        if resp.statusCode == 400
-          console.log resp.headers
-          console.log "res", res
-          console.log "resp", resp.req._headers
-          console.log res.error.errors
+        if resp.statusCode == 400 or resp.statusCode == 401
+          refreshToken()
+          _uploadData(location, start, fileSize, mime, fd, buffer, cb)
           return null
 
         if resp.statusCode == 308 #success on resume
