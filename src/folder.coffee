@@ -223,6 +223,9 @@ class GFolder
           fs.closeSync(fd)
 
       logger.log 'debug', "finished uploading #{fileName}"
+      unless result.result
+        logger.error "result from file uploading was empty."
+        logger.error result
       cb(null, result.result)
 
     .run()
