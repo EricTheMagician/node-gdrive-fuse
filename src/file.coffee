@@ -34,8 +34,11 @@ google = require 'googleapis'
 oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUrl)
 refreshToken =  () ->
   oauth2Client.refreshAccessToken (err,tokens) ->
-    config.accessToken = tokens
-    fs.outputJsonSync 'config.json', config
+    if err
+      refreshToken()
+    else
+      config.accessToken = tokens
+      fs.outputJsonSync 'config.json', config
 oauth2Client.setCredentials config.accessToken
 
 

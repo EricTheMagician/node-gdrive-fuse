@@ -23,8 +23,11 @@ google.options({ auth: oauth2Client, user: config.email })
 drive = google.drive({ version: 'v2' })
 refreshToken =  () ->
   oauth2Client.refreshAccessToken (err,tokens) ->
-    config.accessToken = tokens
-    fs.outputJsonSync 'config.json', config
+    if err
+      refreshToken()
+    else
+      config.accessToken = tokens
+      fs.outputJsonSync 'config.json', config
 
 
 ######################################
