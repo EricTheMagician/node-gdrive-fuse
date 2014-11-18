@@ -431,8 +431,9 @@ uploadCallback = (path) ->
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
         file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
-        if parent.children.indexOf( file.name ) < 0
-          parent.children.push file.name
+
+      if parent.children.indexOf( file.name ) < 0
+        parent.children.push file.name
       folderTree.set path, file
       client.saveFolderTree()
 
