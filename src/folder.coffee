@@ -87,10 +87,13 @@ _getNewRangeEnd = (location, fileSize, cb) ->
         # console.log resp
         # console.log res.error.errors
         cb(401)
-        return null
-      range = resp.headers.Range || resp.headers.range
+        return null      
+      range = resp.headers.range
       unless range #sometimes, it doesn't return the range, so assume it is 0.
-        cb(null, 0)
+        range = resp.headers.Range
+        unless range
+          cb(null, 0)
+          return null
       [start,end] = range.match(/(\d*)-(\d*)/)
       cb(null,parseInt(end))
 getNewRangeEnd = Future.wrap _getNewRangeEnd
