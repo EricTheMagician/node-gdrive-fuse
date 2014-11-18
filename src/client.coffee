@@ -87,6 +87,8 @@ parseFilesFolders = (items) ->
   files = []
   folders = []
   for i in items
+    if (!i.parents ) or i.parents.length == 0 
+      continue
     unless i.labels.trashed
       if i.mimeType is "application/vnd.google-apps.folder"
         folders.push i
@@ -236,9 +238,15 @@ Fibers () ->
   else
     logger.log 'info', "Downloading full folder structure from google"
     items = getAllFiles().wait()
-    data = parseFilesFolders items
-    now = (new Date).getTime()
+
     logger.log 'info', "Finished downloading folder structure from google"
+    logger.info "Parinsg data, looking for root foolder"
+
+    data = parseFilesFolders items
+
+    items = null # let node's garbage collection kick in
+
+    now = (new Date).getTime()
 
 
     for f in data.folders
@@ -251,7 +259,7 @@ Fibers () ->
       if f.parents[0].isRoot
         folderTree.set('/', new GFolder(f.parents[0].id, null, 'root',now, now,true))
         idToPath.set(f.parents[0].id, '/')
-        logger.log "debug", "root node found"
+        logger.log "info", "root node found"
         break
 
     # google does not return the list of files and folders in a particular order.
@@ -259,13 +267,14 @@ Fibers () ->
     # and then parse files
     left = data.folders
     while left.length > 0
+      logger.info "Folders left to parse: #{left.length}"
       notFound = []
 
       for f in data.folders
-        if (!f.parents ) or f.parents.length == 0 
-          logger.log "debug", "folder.parents is undefined or empty"
-          logger.log "debug", f
-          continue
+        # if (!f.parents ) or f.parents.length == 0 
+        #   logger.log "debug", "folder.parents is undefined or empty"
+        #   logger.log "debug", f
+        #   continue
         pid = f.parents[0].id #parent id
         parentPath = idToPath.get(pid)
         if parentPath
@@ -286,6 +295,9 @@ Fibers () ->
           notFound.push f
       left = notFound
 
+    data.folders = null
+    
+    logger.info "Parsing files"
     for f in data.files
       pid = f.parents[0].id
       parentPath = idToPath.get(pid)
@@ -293,7 +305,8 @@ Fibers () ->
         parent = folderTree.get parentPath
         if parent.children.indexOf(f.title) < 0
           parent.children.push f.title
-
+    logger.info "Finished parsing files"
+    logger.info "Everything should be ready to use"
 
         path = pth.join parentPath, f.title
         folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
