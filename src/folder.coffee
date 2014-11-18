@@ -182,6 +182,20 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
           }
           return null
 
+        if resp.statusCode == 410
+          logger.debug "got status code 401 while uploading"
+          logger.debug "result", res
+          logger.debug "response",resp
+          callback = (err,end) ->
+            cb err, {
+              statusCode: resp.statusCode
+              rangeEnd: end
+            }
+
+
+          end = _getNewRangeEnd(location, fileSize, callback)
+
+
         if resp.statusCode >= 500
           callback = (err,end) ->
             cb err, {
