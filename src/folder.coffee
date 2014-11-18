@@ -91,14 +91,14 @@ _getNewRangeEnd = (location, fileSize, cb) ->
       
       #if the link is dead or bad
       if resp.statusCode == 404 or resp.statusCode == 410
-        cb(null, 0)
+        cb(null, -1)
         return null
 
       range = resp.headers.range
       unless range #sometimes, it doesn't return the range, so assume it is 0.
         range = resp.headers.Range
         unless range
-          cb(null, 0)
+          cb(null, -1)
           return null
       [start,end] = range.match(/(\d*)-(\d*)/)
       cb(null,parseInt(end))
@@ -187,8 +187,11 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
           }
           return null
 
+
+        console.log "uncaugt state for file uploading"
         console.log resp.statusCode
         console.log resp.headers
+        console.log res
 
 
 
@@ -245,8 +248,11 @@ class GFolder
         location = upFile.location
         try
           end = getNewRangeEnd(location, fsize).wait()
-          start = end + 1
-          logger.debug "got new range end for #{originalPath}: #{end}"
+          if end <= 0
+            delete upFile.location
+          else
+            start = end + 1
+            logger.debug "got new range end for #{originalPath}: #{end}"
         catch e
           delete upFile.location
         
