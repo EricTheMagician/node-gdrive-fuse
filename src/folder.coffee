@@ -86,7 +86,7 @@ _getNewRangeEnd = (location, fileSize, cb) ->
         # console.log "refreshing access token"
         # console.log resp
         # console.log res.error.errors
-        cb(401)
+        cb(null, -1)
         return null      
       
       #if the link is dead or bad
@@ -156,7 +156,8 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
             rangeEnd: end
           }
 
-        end = _getNewRangeEnd(location, fileSize, callback)        
+         _getNewRangeEnd(location, fileSize, callback)
+         return null        
       else
         if resp.statusCode == 400 or resp.statusCode == 401
           logger.debug "there was an error uploading data, refreshing token"

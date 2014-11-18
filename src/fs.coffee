@@ -469,7 +469,12 @@ release = (path, fd, cb) ->
       parent = folderTree.get pth.dirname(path)
 
       if folderTree.has path
-        parent.upload pth.basename(path), path, uploadCallback(path)
+        file = folderTree.get(path)
+        if file.size > 0
+          parent.upload pth.basename(path), path, uploadCallback(path)
+        else
+          uploadTree.remove path
+          saveUploadTree()
       return null
 
   else
