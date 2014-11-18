@@ -237,6 +237,9 @@ write = (path, position, len, buf, fd, cb) ->
   size = file.size
   fs.write fd, buf, 0, len, position, (err, bytesWritten, buffer) ->
     if (err)
+      logger.debug "there was an error writing to the #{path}, #{file}"
+      logger.debug err
+      logger.debug err.code
       return cb(-errnoMap[err.code])
 
     #it is simportant to update the file size as we copy in to it. sometimes, cp and mv will check the progress by scanning the filesystem
