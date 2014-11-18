@@ -192,6 +192,7 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
         console.log resp.statusCode
         console.log resp.headers
         console.log res
+        cb(resp.statusCode)
 
 
 
@@ -281,7 +282,7 @@ class GFolder
       unless result.result
         logger.error "result from file uploading was empty."
         logger.error result
-        cb(result )
+        cb(result)
         return null
       cb(null, result.result)
 

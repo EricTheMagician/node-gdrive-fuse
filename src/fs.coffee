@@ -434,26 +434,17 @@ uploadCallback = (path) ->
 
       folderTree.set path, file
       client.saveFolderTree()
-      Fiber ->
-        #move the file to download folder after finished uploading
-        fd = fsopen(uploadedFileLocation, 'r').wait()
-        buffer = new Buffer(GFile.chunkSize)
-        start = 0
-        while start < file.size
-          end = Math.min(start + GFile.chunkSize - 1, file.size - 1)
-          size = Math.min(GFile.chunkSize, file.size - start)
 
-          ofd = fsopen(pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}"),'w')
-          fsread(fd, buffer, 0, size, start).wait()
-          ofd = ofd.wait()
-          fswrite(ofd, buffer, 0, size, 0).wait()
-          fsclose( ofd )
-          start += GFile.chunkSize
+      #move the file to download folder after finished uploading
+      start = 0
+      while start < file.size
+        savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
+        fs.createReadStream(uploadedFileLocation, {start: start, end: end}).pipe(fs.createWriteStream(savePath))
+        start += GFile.chunkSize
 
-        fsclose(fd).wait()
-        fs.unlink uploadedFileLocation, (err)->
-          if err
-            logger.log "error", "unable to remove file #{uploadedFile}"
+      fs.unlink uploadedFileLocation, (err)->
+        if err
+          logger.log "error", "unable to remove file #{uploadedFile}"
       .run()
 
 # /*
