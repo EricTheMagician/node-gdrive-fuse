@@ -444,8 +444,7 @@ uploadCallback = (path) ->
 
       fs.unlink uploadedFileLocation, (err)->
         if err
-          logger.log "error", "unable to remove file #{uploadedFile}"
-      .run()
+          logger.log "error", "unable to remove file #{uploadedFile}"      
 
 # /*
 #  * Handler for the release() system call.
