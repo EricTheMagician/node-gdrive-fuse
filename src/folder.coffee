@@ -183,14 +183,15 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
           return null
 
         if resp.statusCode >= 500
-          end = getNewRangeEnd(location, fileSize).wait()
-          logger.debug "The resp code for uploading was #{resp.statusCode}. The new end is #{end}"
-          logger.debug res
-          logger.debug resp
-          cb null, {
-            statusCode: resp.statusCode
-            rangeEnd: end
-          }
+          callback = (err,end) ->
+            cb err, {
+              statusCode: resp.statusCode
+              rangeEnd: end
+            }
+
+
+          end = _getNewRangeEnd(location, fileSize, callback)
+ 
           return null
 
 
@@ -249,6 +250,9 @@ class GFolder
 
       mime = detectFile(filePath).wait()
       fsize = stat(filePath).wait().size;
+      if fsize == 0
+
+        return null
       buffer = new Buffer(GFolder.uploadChunkSize)
 
       if upFile.location
@@ -287,7 +291,7 @@ class GFolder
           start = fsize
           fs.closeSync(fd)
 
-      logger.log 'debug', "finished uploading #{fileName}"
+      logger.log 'debug', "finished uploading #{fileName}"      
       unless result.result
         logger.error "result from file uploading was empty."
         logger.error result
