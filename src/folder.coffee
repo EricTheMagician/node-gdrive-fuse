@@ -150,7 +150,7 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
       if res instanceof Error
         logger.error "There was an error with uploading data, retrying"
         logger.error "#{res}"
-        end = getNewRangeEnd(location, fileSize).wait()
+        end = getNewRangeEnd(location, fileSize).wait()        
         cb null, {
           statusCode: resp.statusCode
           rangeEnd: end
@@ -181,6 +181,9 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
 
         if resp.statusCode >= 500
           end = getNewRangeEnd(location, fileSize).wait()
+          logger.debug "The resp code for uploading was #{resp.statusCode}. The new end is #{end}"
+          logger.debug res
+          logger.debug resp
           cb null, {
             statusCode: resp.statusCode
             rangeEnd: end
@@ -251,10 +254,12 @@ class GFolder
           end = getNewRangeEnd(location, fsize).wait()
           if end <= 0
             delete upFile.location
+            logger.debug "tried to get new range for #{originalPath}, but it was #{end}"            
           else
             start = end + 1
             logger.debug "got new range end for #{originalPath}: #{end}"
         catch e
+          logger.debug "tried to get new range for #{originalPath} but there was an error"
           delete upFile.location
         
       
