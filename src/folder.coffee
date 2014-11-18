@@ -6,7 +6,6 @@ pth = require 'path'
 mmm = require('mmmagic')
 winston = require 'winston'
 hashmap = require('hashmap').HashMap
-
 logger = new (winston.Logger)({
     transports: [
       new (winston.transports.Console)({ level: 'info' }),
@@ -21,14 +20,14 @@ oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, conf
 oauth2Client.setCredentials config.accessToken
 google.options({ auth: oauth2Client, user: config.email })
 drive = google.drive({ version: 'v2' })
-refreshToken =  () ->
+refreshToken =  (cb) ->
   oauth2Client.refreshAccessToken (err,tokens) ->
     if err
-      refreshToken()
+      refreshToken(cb)
     else
       config.accessToken = tokens
       fs.outputJsonSync 'config.json', config
-
+      cb()
 
 ######################################
 ########## Wrap functions ############
@@ -56,7 +55,7 @@ detectFile = Future.wrap ( file,cb ) ->
   magic.detectFile(file, cb)
 
 uploadTree = new hashmap()
-
+uploadLocation = pth.join(config.cacheLocation, 'upload')
 ############################################
 ######### Upload Helper Functions ##########
 ############################################
@@ -71,19 +70,30 @@ rangeRegex =  ///
 
 getRangeEnd = (range) ->
   return parseInt(range.match(rangeRegex)[3])
-getNewRangeEnd = Future.wrap (location, fileSize, cb) ->
+
+_getNewRangeEnd = (location, fileSize, cb) ->
   rest.put location, {
     headers:
       "Authorization": "Bearer #{config.accessToken.access_token}"
       "Content-Length": 0
       "Content-Range": "bytes */#{fileSize}"
-  }.on 'complete', (res, resp) ->
+    }
+  .on 'complete', (res, resp) ->
     if res instanceof Error
       cb(res)
     else
-      range = resp.headers.Range
+      if resp.statusCode == 401
+        # console.log "refreshing access token"
+        # console.log resp
+        # console.log res.error.errors
+        cb(401)
+        return null
+      range = resp.headers.Range || resp.headers.range
+      unless range #sometimes, it doesn't return the range, so assume it is 0.
+        cb(null, 0)
       [start,end] = range.match(/(\d*)-(\d*)/)
-      cb(null,end)
+      cb(null,parseInt(end))
+getNewRangeEnd = Future.wrap _getNewRangeEnd
 _getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
   data =
     "parents": ["id": parentId]
@@ -102,8 +112,10 @@ _getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
     else
       if resp.statusCode == 401
         console.log "refreshing access token"
-        refreshToken()
-        _getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
+        fn = ->
+          _getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
+
+        refreshToken(fn)
       else if resp.statusCode == 200
         cb(null, resp.headers.location)
       else
@@ -136,8 +148,10 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
         }
       else
         if resp.statusCode == 400 or resp.statusCode == 401
-          refreshToken()
-          _uploadData(location, start, fileSize, mime, fd, buffer, cb)
+          fn = ->
+            _uploadData(location, start, fileSize, mime, fd, buffer, cb)
+
+          refreshToken(fn)
           return null
 
         if resp.statusCode == 308 #success on resume
@@ -150,7 +164,6 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
           return null
 
         if 200 <= resp.statusCode <= 201
-          console.log res
           cb null, {
             statusCode: 201
             result: res
@@ -173,6 +186,19 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
   .run()
 uploadData = Future.wrap _uploadData
 
+lockUploadTree = false
+saveUploadTree = ->
+  unless lockUploadTree
+    lockUploadTree = true
+    toSave = {}
+    for key in uploadTree.keys()
+      value = uploadTree.get key
+      toSave[key] = value
+    logger.debug "saving upload tree"
+    fs.outputJsonSync pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave
+    lockUploadTree = false
+
+
 
 
 ######################################
@@ -192,20 +218,40 @@ class GFolder
       ctime: new Date(@ctime)
     cb(0,attr)
 
-  upload: (fileName, filePath, cb) =>
+  upload: (fileName, originalPath, cb) =>
     folder = @
+    upFile = uploadTree.get originalPath
+    filePath = pth.join uploadLocation, upFile.cache
+    if upFile.uploading
+      return null
+    upFile.uploading = true   
+    uploadTree.set originalPath, upFile 
     Fiber ->
 
       mime = detectFile(filePath).wait()
       fsize = stat(filePath).wait().size;
       buffer = new Buffer(GFolder.uploadChunkSize)
 
-      logger.log 'debug', "getting upload link to upload #{fileName}"
-      location = getUploadResumableLink( folder.id, fileName, fsize, mime ).wait()
+      if upFile.location
+        location = upFile.location
+        try
+          end = getNewRangeEnd(location, fsize).wait()
+          start = end + 1
+        catch e
+          delete upFile.location
+        
+      
+      unless upFile.location
+        logger.log 'debug', "getting upload link to upload #{fileName}"
+        location = getUploadResumableLink( folder.id, fileName, fsize, mime ).wait()
+        upFile.location = location
+        uploadTree.set originalPath, upFile 
+        saveUploadTree()
+        start = 0
+
 
       logger.log 'debug', "starting to upload file #{fileName}"
       fd = open(filePath, 'r').wait()
-      start = 0
 
       while start < fsize
         result = uploadData(location, start, fsize, mime, fd, buffer).wait()
@@ -229,15 +275,11 @@ class GFolder
 if fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json'))
   fs.readJson pth.join(config.cacheLocation, 'data','uploadTree.json'), (err, data) ->
     for key in Object.keys(data)
-      uploadTree.set key, data[key]
+      value = data[key]
+      value.uploading = false
+      uploadTree.set key, value
 
 
 module.exports.GFolder = GFolder
 module.exports.uploadTree = uploadTree
-module.exports.saveUploadTree = ->
-  toSave = {}
-  for key in uploadTree.keys()
-    value = uploadTree.get key
-    toSave[key] = value
-
-  fs.outputJsonSync pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave
+module.exports.saveUploadTree = saveUploadTree

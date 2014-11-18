@@ -158,7 +158,10 @@ open = (path, flags, cb) ->
           file = new GFile(null, null, parent.id, name, 0, now, now, true)
           cache = MD5(path)
           folderTree.set path, file
-          uploadTree.set path, cache
+          upFile = 
+            cache: cache
+            uploading: false
+          uploadTree.set path, upFile
           saveUploadTree()
 
           if parent.children.indexOf(name) < 0
@@ -302,6 +305,7 @@ rmdir = (path, cb) ->
           if err
             logger.log "error", "unable to remove folder #{path}"
             cb -errnoMap.EIO
+            return null
           else
             console.log res
             parent = folderTree.get pth.dirname(path)
@@ -310,15 +314,19 @@ rmdir = (path, cb) ->
             if idx >= 0
               parent.children.splice idx, 1
             folderTree.remove path
+            cb(0)
             client.saveFolderTree()
-            cb 0
+            return null
+            
       else
         cb -errnoMap.ENOTEMPTY
+        return null
     else
       cb -errnoMap.ENOTDIR
+      return null
 
   else
-    cb -errnoMap.EEXIST
+    cb -errnoMap.ENOENT
     return null
 
 
@@ -350,8 +358,11 @@ create = (path, mode, cb) ->
         logger.log "error", "unable to createfile #{path}, #{err}"
         return cb(-errnoMap[err.code])
 
-      logger.log "debug", "setting uploadTree #{path}--#{cache}"
-      uploadTree.set path, cache
+      logger.log "debug", "setting upload Tree"
+      upFile = 
+        cache: cache
+        uploading: false
+      uploadTree.set path, upFile
       saveUploadTree()
 
       now = (new Date).getTime()
@@ -375,8 +386,9 @@ unlink = (path, cb) ->
     if file instanceof GFile #make sure that the folder is in fact a folder
       drive.files.trash {fileId: file.id}, (err, res) ->
         if err
-          logger.log "error", "unable to remove folder #{path}"
+          logger.log "error", "unable to remove file #{path}"
           cb -errnoMap.EIO
+          return null
         else
           console.log res
           parent = folderTree.get pth.dirname(path)
@@ -385,8 +397,9 @@ unlink = (path, cb) ->
           if idx >= 0
             parent.children.splice idx, 1
           folderTree.remove path
+          cb(0)
           client.saveFolderTree()
-          cb 0
+          return null          
     else
       cb -errnoMap.EISDIR
 
@@ -400,9 +413,11 @@ uploadCallback = (path) ->
   return (err, result) ->
     if err
       logger.log "error", "failed to upload \"#{path}\". Retrying"
-      parent.upload uploadTree.get(path), callback
+      parent = folderTree.get pth.dirname(path)
+      parent.upload pth.basename(path), path , callback
     else
-      uploadedFile = pth.join(uploadLocation, uploadTree.get(path))
+      uploadedFile = uploadTree.get(path)
+      uploadedFileLocation = pth.join uploadLocation, uploadedFile.cache
 
       logger.log 'info', "successfully uploaded #{path}"
       uploadTree.remove path
@@ -417,10 +432,11 @@ uploadCallback = (path) ->
       else
         file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)
 
+      folderTree.set path, file
       client.saveFolderTree()
 
       #move the file to download folder after finished uploading
-      fd = fsopen(uploadedFile, 'r').wait()
+      fd = fsopen(uploadedFileLocation, 'r').wait()
       buffer = new Buffer(GFile.chunkSize)
       start = 0
       while start < file.size
@@ -435,7 +451,7 @@ uploadCallback = (path) ->
         start += GFile.chunkSize
 
       fsclose(fd).wait()
-      fs.unlink uploadedFile, (err)->
+      fs.unlink uploadedFileLocation, (err)->
         if err
           logger.log "error", "unable to remove file #{uploadedFile}"
 
@@ -460,7 +476,8 @@ release = (path, fd, cb) ->
       #upload file once file is closed
       parent = folderTree.get pth.dirname(path)
 
-      parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), uploadCallback(path)
+      if folderTree.has path
+        parent.upload pth.basename(path), path, uploadCallback(path)
       return null
 
   else
@@ -505,7 +522,8 @@ fn = ->
   for path in uploadTree.keys()
       if folderTree.has pth.dirname(path)
         parent = folderTree.get pth.dirname(path)
-        parent.upload pth.basename(path), pth.join(uploadLocation, uploadTree.get(path)), uploadCallback(path)
+        parent.upload pth.basename(path), path, uploadCallback(path)
+
 setTimeout fn, 25000
 
 

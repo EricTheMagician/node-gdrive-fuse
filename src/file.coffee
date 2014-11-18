@@ -32,13 +32,14 @@ downloadTree = new hashmap()
 
 google = require 'googleapis'
 oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUrl)
-refreshToken =  () ->
+refreshToken =  (cb) ->
   oauth2Client.refreshAccessToken (err,tokens) ->
     if err
-      refreshToken()
+      refreshToken(cb)
     else
       config.accessToken = tokens
       fs.outputJsonSync 'config.json', config
+      cb()
 oauth2Client.setCredentials config.accessToken
 
 
@@ -86,8 +87,9 @@ class GFile
       else
         #check to see if token is expired
         if response.statusCode == 401
-          refreshToken()
-          GFile.download(url, start,end, size,cb )
+          fn = ->
+            GFile.download(url, start,end, size,cb )
+          refreshToken(fn)          
         else
           cb(null, result)
 

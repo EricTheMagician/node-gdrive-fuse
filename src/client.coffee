@@ -97,14 +97,6 @@ parseFilesFolders = (items) ->
 
   return {files:files, folders:folders}
 
-refreshToken =  () ->
-  oauth2Client.refreshAccessToken (err,tokens) ->
-    if err
-      refreshToken()
-    else
-      config.accessToken = tokens
-      fs.outputJsonSync 'config.json', config
-
 loadFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
   now = Date.now()
@@ -133,13 +125,19 @@ loadFolderTree = ->
       largestChangeId = data.largestChangeId
       loadChanges()
 
+lockFolderTree = false
 saveFolderTree = () ->
-  toSave = {}
-  for key in folderTree.keys()
-    value = folderTree.get key
-    toSave[key] = value
+  unless lockFolderTree
+    lockFolderTree = true
+    logger.debug "saving folder tree"
+    toSave = {}
+    for key in folderTree.keys()
+      value = folderTree.get key
+      toSave[key] = value
 
-  fs.outputJsonSync "#{config.cacheLocation}/data/folderTree.json", toSave
+    fs.outputJson "#{config.cacheLocation}/data/folderTree.json", toSave,  ->
+    lockFolderTree = false
+
 
 getLargestChangeId = Future.wrap (cb)->
   opts =
@@ -200,7 +198,7 @@ scopes = [
 ]
 Fibers () ->
 
-  if not config.accessToken
+  if not (config.accessToken)
     url = oauth2Client.generateAuthUrl
       access_type: 'offline', # 'online' (default) or 'offline' (gets refresh_token)
       scope: scopes #If you only need one scope you can pass it as string
@@ -322,4 +320,3 @@ module.exports.folderTree = folderTree
 module.exports.saveFolderTree = saveFolderTree
 module.exports.drive = drive
 module.exports.loadChanges = loadChanges
-module.exports.refreshToken = refreshToken
