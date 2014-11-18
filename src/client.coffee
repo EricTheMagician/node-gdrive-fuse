@@ -303,13 +303,12 @@ Fibers () ->
         parent = folderTree.get parentPath
         if parent.children.indexOf(f.title) < 0
           parent.children.push f.title
-    logger.info "Finished parsing files"
-    logger.info "Everything should be ready to use"
 
         path = pth.join parentPath, f.title
         folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
 
-    logger.info "Finished parsing files and folders from Google"
+    logger.info "Finished parsing files"
+    logger.info "Everything should be ready to use"
     saveFolderTree()
 
   # loadChanges()
