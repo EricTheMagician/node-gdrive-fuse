@@ -407,6 +407,25 @@ unlink = (path, cb) ->
     cb -errnoMap.EEXIST
     return null
 
+#recursively read and write streams
+moveToDownload = (file, uploadedFileLocation, start) ->
+      if start < file.size
+        end = Math.min(start + GFile.chunkSize, file.size)-1
+        savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
+        rstream = fs.createReadStream(uploadedFileLocation, {start: start, end: end})
+        wstream = fs.createWriteStream(savePath)
+        rstream.pipe(wstream)
+
+        start += GFile.chunkSize
+
+      if start < file.size
+        moveToDownload(file,start)
+      else
+        fs.unlink uploadedFileLocation, (err)->
+          if err
+            logger.log "error", "unable to remove file #{uploadedFile}"      
+
+
 
 #function to create a callback for file uploading
 uploadCallback = (path) ->
@@ -434,20 +453,11 @@ uploadCallback = (path) ->
 
       if parent.children.indexOf( file.name ) < 0
         parent.children.push file.name
+      moveToDownload(file, uploadedFileLocation, 0)
       folderTree.set path, file
       client.saveFolderTree()
 
       #move the file to download folder after finished uploading
-      start = 0
-      while start < file.size
-        end = Math.min(start + GFile.chunkSize, file.size)-1
-        savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
-        fs.createReadStream(uploadedFileLocation, {start: start, end: end}).pipe(fs.createWriteStream(savePath))
-        start += GFile.chunkSize
-
-      fs.unlink uploadedFileLocation, (err)->
-        if err
-          logger.log "error", "unable to remove file #{uploadedFile}"      
 
 # /*
 #  * Handler for the release() system call.
