@@ -150,17 +150,19 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
       if res instanceof Error
         logger.error "There was an error with uploading data, retrying"
         logger.error "#{res}"
-        end = getNewRangeEnd(location, fileSize).wait()        
-        cb null, {
-          statusCode: resp.statusCode
-          rangeEnd: end
-        }
+        callback = (err,end) ->
+          cb err, {
+            statusCode: resp.statusCode
+            rangeEnd: end
+          }
+
+        end = _getNewRangeEnd(location, fileSize, callback)        
       else
         if resp.statusCode == 400 or resp.statusCode == 401
+          logger.debug "there was an error uploading data, refreshing token"
           fn = ->
             _uploadData(location, start, fileSize, mime, fd, buffer, cb)
-
-          refreshToken(fn)
+          refreshToken(fn)          
           return null
 
         if resp.statusCode == 308 #success on resume

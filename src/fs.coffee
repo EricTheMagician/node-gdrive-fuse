@@ -439,6 +439,7 @@ uploadCallback = (path) ->
       #move the file to download folder after finished uploading
       start = 0
       while start < file.size
+        end = Math.min(start + GFile.chunkSize, file.size)-1
         savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
         fs.createReadStream(uploadedFileLocation, {start: start, end: end}).pipe(fs.createWriteStream(savePath))
         start += GFile.chunkSize
