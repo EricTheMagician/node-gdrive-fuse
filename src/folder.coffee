@@ -88,6 +88,12 @@ _getNewRangeEnd = (location, fileSize, cb) ->
         # console.log res.error.errors
         cb(401)
         return null      
+      
+      #if the link is dead or bad
+      if resp.statusCode == 404 or resp.statusCode == 410
+        cb(null, 0)
+        return null
+
       range = resp.headers.range
       unless range #sometimes, it doesn't return the range, so assume it is 0.
         range = resp.headers.Range
