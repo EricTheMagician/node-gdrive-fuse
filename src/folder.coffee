@@ -246,6 +246,7 @@ class GFolder
         try
           end = getNewRangeEnd(location, fsize).wait()
           start = end + 1
+          logger.debug "got new range end for #{originalPath}: #{end}"
         catch e
           delete upFile.location
         
