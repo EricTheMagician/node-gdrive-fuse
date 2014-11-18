@@ -260,6 +260,7 @@ class GFolder
             logger.debug "got new range end for #{originalPath}: #{end}"
         catch e
           logger.debug "tried to get new range for #{originalPath} but there was an error"
+          logger.debug e
           delete upFile.location
         
       
