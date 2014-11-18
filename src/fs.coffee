@@ -411,9 +411,9 @@ unlink = (path, cb) ->
 #function to create a callback for file uploading
 uploadCallback = (path) ->
   return (err, result) ->
+    parent = folderTree.get pth.dirname(path)
     if err
       logger.log "error", "failed to upload \"#{path}\". Retrying"
-      parent = folderTree.get pth.dirname(path)
       parent.upload pth.basename(path), path , callback
     else
       uploadedFile = uploadTree.get(path)
@@ -430,8 +430,9 @@ uploadCallback = (path) ->
         file.ctime = (new Date(result.createdDate)).getTime()
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
-        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)
-
+        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
+        if parent.children.indexOf( file.name ) < 0
+          parent.children.push file.name
       folderTree.set path, file
       client.saveFolderTree()
 
