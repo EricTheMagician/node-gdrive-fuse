@@ -347,7 +347,7 @@ create = (path, mode, cb) ->
         logger.log "error", "unable to createfile #{path}, #{err}"
         return cb(-errnoMap[err.code])
 
-      logger.log "debug", "setting upload Tree"
+      logger.log "debug", "setting uploadTree #{path}--#{cache}"
       uploadTree.set path, cache
       saveUploadTree()
 

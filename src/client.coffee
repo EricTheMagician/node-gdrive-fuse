@@ -88,10 +88,11 @@ parseFilesFolders = (items) ->
   folders = []
   for i in items
     unless i.labels.trashed
-      if i.fileSize
-        files.push i
-      else
+      if i.mimeType is "application/vnd.google-apps.folder"
         folders.push i
+      else
+        files.push i
+
   return {files:files, folders:folders}
 
 refreshToken =  () ->
@@ -243,8 +244,8 @@ Fibers () ->
     for f in data.folders
       #check to make sure that parents is defined.
       if (!f.parents ) or f.parents.length == 0 
-        logger.log "error", "folder.parents is undefined or empty"
-        logger.log "error", f
+        logger.log "debug", "folder.parents is undefined or empty"
+        logger.log "debug", f
         continue
 
       if f.parents[0].isRoot
@@ -262,8 +263,8 @@ Fibers () ->
 
       for f in data.folders
         if (!f.parents ) or f.parents.length == 0 
-          logger.log "error", "folder.parents is undefined or empty"
-          logger.log "error", f
+          logger.log "debug", "folder.parents is undefined or empty"
+          logger.log "debug", f
           continue
         pid = f.parents[0].id #parent id
         parentPath = idToPath.get(pid)
@@ -297,6 +298,7 @@ Fibers () ->
         path = pth.join parentPath, f.title
         folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
 
+    logger.info "Finished parsing files and folders from Google"
     saveFolderTree()
 
   # loadChanges()
