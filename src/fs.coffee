@@ -8,9 +8,6 @@ pth = require 'path'
 f4js = require 'fuse4js'
 os = require 'os'
 MD5 = require 'MD5'
-Fiber = require 'fibers'
-Future = require 'fibers/future'
-
 
 client = require('./client.coffee')
 folderTree = client.folderTree
@@ -47,21 +44,7 @@ errnoMap =
     ESPIPE: 29,
     ENOTEMPTY: 39
 
-writeFile = Future.wrap(fs.writeFile)
-fsopen = Future.wrap(fs.open)
-fsread = Future.wrap(fs.read,5)
-fswrite = Future.wrap fs.write
-fsstat = Future.wrap(fs.stat)
-writeFile = Future.wrap(fs.writeFile)
 
-#since fs.exists does not return an error, wrap it using an error
-fsexists = Future.wrap (path, cb) ->
-  fs.exists path, (success)->
-    cb(null,success)
-
-fsclose = Future.wrap (path,cb) ->
-  fs.close path, (err) ->
-    cb(err, true)
 
 ###############################################
 ####### Filesystem Helper Functions ###########
@@ -408,22 +391,27 @@ unlink = (path, cb) ->
     return null
 
 #recursively read and write streams
-moveToDownload = (file, uploadedFileLocation, start) ->
-      if start < file.size
-        end = Math.min(start + GFile.chunkSize, file.size)-1
-        savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
-        rstream = fs.createReadStream(uploadedFileLocation, {start: start, end: end})
-        wstream = fs.createWriteStream(savePath)
-        rstream.pipe(wstream)
+moveToDownload = (file, fd, uploadedFileLocation, start) ->
 
+      end = Math.min(start + GFile.chunkSize, file.size)-1
+      savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
+      rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
+      wstream = fs.createWriteStream(savePath)
+      rstream.pipe(wstream)
+
+      rstream.on 'end',  ->        
         start += GFile.chunkSize
 
-      if start < file.size
-        moveToDownload(file,start)
-      else
-        fs.unlink uploadedFileLocation, (err)->
-          if err
-            logger.log "error", "unable to remove file #{uploadedFile}"      
+        if start < file.size
+          moveToDownload(file, fd, uploadedFileLocation, start)
+        else
+          fs.close fd, (err) ->
+            if err
+              logger.debug "unable to close file after transffering #{uploadedFile}"
+            else
+              fs.unlink uploadedFileLocation, (err)->
+                if err
+                  logger.log "error", "unable to remove file #{uploadedFile}"      
 
 
 
@@ -439,9 +427,11 @@ uploadCallback = (path) ->
       uploadedFileLocation = pth.join uploadLocation, uploadedFile.cache
 
       logger.log 'info', "successfully uploaded #{path}"
+          
       uploadTree.remove path
-      saveUploadTree()      
+      saveUploadTree()
       if folderTree.has path
+        logger.debug "#{path} folderTree already existed"
         file = folderTree.get path
         file.downloadUrl = result.downloadUrl
         file.id = result.id
@@ -449,15 +439,24 @@ uploadCallback = (path) ->
         file.ctime = (new Date(result.createdDate)).getTime()
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
-        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.name, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
+        logger.debug "#{path} folderTree did not exist"
+        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
 
+      #update folder Tree
       if parent.children.indexOf( file.name ) < 0
         parent.children.push file.name
-      moveToDownload(file, uploadedFileLocation, 0)
       folderTree.set path, file
-      client.saveFolderTree()
 
       #move the file to download folder after finished uploading
+      fs.open uploadedFileLocation, 'r', (err,fd) ->
+        if err
+          logger.debug "could not open #{uploadedFileLocation} for copying file from upload to uploader"
+          logger.debug err
+          return null
+        else          
+          moveToDownload(file, fd, uploadedFileLocation, 0)
+      client.saveFolderTree()
+
 
 # /*
 #  * Handler for the release() system call.

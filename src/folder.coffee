@@ -148,8 +148,9 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
     }
     .on 'complete', (res,resp) ->
       if res instanceof Error
-        logger.error "There was an error with uploading data, retrying"
-        logger.error "#{res}"
+        logger.debug "There was an error with uploading data, retrying"
+        logger.debug "res", res
+        logger.debug "resp", resp
         callback = (err,end) ->
           cb err, {
             statusCode: resp.statusCode
@@ -160,10 +161,11 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
          return null        
       else
         if resp.statusCode == 400 or resp.statusCode == 401
-          logger.debug "there was an error uploading data, refreshing token"
-          fn = ->
-            _uploadData(location, start, fileSize, mime, fd, buffer, cb)
-          refreshToken(fn)          
+          logger.debug "there was an error uploading data"
+          cb resp.statusCode, {
+            statusCode: resp.statusCode
+            rangeEnd: 0
+          }
           return null
 
         if resp.statusCode == 308 #success on resume
@@ -183,17 +185,17 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
           return null
 
         if resp.statusCode == 410
-          logger.debug "got status code 401 while uploading"
+          logger.debug "got status code 410 while uploading"
           logger.debug "result", res
           logger.debug "response",resp
-          callback = (err,end) ->
-            cb err, {
-              statusCode: resp.statusCode
-              rangeEnd: end
-            }
+          
+          cb err, {
+            statusCode: resp.statusCode
+            rangeEnd: end
+          }
 
 
-          end = _getNewRangeEnd(location, fileSize, callback)
+          return null
 
 
         if resp.statusCode >= 500
@@ -265,7 +267,6 @@ class GFolder
       mime = detectFile(filePath).wait()
       fsize = stat(filePath).wait().size;
       if fsize == 0
-
         return null
       buffer = new Buffer(GFolder.uploadChunkSize)
 
@@ -299,8 +300,14 @@ class GFolder
 
       while start < fsize
         result = uploadData(location, start, fsize, mime, fd, buffer).wait()
-        if result.statusCode >= 300
+        if 300 <= result.statusCode  < 400
           start = result.rangeEnd + 1
+        else if result.statusCode == 401 or result.statusCode == 410          
+          fs.closeSync(fd)
+          folder.upload(fileName, originalPath, cb)
+          upFile.uploading = false
+          return null
+
         else
           start = fsize
           fs.closeSync(fd)
