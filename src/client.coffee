@@ -129,9 +129,9 @@ parseFilesFolders = (items) ->
         notFound.push f
 
       #make sure that the folder list is gettting smaller over time. 
-      if left.length == notFound.length 
-        logger.info "There #{left.length} folders that were not possible to process"
-        break
+    if left.length == notFound.length 
+      logger.info "There #{left.length} folders that were not possible to process"
+      break
     left = notFound
   
   logger.info "Parsing files"
