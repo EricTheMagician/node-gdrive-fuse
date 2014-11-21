@@ -3,7 +3,6 @@ fs = require 'fs-extra'
 winston = require 'winston'
 rest = require 'restler'
 hashmap = require( 'hashmap' ).HashMap
-NodeCache = require 'node-cache'
 pth = require 'path'
 f4js = require 'fuse4js'
 os = require 'os'
@@ -540,11 +539,12 @@ handlers =
 
 #resume file uploading
 fn = ->
-  logger.info "resuming file uploading"
-  for path in uploadTree.keys()
-      if folderTree.has pth.dirname(path)
-        parent = folderTree.get pth.dirname(path)
-        parent.upload pth.basename(path), path, uploadCallback(path)
+  if uploadTree.count() > 0
+    logger.info "resuming file uploading"
+    for path in uploadTree.keys()
+        if folderTree.has pth.dirname(path)
+          parent = folderTree.get pth.dirname(path)
+          parent.upload pth.basename(path), path, uploadCallback(path)
   return
 setTimeout fn, 25000
 

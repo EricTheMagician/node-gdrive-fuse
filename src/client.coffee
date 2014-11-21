@@ -48,7 +48,12 @@ getPageFiles = (pageToken, items, cb) ->
     pageToken: pageToken
   drive.files.list opts, (err, resp) ->
     if err
-      logger.log 'error', err
+      logger.log 'error', "There was an error while downloading files from google, retrying"
+      logger.error err
+      fn = ->
+        getPageFiles(pageToken, items, cb)
+        return
+      setTimeout(fn, 4000)
       cb(err)
       return
 
