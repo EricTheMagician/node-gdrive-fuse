@@ -1,17 +1,11 @@
 fs = require 'fs-extra'
-Fiber = require 'fibers'
-Future = require 'fibers/future'
 rest = require 'restler'
 pth = require 'path'
 mmm = require('mmmagic')
 winston = require 'winston'
 hashmap = require('hashmap').HashMap
-logger = new (winston.Logger)({
-    transports: [
-      new (winston.transports.Console)({ level: 'info' }),
-      new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
-    ]
-  })
+f = require("./file.coffee")
+logger = f.logger
 
 
 config = fs.readJSONSync 'config.json'
@@ -23,39 +17,27 @@ drive = google.drive({ version: 'v2' })
 refreshToken =  (cb) ->
   oauth2Client.refreshAccessToken (err,tokens) ->
     if err
+      logger.debug "There was an error with refreshing access token"
+      logger.debug err
       refreshToken(cb)
     else
       config.accessToken = tokens
-      fs.outputJsonSync 'config.json', config
-      cb()
-
-######################################
-########## Wrap functions ############
-######################################
-
-writeFile = Future.wrap(fs.writeFile)
-open = Future.wrap(fs.open)
-read = Future.wrap(fs.read,5)
-write = Future.wrap fs.write
-stat = Future.wrap(fs.stat)
-writeFile = Future.wrap(fs.writeFile)
-
-#since fs.exists does not return an error, wrap it using an error
-exists = Future.wrap (path, cb) ->
-  fs.exists path, (success)->
-    cb(null,success)
-
-close = Future.wrap (path,cb) ->
-  fs.close path, (err) ->
-    cb(err, true)
+      fs.outputJson 'config.json', config, (err) ->
+        if err
+          logger.debug "failed to save config from folder.coffee"
+        else
+          logger.debug "succesfully saved config from folder.coffee"
+          cb()
+        return
+    return
+  return
 
 Magic = mmm.Magic;
 magic = new Magic(mmm.MAGIC_MIME_TYPE)
-detectFile = Future.wrap ( file,cb ) ->
-  magic.detectFile(file, cb)
 
 uploadTree = new hashmap()
 uploadLocation = pth.join(config.cacheLocation, 'upload')
+
 ############################################
 ######### Upload Helper Functions ##########
 ############################################
@@ -71,7 +53,7 @@ rangeRegex =  ///
 getRangeEnd = (range) ->
   return parseInt(range.match(rangeRegex)[3])
 
-_getNewRangeEnd = (location, fileSize, cb) ->
+getNewRangeEnd = (location, fileSize, cb) ->
   rest.put location, {
     headers:
       "Authorization": "Bearer #{config.accessToken.access_token}"
@@ -80,30 +62,34 @@ _getNewRangeEnd = (location, fileSize, cb) ->
     }
   .on 'complete', (res, resp) ->
     if res instanceof Error
-      cb(res)
-    else
-      if resp.statusCode == 401
-        # console.log "refreshing access token"
-        # console.log resp
-        # console.log res.error.errors
-        cb(null, -1)
-        return null      
-      
-      #if the link is dead or bad
-      if resp.statusCode == 404 or resp.statusCode == 410
-        cb(null, -1)
-        return null
+      logger.debug "there was a problem getting a new range end"
+      logger.debug "result", res
+      logger.debug "resp", resp
+      fn = ->
+        getNewRangeEnd(location, fileSize, cb)
+        return
+      refreshToken(fn)
+      return
 
-      range = resp.headers.range
+    else
+
+      #if the link is dead or bad
+      if resp.statusCode == 404 or resp.statusCode == 410 or resp.statusCode == 401
+        logger.debug "the link is no longer valid"
+        cb(resp.statusCode, -1)
+        return
+
+      range = resp.headers.range || resp.headers.Range
       unless range #sometimes, it doesn't return the range, so assume it is 0.
-        range = resp.headers.Range
-        unless range
-          cb(null, -1)
-          return null
-      [start,end] = range.match(/(\d*)-(\d*)/)
-      cb(null,parseInt(end))
-getNewRangeEnd = Future.wrap _getNewRangeEnd
-_getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
+        cb(resp.statusCode, -1)
+        return
+      
+      end = getRangeEnd(range)
+      cb(null,end)
+
+    return
+  return
+getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
   data =
     "parents": ["id": parentId]
     "title": fileName
@@ -117,12 +103,20 @@ _getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
     }
   .on 'complete', (result, resp) ->
     if result instanceof Error
-      cb(result)
+      logger.debug "there was an error with getting a new upload link"
+      logger.debug "result", result
+      logger.debug "response", resp
+      fn = ->
+        getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
+        return
+
+      refreshToken(fn)
     else
-      if resp.statusCode == 401
-        console.log "refreshing access token"
+      if resp.statusCode == 401 or resp.statusCode == 400
+        logger.debug "refreshing access token while getting resumable upload links"
         fn = ->
-          _getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
+          getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
+          return
 
         refreshToken(fn)
       else if resp.statusCode == 200
@@ -133,12 +127,21 @@ _getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
         console.log resp.req._headers
         console.log result
         cb(resp.statusCode)
-getUploadResumableLink = Future.wrap _getUploadResumableLink
-_uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
-  Fiber ->
-    bytesRead = read(fd,buffer,0,buffer.length, start).wait()
-    bytesRead =  bytesRead[0]
+
+    return
+
+  return
+uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
+
+  #read the data
+
+  fs.read fd,buffer,0,buffer.length, start, (err, bytesRead, buffer) ->
+    if err
+      logger.debug "there was an error reading file while upolading"
+      cb(err, fd)
+      return
     end = start + bytesRead - 1
+
     rest.put location, {
       headers:
         "Authorization": "Bearer #{config.accessToken.access_token}"
@@ -152,75 +155,81 @@ _uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
         logger.debug "res", res
         logger.debug "resp", resp
         callback = (err,end) ->
-          cb err, {
+          cb err, fd, {
             statusCode: resp.statusCode
             rangeEnd: end
           }
-
-         _getNewRangeEnd(location, fileSize, callback)
-         return null        
+          return
+        getNewRangeEnd(location, fileSize, callback)
       else
         if resp.statusCode == 400 or resp.statusCode == 401
           logger.debug "there was an error uploading data"
-          cb resp.statusCode, {
-            statusCode: resp.statusCode
-            rangeEnd: 0
-          }
-          return null
+          callback = (err,end) ->
+            cb err, fd, {
+              statusCode: resp.statusCode
+              rangeEnd: end
+            }
+            return
+
+          getNewRangeEnd(location, fileSize, callback)
+          
+          
+          return
 
         if resp.statusCode == 308 #success on resume
           md5Server = resp.headers["x-range-md5"]
           rangeEnd = getRangeEnd(resp.headers.range)
-          cb null, {
+          cb null, fd, {
             statusCode: 308
             rangeEnd: rangeEnd
           }
-          return null
+          return
 
         if 200 <= resp.statusCode <= 201
-          cb null, {
+          cb null, fd, {
             statusCode: 201
             result: res
           }
-          return null
+          return
 
         if resp.statusCode == 410
           logger.debug "got status code 410 while uploading"
           logger.debug "result", res
           logger.debug "response",resp
           
-          cb err, {
+          cb resp.statusCode, fd, {
             statusCode: resp.statusCode
             rangeEnd: end
           }
 
-
-          return null
-
+          return
 
         if resp.statusCode >= 500
+          logger.debug "first time getting a resp code > 500"
+          logger.debug resp
+          logger.debug res
           callback = (err,end) ->
-            cb err, {
+            cb null, fd, {
               statusCode: resp.statusCode
               rangeEnd: end
             }
+            return
 
 
-          end = _getNewRangeEnd(location, fileSize, callback)
+          end = getNewRangeEnd(location, fileSize, callback)
  
-          return null
+          return
 
 
         console.log "uncaugt state for file uploading"
         console.log resp.statusCode
         console.log resp.headers
         console.log res
-        cb(resp.statusCode)
+        cb(resp.statusCode, fd)
 
-
-
-  .run()
-uploadData = Future.wrap _uploadData
+      return
+    return
+  return
 
 lockUploadTree = false
 saveUploadTree = ->
@@ -233,6 +242,7 @@ saveUploadTree = ->
     logger.debug "saving upload tree"
     fs.outputJsonSync pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave
     lockUploadTree = false
+  return
 
 
 
@@ -253,82 +263,145 @@ class GFolder
       mtime: new Date(@mtime),
       ctime: new Date(@ctime)
     cb(0,attr)
+    return
 
   upload: (fileName, originalPath, cb) =>
     folder = @
     upFile = uploadTree.get originalPath
+    unless upFile
+      return
     filePath = pth.join uploadLocation, upFile.cache
-    if upFile.uploading
-      return null
-    upFile.uploading = true   
-    uploadTree.set originalPath, upFile 
-    Fiber ->
+    #if the file is already being uploaded, don't try again.   
+    if upFile and upFile.uploading
+      logger.debug "#{fileName} is already being uploaded"
+      return
 
-      mime = detectFile(filePath).wait()
-      fsize = stat(filePath).wait().size;
-      if fsize == 0
-        return null
-      buffer = new Buffer(GFolder.uploadChunkSize)
 
-      if upFile.location
-        location = upFile.location
-        try
-          end = getNewRangeEnd(location, fsize).wait()
-          if end <= 0
-            delete upFile.location
-            logger.debug "tried to get new range for #{originalPath}, but it was #{end}"            
+    fs.stat filePath, (err, stats) ->
+      size = stats.size
+
+      #sometimes, the operating system will create a file of size 0. Simply delete it.
+
+      if size == 0
+        fs.unlink filePath, (err) ->
+          if err
+            logger.debug "there was an error removing a file of size 0, #{filePath}"
+            logger.debug err
+          return
+        return
+
+      fn = ->
+        fs.stat filePath, (err, stats2) ->
+          if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
+            fn2 = ->
+              folder.upload(fileName, originalPath, cb)
+              return
+            setTimeout fn2, 10000
           else
-            start = end + 1
-            logger.debug "got new range end for #{originalPath}: #{end}"
-        catch e
-          logger.debug "tried to get new range for #{originalPath} but there was an error"
-          logger.debug e
-          delete upFile.location
-        
-      
-      unless upFile.location
-        logger.log 'debug', "getting upload link to upload #{fileName}"
-        location = getUploadResumableLink( folder.id, fileName, fsize, mime ).wait()
-        upFile.location = location
-        uploadTree.set originalPath, upFile 
-        saveUploadTree()
-        start = 0
+            #if the file is already being uploaded, don't try again.
+
+            if upFile.uploading
+              return
+
+            upFile.uploading = true   
+            magic.detectFile filePath, (err, mime) ->
+
+              buffer = new Buffer(GFolder.uploadChunkSize)
+              cbUploadData = (err, fd, res) ->
+                if err
+                  logger.debug "There was an error with uploading data"
+                  logger.debug err
+                  fs.close fd, (err) ->
+                    if err
+                      logger.debug "unable to file close before retrying to upload"
+                    cbfn = -> 
+                      up = uploadTree.get(originalPath)
+                      up.uploading = false
+                      delete up.location               
+                      folder.upload(fileName, originalPath, cb)
+                      return
+                    setTimeout cbfn, 60000
+                    return
+                else
+                  start = res.rangeEnd + 1
+                  if start < size              
+                    uploadData upFile.location, start, size, mime, fd, buffer, cbUploadData
+                  else
+                    fs.close fd, (err) ->
+                      if err
+                        logger.debug "unable to close file after uploading", err
+                      else
+                        logger.debug "successfully uploaded file #{originalPath}"
+                        cb(null, res.result)
+                        
+                      return                    
+                return
+              cbNewLink = (err, location) ->
+                upFile.location = location
+                uploadTree.set originalPath, upFile 
+                saveUploadTree()
+
+                #once new link is obtained, start uploading in chunks
+                fs.open filePath, 'r', (err, fd) ->
+                  if err
+                    logger.debug "there was a problem with opening for uploading #{originalPath}"
+                  else                    
+                    uploadData location, 0, size, mime, fd, buffer, cbUploadData
+                  return
+                return
+
+              cbNewEnd = (err, end) ->
+                if err 
+                  delete upFile.location
+                  logger.debug "there was an error with getting a new range end for #{originalPath}"
+                  logger.debug "err", err
+                  getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
+
+                  return
+
+                if end <= 0
+                  logger.debug "tried to get new range for #{originalPath}, but it was #{end}"
+                  delete upFile.location           
+                  getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
+                else
+                  start = end + 1
+                  logger.debug "got new range end for #{originalPath}: #{end}"
+                  #once new range end is obtained, start uploading in chunks
+                  fs.open filePath, 'r', (err, fd) ->
+                    if err
+                      logger.debug "there was a problem with opening for uploading #{originalPath}"
+                    else                    
+                      uploadData location, start, size, mime, fd, buffer, cbUploadData
+                    return
+                return
 
 
-      logger.log 'debug', "starting to upload file #{fileName}"
-      fd = open(filePath, 'r').wait()
+              logger.log 'debug', "starting to upload file #{fileName}"      
+              if upFile.location
+                location = upFile.location
 
-      while start < fsize
-        result = uploadData(location, start, fsize, mime, fd, buffer).wait()
-        if 300 <= result.statusCode  < 400
-          start = result.rangeEnd + 1
-        else if result.statusCode == 401 or result.statusCode == 410          
-          fs.closeSync(fd)
-          folder.upload(fileName, originalPath, cb)
-          upFile.uploading = false
-          return null
+                getNewRangeEnd(location,size, cbNewEnd)
+                return
+              else
+                getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
+              
+              return
 
-        else
-          start = fsize
-          fs.closeSync(fd)
-
-      logger.log 'debug', "finished uploading #{fileName}"      
-      unless result.result
-        logger.error "result from file uploading was empty."
-        logger.error result
-        cb(result)
-        return null
-      cb(null, result.result)
-
-    .run()
+          return
+        return
+      setTimeout fn, 25000
+      return
+    return
 
 #load upload Tree
 if fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json'))
+  logger.info "loading upload tree"
   fs.readJson pth.join(config.cacheLocation, 'data','uploadTree.json'), (err, data) ->
     for key in Object.keys(data)
       value = data[key]
       value.uploading = false
       uploadTree.set key, value
+    return
 
 
 module.exports.GFolder = GFolder

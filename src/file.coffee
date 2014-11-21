@@ -1,17 +1,16 @@
 pth = require 'path'
 fs = require 'fs-extra'
 hashmap = require( 'hashmap' ).HashMap
-Fiber = require 'fibers'
-Future = require 'fibers/future'
 rest = require 'restler'
 winston = require 'winston'
 
 logger = new (winston.Logger)({
     transports: [
-      new (winston.transports.Console)({ level: 'info' }),
+      new (winston.transports.Console)({ level: 'debug' }),
       new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
     ]
   })
+module.exports.logger = logger
 
 ######################################
 ######### Setup File Config ##########
@@ -40,28 +39,11 @@ refreshToken =  (cb) ->
       config.accessToken = tokens
       fs.outputJsonSync 'config.json', config
       cb()
+    return
+  return
 oauth2Client.setCredentials config.accessToken
 
-
-######################################
-######### Wrap fs functions ##########
-######################################
-
-writeFile = Future.wrap(fs.writeFile)
-open = Future.wrap(fs.open)
-read = Future.wrap(fs.read,5)
-stats = Future.wrap(fs.stat)
-writeFile = Future.wrap(fs.writeFile)
-
-#since fs.exists does not return an error, wrap it using an error
-exists = Future.wrap (path, cb) ->
-  fs.exists path, (success)->
-    cb(null,success)
-
-close = Future.wrap (path,cb) ->
-  fs.close path, (err) ->
-    cb(err, true)
-
+buf0 = new Buffer(0)
 
 ######################################
 ######### Create File Class ##########
@@ -82,16 +64,19 @@ class GFile
         "Range": "bytes=#{start}-#{end}"
     }
     .on 'complete', (result, response) ->
-      if result instanceof Error
+      if result instanceof Error        
         cb(result)
       else
         #check to see if token is expired
-        if response.statusCode == 401
+        if response.statusCode == 401 or response.statusCode == 403
           fn = ->
             GFile.download(url, start,end, size,cb )
+            return
           refreshToken(fn)          
         else
           cb(null, result)
+      return
+    return
 
   getAttr: (cb) =>
     attr =
@@ -101,131 +86,134 @@ class GFile
       mtime: new Date(@mtime),
       ctime: new Date(@ctime)
     cb(0,attr)
+    return
 
   recursive: (start,end) =>
     file = @
-    Fiber ()->
-      path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
-      unless exists(path).wait()
+    path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
+    fs.exists path, (exists) ->
+      unless exists
         unless downloadTree.has("#{file.id}-#{start}")
           downloadTree.set("#{file.id}-#{start}", 1)
 
           callback = (err,result) ->
             downloadTree.remove("#{file.id}-#{start}")
             unless err
-              fs.writeFileSync(path,result)
+              if result instanceof Buffer
+                fs.writeFile path,result, (err) ->
+                  return
+            return
+          GFile.download(file.downloadUrl, start,end, file.size,callback)
+      return
+
+    return
+  read: (start,end, readAhead, cb) =>
+    file = @
+    chunkStart = Math.floor((start)/GFile.chunkSize)* GFile.chunkSize
+    chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1
+
+    path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
+
+    #try to read the file
+    fs.exists path, (exists) ->
+      unless exists
+        if downloadTree.has("#{file.id}-#{chunkStart}")
+          fn = ->
+            file.download(start, end, readAhead, cb)
+            return
+          setTimeout fn, 1000
+        else
+          file.download start, end, readAhead, cb
+        return
 
 
-          GFile.download(file.downloadUrl, start,end,@size,callback)
-    .run()
+      fs.open path, 'r', (err,fd) ->
+        readSize = end-start;
+        buffer = new Buffer(readSize+1)
+        fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
+          fs.close fd, (err) ->
+            cb(buffer.slice(0,bytesRead))
+            return
+          return
+        return
+      return
 
-  download: (start,end, readAhead, cb) ->
-    #check to see if part of the file is being downloaded or in use
+      if readAhead
+        if chunkStart <= start < chunkStart + 131072
+          file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
+          file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
+
+
+    return
+
+  download:  (start, end, readAhead, cb) =>
+    #if file chunk already exists, just download it
+    #else download it    
     file = @
     chunkStart = Math.floor((start)/GFile.chunkSize) * GFile.chunkSize
     chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1 #and make sure that it's not bigger than the actual file
     nChunks = (chunkEnd - chunkStart)/GFile.chunkSize
-    _download =  (cStart, cEnd,_cb) ->
-      #if file chunk already exists, just download it
-      #else download it
-      Fiber () ->
-        _cStart = Math.floor((cStart)/GFile.chunkSize)* GFile.chunkSize
-        _cEnd = Math.min( Math.ceil(cEnd/GFile.chunkSize) * GFile.chunkSize, file.size)-1
-
-        path = pth.join(downloadLocation, "#{file.id}-#{_cStart}-#{_cEnd}")
-        if exists(path).wait()
-          readSize = cEnd-cStart;
-          buffer = new Buffer(readSize+1)
-          fd = open(path, 'r').wait()
-          # fd = fs.openSync(path,'r')
-          read(fd,buffer,0,readSize+1, cStart - _cStart).wait()
-          close(fd).wait()
-          _cb(null, buffer)
-        else
-          unless downloadTree.has("#{file.id}-#{cStart}")
-            downloadTree.set("#{file.id}-#{cStart}", 1)
-            callback = (err, result)->
-              if err
-                _cb(err)
-                return null
-              downloadTree.remove("#{file.id}-#{cStart}")
-              fs.writeFileSync(path,result)
-              if result instanceof Buffer
-                _cb(null, result.slice(cStart - _cStart, _cEnd - cEnd ))
-              else
-                _cb(result)
-            GFile.download(file.downloadUrl, _cStart, _cEnd, file.size, callback)
 
 
-          else
-            fn = ->
-              _download(cStart, cEnd,_cb)
-            setTimeout fn, 1500
-      .run()
-    download = Future.wrap _download
+
     if nChunks < 1
-      Fiber( ->
-        fiber = Fiber.current
-        fiberRun = ->
-          fiber.run()
-          return null
-
-        #only read ahead if the start is within first 128kb of the chunk
-        if readAhead
-          if chunkStart <= start < chunkStart + 131072
-            file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
-            file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
-
-        #download chunks
-        data = download(start,end)
-
-        try
-          data = data.wait()
-        catch error #there might have been a connection error
-          data = null
-          logger.debug "debug", "failed to download chunk #{file.name}-#{start} - #{error.message}"
-        if data == null
-          cb()
+      unless downloadTree.has("#{file.id}-#{start}")
+        logger.debug "starting to download #{file.name}, chunkStart: #{chunkStart}"
+        downloadTree.set("#{file.id}-#{start}", 1)
+        callback = (err, result)->          
+          if err
+            logger.error "there was an error downloading file"
+            logger.error err
+            cb(buf0)
+            return
+          if result instanceof Buffer
+            path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
+            fs.writeFile path, result, (err) ->
+              if err
+                logger.error "there was an error saving #{path}"
+                logger.error err
+                cb( buf0)
+              else
+                downloadTree.remove("#{file.id}-#{start}")
+                cb result.slice(start - chunkStart, chunkEnd - end )
+              return
+              
+          else
+            cb(result)
           return
-        cb( data )
+        GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, callback)
 
-      ).run()
-    else if nChunks < 2
+      else        
+        fn = ->
+          file.download(start, end, readAhead, cb)
+          return
+        setTimeout fn, 1500
+
+
+    else if nChunks < 2      
       end1 = chunkStart + GFile.chunkSize - 1
       start2 = chunkStart + GFile.chunkSize
 
-      Fiber( ->
-        fiber = Fiber.current
-        data1 = download( start, end1)
-        data2 = download( start2, end)
+      callback1 = (buffer1) ->
+        if buffer1.length == 0
+          cb(buffer1)
+          return
+        callback2 = (buffer2) ->
+          if buffer2.length == 0
+            cb(buffer1)
+            return
+          cb( Buffer.concat([buffer1, buffer2]) )
+          return
 
-        try #check that data1 does not have any connection error
-          data1 = data1.wait()
-        catch error
-          data1 = null
+        file.read( start2, end, true, callback2)
+        return
 
-        try #check that data1 does not have any connection error
-          data2 = data2.wait()
-        catch
-          data2 = null
+      file.read( start, end1,true, callback1)
 
-        buf1 = Buffer.isBuffer(data1)
-        buf2 = Buffer.isBuffer(data2)
-        if buf1 and buf2
-          cb(Buffer.concat([data1, data2]))
-          return null
-        else if buf1
-          cb data1
-          return null
-        else
-          cb( new Buffer(0) )
-          return null
-
-        return null
-      ).run()
     else
-      logger.log("error", "number of chunks greater than 2 - (#{start}-#{end})");
-      buffer = new Buffer(0)
-      cb(buffer)
+      logger.debug "too many chunks requested, #{nChunks}"
+      cb(buf0)
+
+    return
 
 module.exports.GFile = GFile

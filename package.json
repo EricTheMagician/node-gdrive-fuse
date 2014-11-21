@@ -25,7 +25,6 @@
     "limiter": "~1.0.5",
     "memoizee": "^0.3.8",
     "mmmagic": "^0.3.8",
-    "node-cache": "^1.0.3",
     "restler": "git://github.com/mthx/restler#4cc136af9a089ef21013cdad6fdd68adebf92caa",
     "winston": "~0.7.3"
   },

@@ -16,13 +16,9 @@ folder = require("./folder.coffee")
 uploadTree = folder.uploadTree
 GFolder = folder.GFolder
 saveUploadTree = folder.saveUploadTree
-GFile = require("./file.coffee").GFile
-logger = new (winston.Logger)({
-    transports: [
-      new (winston.transports.Console)({ level: 'info' }),
-      new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
-    ]
-  })
+f = require("./file.coffee");
+logger = f.logger
+GFile = f.GFile
 
 #read input config
 config = fs.readJSONSync 'config.json'
@@ -73,9 +69,12 @@ getattr = (path, cb) ->
   if folderTree.has(path)
     callback = (status, attr)->
       cb(status, attr)
-    return folderTree.get(path).getAttr(callback)
+      return
+    folderTree.get(path).getAttr(callback)
+      
   else
-    return cb(-errnoMap.ENOENT)
+    cb(-errnoMap.ENOENT)
+  return
 
 
 # /*
@@ -97,7 +96,8 @@ readdir = (path, cb) ->
       err = -errnoMap.ENOENT
   else
     err = -errnoMap.ENOENT
-  return cb( err, names );
+  cb( err, names )
+  return
 
 open = (path, flags, cb) ->
   err = 0 # assume success
@@ -115,10 +115,10 @@ open = (path, flags, cb) ->
             cb -errnoMap.EACCESS
         else
           cb -errnoMap.EISDIR
-        return null
+        return
       else
         cb(-errnoMap.ENOENT)
-        return null
+        return
 
     when 1 #write only
       logger.log 'debug', "tried to open file \"#{path}\" for writing"
@@ -131,7 +131,7 @@ open = (path, flags, cb) ->
              cb -errnoMap.EACCESS
         else
           cb -errnoMap.EISDIR
-        return null
+        return
       else #if it doesn't have the path, create the file
         parent = folderTree.get pth.dirname(path)
         if parent and parent instanceof GFolder
@@ -155,19 +155,21 @@ open = (path, flags, cb) ->
               cb -errnoMap[err.code]
             else
               cb 0, fd
+            return
 
-          return null
+          return
         else
           cb -errnoMap.EPERM
-          return null
+          return
 
       cb(-errnoMap.ENOENT)
-      return null
+      return
 
     when 2 #read/write
       logger.log 'info', "tried to open file \"#{path}\" for r+w"
       cb(-errnoMap.ENOENT)
 
+  return
 # /*
 #  * Handler for the read() system call.
 #  * path: the path to the file
@@ -186,11 +188,10 @@ read = (path, offset, len, buf, fh, cb) ->
       try
         dataBuf.copy(buf)
         cb(dataBuf.length)
-        return null
       catch error
         logger.log( "error", "failed reading: #{error}")
         cb(-errnoMap.EIO)
-        return null
+      return
 
     #make sure that we are only reading a file
     file = folderTree.get(path)
@@ -198,14 +199,16 @@ read = (path, offset, len, buf, fh, cb) ->
 
       #make sure the offset request is not bigger than the file itself
       if offset < file.size
-        file.download(offset, offset+len-1,true,callback)
+        file.read(offset, offset+len-1,true,callback)
       else
         cb(-errnoMap.ESPIPE)
     else
       cb(-errnoMap.EISDIR)
 
   else
-    return cb(-errnoMap.ENOENT)
+    cb(-errnoMap.ENOENT)
+
+  return
 
 # /*
 #  * Handler for the write() system call.
@@ -226,15 +229,19 @@ write = (path, position, len, buf, fd, cb) ->
       logger.debug "there was an error writing to the #{path}, #{file}"
       logger.debug err
       logger.debug err.code
-      return cb(-errnoMap[err.code])
+      cb(-errnoMap[err.code])
+      return
 
     #it is simportant to update the file size as we copy in to it. sometimes, cp and mv will check the progress by scanning the filesystem
-    if size < position + len 
+    if size < (position + len)
       file.size = position + len
     cb(bytesWritten)
+    return
+  return
 
 flush = (buf, cb) ->
-  return cb(0)
+  cb(0)
+  return
 
 # /*
 #  * Handler for the mkdir() system call.
@@ -250,7 +257,7 @@ mkdir = (path, mode, cb) ->
       unless parent.children.indexOf name < 0 #make sure that the child doesn't already exist
         console.log parent.children
         cb(-errnoMap.EEXIST)
-        return null
+        return
       folder =
         resource:
           title: name
@@ -260,18 +267,19 @@ mkdir = (path, mode, cb) ->
       drive.files.insert folder, (err, res) ->
         if err
           logger.log "error", err
-          return cb(-errnoMap.EIO)
+          cb(-errnoMap.EIO)
+          return
         else
           parent.children.push name
           folderTree.set path, new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
           cb(0)
           client.saveFolderTree()
-          return null
+        return
     else
       cb(-errnoMap.ENOTDIR)
   else
     cb(-errnoMap.ENOENT)
-    return null
+  return
 
 # /*
 #  * Handler for the rmdir() system call.
@@ -288,7 +296,7 @@ rmdir = (path, cb) ->
           if err
             logger.log "error", "unable to remove folder #{path}"
             cb -errnoMap.EIO
-            return null
+            return
           else
             console.log res
             parent = folderTree.get pth.dirname(path)
@@ -299,19 +307,19 @@ rmdir = (path, cb) ->
             folderTree.remove path
             cb(0)
             client.saveFolderTree()
-            return null
-            
+            return
+          return  
       else
         cb -errnoMap.ENOTEMPTY
-        return null
+        return
     else
       cb -errnoMap.ENOTDIR
-      return null
+      return
 
   else
     cb -errnoMap.ENOENT
-    return null
-
+    return
+  return
 
 
  #  /*
@@ -332,14 +340,19 @@ create = (path, mode, cb) ->
   if parent #make sure parent exists
     name = pth.basename path
 
-    unless parent.children.indexOf(name) < 0 #make sure file doesn't exist yet
-      cb(-errnoMap.EEXIST)
-      return null
-    parent.children.push name
-    fs.open systemPath, 'w', mode, (err, fd) ->
+    if parent.children.indexOf(name) < 0 #TODO: if file exists, delete it first
+      parent.children.push name
+    now = (new Date).getTime()
+    logger.log "debug", "adding #{path} to folderTree"
+    folderTree.set path, new GFile(null, null, parent.id, name, 0, now, now, true)
+    client.saveFolderTree()
+
+
+    fs.open systemPath, 'w', (err, fd) ->
       if (err)
         logger.log "error", "unable to createfile #{path}, #{err}"
-        return cb(-errnoMap[err.code])
+        cb(-errnoMap[err.code])
+        return
 
       logger.log "debug", "setting upload Tree"
       upFile = 
@@ -347,16 +360,11 @@ create = (path, mode, cb) ->
         uploading: false
       uploadTree.set path, upFile
       saveUploadTree()
-
-      now = (new Date).getTime()
-      logger.log "debug", "adding #{path} to folderTree"
-      folderTree.set path, new GFile(null, null, parent.id, name, 0, now, now, true)
       cb(0, fd);
-      return null
+      return
   else
     cb( -errnoMap.ENOENT )
-    return null
-
+  return
 # /*
 #  * Handler for the unlink() system call.
 #  * path: the path to the file
@@ -371,9 +379,7 @@ unlink = (path, cb) ->
         if err
           logger.log "error", "unable to remove file #{path}"
           cb -errnoMap.EIO
-          return null
         else
-          console.log res
           parent = folderTree.get pth.dirname(path)
           name = pth.basename path
           idx = parent.children.indexOf name
@@ -382,37 +388,40 @@ unlink = (path, cb) ->
           folderTree.remove path
           cb(0)
           client.saveFolderTree()
-          return null          
+        return          
     else
-      cb -errnoMap.EISDIR
-
+      cb -errnoMap.EISDIR    
   else
     cb -errnoMap.EEXIST
-    return null
+  return
 
 #recursively read and write streams
 moveToDownload = (file, fd, uploadedFileLocation, start) ->
 
-      end = Math.min(start + GFile.chunkSize, file.size)-1
-      savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
-      rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
-      wstream = fs.createWriteStream(savePath)
-      rstream.pipe(wstream)
+  end = Math.min(start + GFile.chunkSize, file.size)-1
+  savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
+  rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
+  wstream = fs.createWriteStream(savePath)
+  rstream.pipe(wstream)
 
-      rstream.on 'end',  ->        
-        start += GFile.chunkSize
+  rstream.on 'end',  ->        
+    start += GFile.chunkSize
 
-        if start < file.size
-          moveToDownload(file, fd, uploadedFileLocation, start)
+    if start < file.size
+      moveToDownload(file, fd, uploadedFileLocation, start)
+    else
+      fs.close fd, (err) ->
+        if err
+          logger.debug "unable to close file after transffering #{uploadedFile}"
         else
-          fs.close fd, (err) ->
+          fs.unlink uploadedFileLocation, (err)->
             if err
-              logger.debug "unable to close file after transffering #{uploadedFile}"
-            else
-              fs.unlink uploadedFileLocation, (err)->
-                if err
-                  logger.log "error", "unable to remove file #{uploadedFile}"      
+              logger.log "error", "unable to remove file #{uploadedFile}"      
+            return
+        return
+    return
 
+  return
 
 
 #function to create a callback for file uploading
@@ -440,23 +449,25 @@ uploadCallback = (path) ->
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
         logger.debug "#{path} folderTree did not exist"
-        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.size), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
+        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
 
       #update folder Tree
       if parent.children.indexOf( file.name ) < 0
         parent.children.push file.name
       folderTree.set path, file
+      client.saveFolderTree()
 
       #move the file to download folder after finished uploading
       fs.open uploadedFileLocation, 'r', (err,fd) ->
         if err
           logger.debug "could not open #{uploadedFileLocation} for copying file from upload to uploader"
           logger.debug err
-          return null
+          return
         else          
           moveToDownload(file, fd, uploadedFileLocation, 0)
-      client.saveFolderTree()
+        return
 
+    return
 
 # /*
 #  * Handler for the release() system call.
@@ -468,12 +479,12 @@ release = (path, fd, cb) ->
   logger.silly "closing file #{path}"
   if uploadTree.has path
     logger.log "debug", "#{path} was in the upload tree"
-
+    client.saveFolderTree()
     #close the file
     fs.close fd, (err) ->
       if (err)
         cb(-errnoMap[err.code])
-        return null
+        return
       cb(0)
       #upload file once file is closed
       parent = folderTree.get pth.dirname(path)
@@ -482,14 +493,17 @@ release = (path, fd, cb) ->
         file = folderTree.get(path)
         if file.size > 0
           parent.upload pth.basename(path), path, uploadCallback(path)
-        else
+        else          
           uploadTree.remove path
-          saveUploadTree()
-      return null
+          saveUploadTree()      
+
+        return
+      console.log "no uploading"
+      return
 
   else
     cb(0)
-    return null
+  return
 
 statfs= (cb) ->
   return cb(0, {
@@ -508,7 +522,7 @@ statfs= (cb) ->
 
 flush = (cb) ->
   cb(0)
-  return null
+  return
 
 handlers =
   readdir:    readdir
@@ -526,11 +540,12 @@ handlers =
 
 #resume file uploading
 fn = ->
+  logger.info "resuming file uploading"
   for path in uploadTree.keys()
       if folderTree.has pth.dirname(path)
         parent = folderTree.get pth.dirname(path)
         parent.upload pth.basename(path), path, uploadCallback(path)
-
+  return
 setTimeout fn, 25000
 
 
