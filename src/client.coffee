@@ -79,6 +79,10 @@ parseFilesFolders = (items) ->
   now = (new Date).getTime()
 
   logger.info "Parinsg data, looking for root foolder"
+  # google does not return the list of files and folders in a particular order.
+  # so find the root folder first,
+  # then parse the folders
+  # and then parse files
 
   for i in items
     if (! (i.parents) ) or i.parents.length == 0 
@@ -96,9 +100,6 @@ parseFilesFolders = (items) ->
       else
         files.push i
 
-  # google does not return the list of files and folders in a particular order.
-  # so parse folders first
-  # and then parse files
   left = folders
   while left.length > 0
     logger.info "Folders left to parse: #{left.length}"

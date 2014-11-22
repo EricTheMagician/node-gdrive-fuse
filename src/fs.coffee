@@ -31,6 +31,7 @@ errnoMap =
     EPERM: 1,
     ENOENT: 2,
     EIO: 5,
+    ENXIO: 9,
     EACCESS: 13,
     EEXIST: 17,
     ENOTDIR: 20,
