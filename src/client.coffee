@@ -87,7 +87,7 @@ parseFilesFolders = (items) ->
   for i in items
     if (! (i.parents) ) or i.parents.length == 0 
       continue
-    unless i.labels.trashed
+    unless i.labels.trashed      
       if i.mimeType == "application/vnd.google-apps.folder"
         unless rootFound
           if i.parents[0].isRoot
@@ -168,8 +168,8 @@ loadFolderTree = ->
       idToPath.set(o.id,key)
       idToPath.set(o.parentid, pth.basename(key))
 
-      if 'size' in o 
-        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, parseInt(o.size), new Date(o.ctime), new Date(o.mtime), o.permission )
+      if o.size >= 0
+        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, new Date(o.ctime), new Date(o.mtime), o.permission )
       else
         # keep track of the conversion of bitcasa path to real path
         idToPath.set o.path, key
