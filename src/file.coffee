@@ -97,10 +97,10 @@ class GFile
           downloadTree.set("#{file.id}-#{start}", 1)
 
           callback = (err,result) ->
-            downloadTree.remove("#{file.id}-#{start}")
             unless err
               if result instanceof Buffer
                 fs.writeFile path,result, (err) ->
+                  downloadTree.remove("#{file.id}-#{start}")
                   return
             return
           GFile.download(file.downloadUrl, start,end, file.size,callback)
