@@ -378,16 +378,15 @@ unlink = (path, cb) ->
       drive.files.trash {fileId: file.id}, (err, res) ->
         if err
           logger.log "error", "unable to remove file #{path}"
-          cb -errnoMap.EIO
-        else
-          parent = folderTree.get pth.dirname(path)
-          name = pth.basename path
-          idx = parent.children.indexOf name
-          if idx >= 0
-            parent.children.splice idx, 1
-          folderTree.remove path
-          cb(0)
-          client.saveFolderTree()
+
+        parent = folderTree.get pth.dirname(path)
+        name = pth.basename path
+        idx = parent.children.indexOf name
+        if idx >= 0
+          parent.children.splice idx, 1
+        folderTree.remove path
+        client.saveFolderTree()
+        cb(0) #always return success
         return          
     else
       cb -errnoMap.EISDIR    
