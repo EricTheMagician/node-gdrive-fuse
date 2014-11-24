@@ -259,6 +259,7 @@ flush = (buf, cb) ->
 #  * cb: a callback of the form cb(err), where err is the Posix return code.
 #  */
 mkdir = (path, mode, cb) ->
+  logger.debug "creating folder #{path}"
   parent = folderTree.get pth.dirname(path)
   if parent #make sure that the parent exists
     if parent instanceof GFolder #make sure that the parent is a folder
