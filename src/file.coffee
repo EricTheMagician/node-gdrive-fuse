@@ -70,7 +70,6 @@ class GFile
         #check to see if token is expired
         if response.statusCode == 401 or response.statusCode == 403
           logger.debug "There was an error while downloading. refreshing Token"
-          logger.debug response.headers
           fn = ->
             GFile.download(url, start,end, size,cb )
             return
@@ -128,9 +127,9 @@ class GFile
       unless exists
         if downloadTree.has("#{file.id}-#{chunkStart}")
           fn = ->
-            file.download(start, end, readAhead, cb)
+            file.read(start, end, readAhead, cb)
             return
-          setTimeout fn, 1000
+          setTimeout fn, 50
         else
           file.download start, end, readAhead, cb
         return
