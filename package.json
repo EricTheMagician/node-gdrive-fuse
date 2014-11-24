@@ -19,7 +19,7 @@
     "coffee-script": "~1.8.0",
     "fibers": "^1.0.1",
     "fs-extra": "^0.10.0",
-    "fuse4js": "git://github.com/thejinx0r/fuse4js#e4e886a70bd5004868d7434c5915903119468860",
+    "fuse4js": "git://github.com/thejinx0r/fuse4js#224d591bef8b25f4d6dd587d0df9c71150732951",
     "googleapis": "^1.0.20",
     "hashmap": "^1.1.0",
     "limiter": "~1.0.5",
