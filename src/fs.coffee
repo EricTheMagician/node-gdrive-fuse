@@ -8,14 +8,14 @@ f4js = require 'fuse4js'
 os = require 'os'
 MD5 = require 'MD5'
 
-client = require('./client.coffee')
+client = require('./client')
 folderTree = client.folderTree
 drive = client.drive
-folder = require("./folder.coffee")
+folder = require("./folder")
 uploadTree = folder.uploadTree
 GFolder = folder.GFolder
 saveUploadTree = folder.saveUploadTree
-f = require("./file.coffee");
+f = require("./file");
 logger = f.logger
 GFile = f.GFile
 
@@ -378,7 +378,6 @@ unlink = (path, cb) ->
       drive.files.trash {fileId: file.id}, (err, res) ->
         if err
           logger.log "error", "unable to remove file #{path}"
-
         parent = folderTree.get pth.dirname(path)
         name = pth.basename path
         idx = parent.children.indexOf name
@@ -553,7 +552,7 @@ try
   logger.log "info", 'attempting to start f4js'
   opts = switch os.type()
     when 'Linux' then  ["-o", "allow_other"]
-    when 'Darwin' then  ["-o", "allow_other", "-o", "noappledouble", "-o", "daemon_timeout=0", '-o', 'noubc']
+    when 'Darwin' then  ["-o", "allow_other","-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc"]
     else []
   fs.ensureDirSync(config.mountPoint)
   debug = false

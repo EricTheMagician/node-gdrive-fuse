@@ -69,6 +69,8 @@ class GFile
       else
         #check to see if token is expired
         if response.statusCode == 401 or response.statusCode == 403
+          logger.debug "There was an error while downloading. refreshing Token"
+          logger.debug response.headers
           fn = ->
             GFile.download(url, start,end, size,cb )
             return
@@ -138,10 +140,10 @@ class GFile
         return
       return
 
-      if readAhead
-        if chunkStart <= start < chunkStart + 131072
-          file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
-          file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
+    if readAhead
+      if chunkStart <= start < chunkStart + 131072
+        file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
+        file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
 
 
     return
