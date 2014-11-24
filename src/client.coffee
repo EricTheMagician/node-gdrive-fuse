@@ -5,11 +5,11 @@ winston = require 'winston'
 rest = require 'restler'
 hashmap = require( 'hashmap' ).HashMap
 pth = require 'path'
-folder = require("./folder.coffee")
+folder = require("./folder")
 GFolder = folder.GFolder
-f = require("./file.coffee")
+f = require("./file")
 GFile = f.GFile
-uploadTree = require("./folder.coffee").uploadTree
+uploadTree = folder.uploadTree
 #read input config
 config = fs.readJSONSync 'config.json'
 

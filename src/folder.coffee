@@ -4,7 +4,7 @@ pth = require 'path'
 mmm = require('mmmagic')
 winston = require 'winston'
 hashmap = require('hashmap').HashMap
-f = require("./file.coffee")
+f = require("./file")
 logger = f.logger
 
 
