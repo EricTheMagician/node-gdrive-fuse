@@ -121,12 +121,22 @@ open = (path, flags, cb) ->
         return
 
     when 1 #write only
+      cache = MD5(path)
       logger.log 'debug', "tried to open file \"#{path}\" for writing"
       if folderTree.has(path) #if folderTree has path, make sure it's a file with size zero
         file = folderTree.get(path)
         if (file instanceof GFile)
            if file.size == 0
-            cb 0, null
+            logger.debug "#{path} size was 0"
+            fs.open pth.join(uploadLocation, cache), 'w', (err,fd) ->
+              if err
+                logger.debug "could not open file for writing"
+                logger.debug err
+                cb -errnoMap[err.code]
+              else
+                cb 0, fd
+              return
+
            else
              cb -errnoMap.EACCESS
         else
@@ -139,7 +149,6 @@ open = (path, flags, cb) ->
           name = pth.basename(path)
 
           file = new GFile(null, null, parent.id, name, 0, now, now, true)
-          cache = MD5(path)
           folderTree.set path, file
           upFile = 
             cache: cache
@@ -552,7 +561,7 @@ try
   logger.log "info", 'attempting to start f4js'
   opts = switch os.type()
     when 'Linux' then  ["-o", "allow_other"]
-    when 'Darwin' then  ["-o", "allow_other","-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc"]
+    when 'Darwin' then  ["-o", "allow_other","-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
     else []
   fs.ensureDirSync(config.mountPoint)
   debug = false
