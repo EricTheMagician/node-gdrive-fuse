@@ -53,7 +53,7 @@ class GFile
       else
         #check to see if token is expired
         if (response.statusCode == 401) or (response.statusCode == 403)
-          logger.debug "There was an error while downloading. refreshing downloadUrl"
+          logger.debug "There was an error while downloading."
           fn = ->            
             cb("expiredUrl")
             return
@@ -141,7 +141,7 @@ class GFile
     return
 
   updateUrl: (cb) =>
-    console.log "updating url"
+    logger.debug "updating url for #{@name}"
     file = @
     data = 
       fileId: @id
