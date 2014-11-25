@@ -27,22 +27,6 @@ uploadLocation = pth.join config.cacheLocation, 'upload'
 fs.ensureDirSync uploadLocation
 
 downloadTree = new hashmap()
-
-
-google = require 'googleapis'
-oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUrl)
-refreshToken =  (cb) ->
-  oauth2Client.refreshAccessToken (err,tokens) ->
-    if err
-      refreshToken(cb)
-    else
-      config.accessToken = tokens
-      fs.outputJsonSync 'config.json', config
-      cb()
-    return
-  return
-oauth2Client.setCredentials config.accessToken
-
 buf0 = new Buffer(0)
 
 ######################################
@@ -68,14 +52,12 @@ class GFile
         cb(result)
       else
         #check to see if token is expired
-        if response.statusCode == 401 or response.statusCode == 403
+        if (response.statusCode == 401) or (response.statusCode == 403)
           logger.debug "There was an error while downloading. refreshing downloadUrl"
-          cb("expiredUrl")
-          GFile.GDrive.files.get 
-          # fn = ->
-          #   GFile.download(url, start,end, size,cb )
-          #   return
-          # refreshToken(fn)          
+          fn = ->            
+            cb("expiredUrl")
+            return
+          setTimeout fn, 15000
         else
           cb(null, result)
       return
@@ -166,9 +148,12 @@ class GFile
       acknowledgeAbuse  : true
       fields: "downloadUrl"    
     GFile.GDrive.files.get data, (err, res) ->
+      config.accessToken = GFile.oauth.credentials
+
       unless err
         file.downloadUrl = res.downloadUrl
-        console.log res.downloadUrl
+      else
+        logger.debug "there was an error while updating"
       cb(res.downloadUrl)
       return
     return
