@@ -153,10 +153,8 @@ uploadData = (location, start, fileSize, mime, fd, buffer, cb) ->
       if res instanceof Error
         logger.debug "There was an error with uploading data, retrying"
         logger.debug "res", res
-        logger.debug "resp", resp
         callback = (err,end) ->
           cb err, fd, {
-            statusCode: resp.statusCode
             rangeEnd: end
           }
           return
