@@ -286,7 +286,8 @@ if not (config.accessToken)
 else
   oauth2Client.setCredentials config.accessToken
 google.options({ auth: oauth2Client, user: config.email })
-
+GFile.oauth = oauth2Client;
+GFolder.oauth = oauth2Client;
 console.log "Access Token Set"
 
 #create (or read) the folderTree
