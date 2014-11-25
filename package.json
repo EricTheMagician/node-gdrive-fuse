@@ -18,7 +18,7 @@
     "MD5": "^1.2.1",
     "coffee-script": "~1.8.0",
     "fs-extra": "^0.10.0",
-    "fuse4js": "git://github.com/thejinx0r/fuse4js#d13669f7d7945c6be36a503b8b362f7798015510",
+    "fuse4js": "git://github.com/thejinx0r/fuse4js#544cd52505aa67b9096b646a13e6e497e4275c77",
     "googleapis": "^1.0.20",
     "hashmap": "^1.1.0",
     "limiter": "~1.0.5",

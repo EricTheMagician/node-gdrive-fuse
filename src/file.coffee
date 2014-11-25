@@ -69,11 +69,13 @@ class GFile
       else
         #check to see if token is expired
         if response.statusCode == 401 or response.statusCode == 403
-          logger.debug "There was an error while downloading. refreshing Token"
-          fn = ->
-            GFile.download(url, start,end, size,cb )
-            return
-          refreshToken(fn)          
+          logger.debug "There was an error while downloading. refreshing downloadUrl"
+          cb("expiredUrl")
+          GFile.GDrive.files.get 
+          # fn = ->
+          #   GFile.download(url, start,end, size,cb )
+          #   return
+          # refreshToken(fn)          
         else
           cb(null, result)
       return
@@ -98,7 +100,9 @@ class GFile
           downloadTree.set("#{file.id}-#{start}", 1)
 
           callback = (err,result) ->
-            unless err
+            if err
+              downloadTree.remove("#{file.id}-#{start}")
+            else
               if result instanceof Buffer
                 fs.writeFile path,result, (err) ->
                   downloadTree.remove("#{file.id}-#{start}")
@@ -154,6 +158,21 @@ class GFile
 
     return
 
+  updateUrl: (cb) =>
+    console.log "updating url"
+    file = @
+    data = 
+      fileId: @id
+      acknowledgeAbuse  : true
+      fields: "downloadUrl"    
+    GFile.GDrive.files.get data, (err, res) ->
+      unless err
+        file.downloadUrl = res.downloadUrl
+        console.log res.downloadUrl
+      cb(res.downloadUrl)
+      return
+    return
+
   download:  (start, end, readAhead, cb) =>
     #if file chunk already exists, just download it
     #else download it    
@@ -170,9 +189,17 @@ class GFile
         downloadTree.set("#{file.id}-#{start}", 1)
         callback = (err, result)->          
           if err
-            logger.error "there was an error downloading file"
-            logger.error err
-            cb(buf0)
+            if err == "expiredUrl"
+              fn = (url) ->
+                GFile.download(url, chunkStart, chunkEnd, file.size, callback)
+                return
+              file.updateUrl(fn)
+
+            else
+              logger.error "there was an error downloading file"
+              logger.error err
+              cb(buf0)
+              downloadTree.remove("#{file.id}-#{start}")
             return
           if result instanceof Buffer
             path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")

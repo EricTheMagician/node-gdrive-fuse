@@ -22,6 +22,7 @@ GFile = f.GFile
 #read input config
 config = fs.readJSONSync 'config.json'
 GFile.chunkSize = config.chunkSize
+GFile.GDrive = client.drive;
 GFolder.uploadChunkSize = config.uploadChunkSize
 uploadLocation = pth.join config.cacheLocation, 'upload'
 
