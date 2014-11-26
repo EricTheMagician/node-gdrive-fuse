@@ -419,7 +419,7 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
     start += GFile.chunkSize
 
     if start < file.size
-      moveToDownload(file, fd, uploadedFileLocation, start)
+      moveToDownload(file, fd, uploadedFileLocation, start, cb)
     else
       fs.close fd, (err) ->
         if err
