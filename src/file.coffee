@@ -114,6 +114,13 @@ class GFile
 
     path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
 
+    if downloadTree.has("#{file.id}-#{chunkStart}")
+      fn = ->
+        file.read(start, end, readAhead, cb)
+        return
+      setTimeout fn, 50
+      return
+
     #try to read the file
     fs.exists path, (exists) ->
       unless exists
@@ -185,7 +192,7 @@ class GFile
 
       else        
         fn = ->
-          file.download(start, end, readAhead, cb)
+          file.read(start, end, readAhead, cb)
           return
         setTimeout fn, 1500
 
