@@ -40,36 +40,49 @@ largestChangeId = 1;
 ####### Client Functions ###########
 ####################################
 
-
+once = false
 getPageFiles = (pageToken, items, cb) ->
   opts =
     fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission),nextPageToken"
-    maxResults: 500
+    maxResults: 1000
     pageToken: pageToken
   drive.files.list opts, (err, resp) ->
     if err
-      logger.log 'error', "There was an error while downloading files from google, retrying"
       logger.error err
       fn = ->
         getPageFiles(pageToken, items, cb)
         return
-      setTimeout(fn, 4000)
-      return
 
+      if pageToken
+        logger.log 'error', "There was an error while downloading files from google, retrying"
+        setTimeout(fn, 4000)        
+      else
+        if once
+          logger.debug "retrying once a failed get page files"
+          cb(err, resp.nextPageToken, items)
+        else
+          setTimeout(fn, 4000)        
+          once = true
+
+      return
+    once = false
     cb(null, resp.nextPageToken, items.concat(resp.items))
     return
   return
 
 getAllFiles = ()->
-  callback = (err, nextPageToken, items) ->
-    if nextPageToken
-      getPageFiles(nextPageToken, items, callback)
-    else
-      logger.log 'info', "Finished downloading folder structure from google"
-      getLargestChangeId()
-      parseFilesFolders(items)
+  oauth2Client.refreshAccessToken (err,tokens) ->
+    oauth2Client.setCredentials(tokens)
+    callback = (err, nextPageToken, items) ->
+      if nextPageToken
+        getPageFiles(nextPageToken, items, callback)
+      else
+        logger.log 'info', "Finished downloading folder structure from google"
+        getLargestChangeId()
+        parseFilesFolders(items)
+      return
+    getPageFiles(null, [], callback)
     return
-  getPageFiles(null, [], callback)
   return
 
 parseFilesFolders = (items) ->
