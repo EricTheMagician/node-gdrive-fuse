@@ -24,6 +24,7 @@
     "limiter": "~1.0.5",
     "memoizee": "^0.3.8",
     "mmmagic": "git://github.com/thejinx0r/mmmagic#9bf342cae56452457985cd24e46e4bad6a1eacb0",
+    "queue": "^3.0.10",
     "restler": "git://github.com/mthx/restler#4cc136af9a089ef21013cdad6fdd68adebf92caa",
     "winston": "~0.7.3"
   },
