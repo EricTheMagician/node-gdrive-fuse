@@ -18,6 +18,8 @@ saveUploadTree = folder.saveUploadTree
 f = require("./file");
 logger = f.logger
 GFile = f.GFile
+queue = require 'queue'
+q = queue({concurrency: 6, timeout: 7200000 })
 
 #read input config
 config = fs.readJSONSync 'config.json'
@@ -405,7 +407,7 @@ unlink = (path, cb) ->
   return
 
 #recursively read and write streams
-moveToDownload = (file, fd, uploadedFileLocation, start) ->
+moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
 
   end = Math.min(start + GFile.chunkSize, file.size)-1
   savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
@@ -422,10 +424,12 @@ moveToDownload = (file, fd, uploadedFileLocation, start) ->
       fs.close fd, (err) ->
         if err
           logger.debug "unable to close file after transffering #{uploadedFile}"
+          cb()
         else
           fs.unlink uploadedFileLocation, (err)->
             if err
               logger.log "error", "unable to remove file #{uploadedFile}"      
+            cb()
             return
         return
     return
@@ -434,12 +438,16 @@ moveToDownload = (file, fd, uploadedFileLocation, start) ->
 
 
 #function to create a callback for file uploading
-uploadCallback = (path) ->
+uploadCallback = (path, cb) ->
   return (err, result) ->
     parent = folderTree.get pth.dirname(path)
     if err
       logger.log "error", "failed to upload \"#{path}\". Retrying"
-      parent.upload pth.basename(path), path , callback
+      fn = (cb) ->
+        parent.upload pth.basename(path), path , callback(path,cb)
+        return
+      q.push fn
+      return
     else
       uploadedFile = uploadTree.get(path)
       uploadedFileLocation = pth.join uploadLocation, uploadedFile.cache
@@ -473,7 +481,7 @@ uploadCallback = (path) ->
           logger.debug err
           return
         else          
-          moveToDownload(file, fd, uploadedFileLocation, 0)
+          moveToDownload(file, fd, uploadedFileLocation, 0, cb)
         return
 
     return
@@ -501,7 +509,10 @@ release = (path, fd, cb) ->
       if folderTree.has path
         file = folderTree.get(path)
         if file.size > 0
-          parent.upload pth.basename(path), path, uploadCallback(path)
+          fn = (cb)->
+            parent.upload pth.basename(path), path, uploadCallback(path,cb)            
+            return
+          q.push fn
         else          
           uploadTree.remove path
           saveUploadTree()      
@@ -549,12 +560,16 @@ handlers =
 
 #resume file uploading
 fn = ->
+  q.start()
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
     for path in uploadTree.keys()
         if folderTree.has pth.dirname(path)
           parent = folderTree.get pth.dirname(path)
-          parent.upload pth.basename(path), path, uploadCallback(path)
+          _fn = (cb) ->
+            parent.upload pth.basename(path), path, uploadCallback(path,fn)
+            return
+          q.push(_fn)
   return
 setTimeout fn, 25000
 

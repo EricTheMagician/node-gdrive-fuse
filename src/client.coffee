@@ -278,17 +278,22 @@ if not (config.accessToken)
     oauth2Client.getToken code, (err,tokens) ->
       oauth2Client.setCredentials(tokens)
       config.accessToken = tokens
+      console.log "Access Token Set"
+
       fs.outputJsonSync 'config.json', config
       return
-    return
+
     rl.close()
+    return
+
 
 else
   oauth2Client.setCredentials config.accessToken
+  console.log "Access Token Set"
+
 google.options({ auth: oauth2Client, user: config.email })
 GFile.oauth = oauth2Client;
 GFolder.oauth = oauth2Client;
-console.log "Access Token Set"
 
 #create (or read) the folderTree
 fs.exists pth.join(dataLocation, 'folderTree.json'), (exists) ->
