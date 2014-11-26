@@ -446,6 +446,7 @@ uploadCallback = (path, cb) ->
       fn = (cb) ->
         parent.upload pth.basename(path), path , callback(path,cb)
         return
+      cb()
       q.push fn
       q.start()
       return
