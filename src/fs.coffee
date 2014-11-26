@@ -19,7 +19,7 @@ f = require("./file");
 logger = f.logger
 GFile = f.GFile
 queue = require 'queue'
-q = queue({concurrency: 6, timeout: 7200000 })
+q = queue({concurrency: 4, timeout: 7200000 })
 
 #read input config
 config = fs.readJSONSync 'config.json'
@@ -447,6 +447,7 @@ uploadCallback = (path, cb) ->
         parent.upload pth.basename(path), path , callback(path,cb)
         return
       q.push fn
+      q.start()
       return
     else
       uploadedFile = uploadTree.get(path)
@@ -513,6 +514,7 @@ release = (path, fd, cb) ->
             parent.upload pth.basename(path), path, uploadCallback(path,cb)            
             return
           q.push fn
+          q.start()
         else          
           uploadTree.remove path
           saveUploadTree()      
@@ -570,6 +572,7 @@ fn = ->
             parent.upload pth.basename(path), path, uploadCallback(path,fn)
             return
           q.push(_fn)
+          q.start()
   return
 setTimeout fn, 25000
 
