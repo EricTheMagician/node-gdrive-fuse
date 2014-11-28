@@ -152,7 +152,7 @@ parseFilesFolders = (items) ->
   saveFolderTree()
   return
 
-loadFolderTree = ->
+parseFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
   now = Date.now()
 
@@ -182,6 +182,18 @@ loadFolderTree = ->
       return
     return
   return
+
+loadFolderTree = ->
+  #create (or read) the folderTree
+  fs.exists pth.join(dataLocation, 'folderTree.json'), (exists) ->
+    if exists 
+      logger.log 'info', "Loading folder structure"
+      parseFolderTree()
+    else
+      logger.log 'info', "Downloading full folder structure from google"
+      getAllFiles()    
+    return
+
 
 lockFolderTree = false
 saveFolderTree = () ->
@@ -265,7 +277,7 @@ if not (config.accessToken)
   url = oauth2Client.generateAuthUrl
     access_type: 'offline', # 'online' (default) or 'offline' (gets refresh_token)
     scope: scopes #If you only need one scope you can pass it as string
-    approval_prompt: 'force' #Force user ti reapprove to get the refresh_token
+    approval_prompt: 'force' #Force user to reapprove to get the refresh_token
   console.log url
 
   # create interface to read access code
@@ -279,6 +291,7 @@ if not (config.accessToken)
       oauth2Client.setCredentials(tokens)
       config.accessToken = tokens
       console.log "Access Token Set"
+      loadFolderTree()
 
       fs.outputJsonSync 'config.json', config
       return
@@ -290,20 +303,12 @@ if not (config.accessToken)
 else
   oauth2Client.setCredentials config.accessToken
   console.log "Access Token Set"
+  loadFolderTree()
 
 google.options({ auth: oauth2Client, user: config.email })
 GFile.oauth = oauth2Client;
 GFolder.oauth = oauth2Client;
 
-#create (or read) the folderTree
-fs.exists pth.join(dataLocation, 'folderTree.json'), (exists) ->
-  if exists 
-    logger.log 'info', "Loading folder structure"
-    loadFolderTree()
-  else
-    logger.log 'info', "Downloading full folder structure from google"
-    getAllFiles()    
-  return
 # loadChanges()
 # console.log getLargestChangeId().wait()
 
