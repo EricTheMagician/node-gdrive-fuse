@@ -106,11 +106,12 @@ class GFile extends EventEmitter
       fs.close openedFiles.get("#{file.id}-#{start}").fd, (err) ->
         openedFiles.remove "#{file.id}-#{start}"
         return
-      return       
+      return   
+    cacheTimeout = 3000    
     if openedFiles.has( "#{file.id}-#{start}")
       f = openedFiles.get "#{file.id}-#{start}"
       clearTimeout(f.to)
-      f.to = setTimeout(fn, 15000)
+      f.to = setTimeout(fn, cacheTimeout)
       return f.fd
 
     else
@@ -118,7 +119,7 @@ class GFile extends EventEmitter
       path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
       if fs.existsSync( path)
         fd = fs.openSync( path, 'r' )
-        openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, 15000) }
+        openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
         return fd
       else
         return false
@@ -136,7 +137,7 @@ class GFile extends EventEmitter
 
     path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
     listenCallback = (chunkStart, buffer)  ->      
-      if (chunkStart <= start <= (chunkStart + GFile.chunkSize - 1)  ) and (buffer instanceof Buffer)
+      if (chunkStart <= start <= (chunkEnd)  ) and (buffer instanceof Buffer)
         cb buffer.slice(start - chunkStart, chunkEnd - end )
         file.removeListener 'downloaded', listenCallback
       return
