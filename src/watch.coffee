@@ -16,7 +16,7 @@ else
 logger = new (winston.Logger)({
     transports: [
       new (winston.transports.Console)({ level: 'debug' }),
-      new (winston.transports.File)({ filename: '/tmp/GDriveFS.log', level:'debug' })
+      new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
     ]
 })
 
