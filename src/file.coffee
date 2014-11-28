@@ -104,7 +104,7 @@ class GFile extends EventEmitter
     file = @
     fn = ->
       fs.close openedFiles.get("#{file.id}-#{start}").fd, (err) ->
-        openedFiles.remove "#{file.id}-start"
+        openedFiles.remove "#{file.id}-#{start}"
         return
       return       
     if openedFiles.has( "#{file.id}-#{start}")
