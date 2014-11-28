@@ -14,22 +14,29 @@ oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, conf
 oauth2Client.setCredentials config.accessToken
 google.options({ auth: oauth2Client, user: config.email })
 drive = google.drive({ version: 'v2' })
+lockRefresh = false
 refreshToken =  (cb) ->
-  oauth2Client.refreshAccessToken (err,tokens) ->
-    if err
-      logger.debug "There was an error with refreshing access token"
-      logger.debug err
-      refreshToken(cb)
-    else
-      config.accessToken = tokens
-      fs.outputJson 'config.json', config, (err) ->
-        if err
-          logger.debug "failed to save config from folder.coffee"
-        else
-          logger.debug "succesfully saved config from folder.coffee"
-          cb()
-        return
-    return
+  unless lockRefresh
+    lock = true
+    oauth2Client.refreshAccessToken (err,tokens) ->
+      if err
+        logger.debug "There was an error with refreshing access token"
+        logger.debug err
+        refreshToken(cb)
+      else
+        config.accessToken = tokens
+        fs.outputJson 'config.json', config, (err) ->
+          if err
+            logger.debug "failed to save config from folder.coffee"
+          else
+            logger.debug "succesfully saved config from folder.coffee"
+            cb()
+          return
+        lock = false
+      return
+  else
+    cb()
+
   return
 
 Magic = mmm.Magic;
@@ -113,6 +120,19 @@ getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
       refreshToken(fn)
     else
       if resp.statusCode == 401 or resp.statusCode == 400
+        if parseInt(resp.headers['content-length']) > 0
+          logger.debug result
+          logger.debug "type is ", typeof(result)
+          if result.error
+            error = result.error.errors[0]
+            idx = error.message.indexOf("Media type")   
+            if idx >= 0
+              cb("invalid mime");
+              return
+
+        else 
+          logger.debug result
+
         logger.debug "refreshing access token while getting resumable upload links"
         fn = ->
           getUploadResumableLink(parentId, fileName, fileSize, mime, cb)
@@ -303,6 +323,13 @@ class GFolder
 
             upFile.uploading = true   
             magic.detectFile filePath, (err, mime) ->
+              if err
+                logger.debug "There was an error with detecting mime type"
+                logger.debug err
+
+              #if the mime type is binary, set it to application/octect stream so google will accept it
+              if mime == 'binary'
+                mime = 'application/octet-stream'
 
               buffer = new Buffer(GFolder.uploadChunkSize)
               cbUploadData = (err, fd, res) ->
@@ -335,6 +362,10 @@ class GFolder
                       return                    
                 return
               cbNewLink = (err, location) ->
+                if err
+                  cb(err)
+                  return
+
                 upFile.location = location
                 uploadTree.set originalPath, upFile 
                 saveUploadTree()
