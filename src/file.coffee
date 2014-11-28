@@ -103,9 +103,10 @@ class GFile extends EventEmitter
   open: (start) =>
     file = @
     fn = ->
-      fs.close openedFiles.get("#{file.id}-#{start}").fd, (err) ->
-        openedFiles.remove "#{file.id}-#{start}"
-        return
+      if openedFiles.has("#{file.id}-#{start}")
+        fs.close openedFiles.get("#{file.id}-#{start}").fd, (err) ->
+          openedFiles.remove "#{file.id}-#{start}"
+          return
       return   
     cacheTimeout = 3000    
     if openedFiles.has( "#{file.id}-#{start}")
