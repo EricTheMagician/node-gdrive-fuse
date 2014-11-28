@@ -42,17 +42,18 @@ watcher = fs.watch downloadLocation, (event, filename) ->
     logger.silly "checking cache size"
     logger.silly "getting list of upload files"
     fs.readdir uploadLocation, (err, files) ->
-      logger.silly files
-      filtered_files =  files.filter (x) -> (x != undefined and x != null)
-      files = pth.join(uploadLocation, file) for file in filtered_files
+      logger.silly "files", files
+      joined = ( pth.join(uploadLocation, file) for file in files)
+      logger.silly "joined",joined
       logger.silly "getting sizes for uploaded files"
-      async.map files, fs.stat, (err, stats) ->
+      async.map joined, fs.stat, (err, stats) ->
         totalUploadSize = 0
         unless stats.length == 0    
           for stat in stats
             try
               totalUploadSize += stat.size
             catch e
+              logger.log stat
               continue
 
         logger.silly "total upload size is #{totalUploadSize}"
