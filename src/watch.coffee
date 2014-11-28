@@ -33,7 +33,6 @@ sortStats = (x,y) ->
     when diff == 0 then return 0
     else return 1
 
-memStats = async.memoize(fs.stat)
 locked = false
 watcher = fs.watch downloadLocation, (event, filename) ->
   logger.silly event
@@ -46,12 +45,15 @@ watcher = fs.watch downloadLocation, (event, filename) ->
       logger.silly files
       files = pth.join(uploadLocation,file) for file in files
       logger.silly "getting sizes for uploaded files"
-      async.map files, memStats, (err, stats) ->
+      async.map files, fs.stat, (err, stats) ->
         totalUploadSize = 0
         unless stats.length == 0    
-          stats = (stat) for stat in stats when stat
           for stat in stats
-            totalUploadSize += stat.size
+            try
+              totalUploadSize += stat.size
+            catch e
+              continue
+
         logger.silly "total upload size is #{totalUploadSize}"
         #download file sizes
         logger.silly "getting download files"
@@ -59,7 +61,7 @@ watcher = fs.watch downloadLocation, (event, filename) ->
 
           downloadFiles = (pth.join(downloadLocation,file) for file in downloadFiles)
 
-          async.map downloadFiles, memStats, (err, stats) ->            
+          async.map downloadFiles, fs.stat, (err, stats) ->            
             totalDownloadSize = 0
             unless stats.length == 0
               for stat in stats
