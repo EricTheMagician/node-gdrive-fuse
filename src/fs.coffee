@@ -574,7 +574,7 @@ fn = ->
         if folderTree.has pth.dirname(path)
           parent = folderTree.get pth.dirname(path)
           _fn = (cb) ->
-            parent.upload pth.basename(path), path, uploadCallback(path,fn)
+            parent.upload pth.basename(path), path, uploadCallback(path,cb)
             return
           q.push(_fn)
           q.start()
