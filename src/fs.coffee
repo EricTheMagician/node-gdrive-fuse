@@ -586,9 +586,11 @@ setTimeout fn, 25000
 try
   logger.log "info", 'attempting to start f4js'
   opts = switch os.type()
-    when 'Linux' then  ["-o", "allow_other"]
-    when 'Darwin' then  ["-o", "allow_other","-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
+    when 'Linux' then  []
+    when 'Darwin' then  ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
     else []
+  if process.version < '0.11.0'
+    opts.push( "-o", "allow_other")
   fs.ensureDirSync(config.mountPoint)
   debug = false
   f4js.start(config.mountPoint, handlers, debug, opts);
