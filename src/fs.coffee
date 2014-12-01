@@ -285,6 +285,7 @@ mkdir = (path, mode, cb) ->
         else
           parent.children.push name
           folderTree.set path, new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
+          client.idToPath.set(res.id, path)
           cb(0)
           client.saveFolderTree()
         return

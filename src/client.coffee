@@ -158,12 +158,17 @@ parseFilesFolders = (items) ->
         parent.children.push f.title
 
       path = pth.join parentPath, f.title
+      idToPath.set( f.id, path)
+
       folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
 
   logger.info "Finished parsing files"
   logger.info "Everything should be ready to use"
   saveFolderTree()
+  getLargestChangeId()
+  setTimeout loadChanges, 90000
   return
+
 
 parseFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
@@ -179,7 +184,7 @@ parseFolderTree = ->
 
       #add to idToPath
       idToPath.set(o.id,key)
-      idToPath.set(o.parentid, pth.basename(key))
+      idToPath.set(o.parentid, pth.dirname(key))
 
       if o.size >= 0
         folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, new Date(o.ctime), new Date(o.mtime), o.permission )
@@ -191,7 +196,7 @@ parseFolderTree = ->
     changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
     fs.readJson changeFile, (err, data) ->
       largestChangeId = data.largestChangeId
-      # loadChanges()
+      loadChanges()
       return
     return
   return
@@ -223,7 +228,7 @@ saveFolderTree = () ->
   return
 
 
-getLargestChangeId = ()->
+getLargestChangeId = (cb)->
   opts =
     fields: "largestChangeId"
   callback = (err, res) ->
@@ -231,50 +236,106 @@ getLargestChangeId = ()->
       res.largestChangeId = parseInt(res.largestChangeId) + 1
       largestChangeId = res.largestChangeId
       fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", res      
+    if typeof(cb) == 'function'
+      cb()
     return
   drive.changes.list opts, callback
   return
 
-loadPageChange = (pageToken, startChangeId, cb) ->
+loadPageChange = (start, items, cb) ->
 
   opts =
-    maxResults: 1000
-    startChangeId:  startChangeId
-    nextPageToken:  pageToken
-    trashed:        false
-
+    maxResults: 500
+    startChangeId: start  
 
   drive.changes.list opts, (err, res) ->
     unless err
-      data =
-        items: res.items
-        largestChangeId: res.largestChangeId
-        pageToken: res.nextPageToken
-      cb(err, data)
+      cb(err, res.largestChangeId, items.concat(res.items), res.nextPageToken)
     else
-      cb(err)
+      logger.debug "There was an error while loading changes"
+      logger.debug err
+      cb(err, largestChangeId, items, start)
     return
   return
 
 
 loadChanges = (cb) ->
-  id = largestChangeId
-  items = []
-  Fibers () ->
-    data = loadPageChange(null,id).wait()
-    items = items.concat data.items
-    largestChangeId = data.largestChangeId
+  id = largestChangeId+1
+  logger.debug "Getting changes from Google Drive. The last change id was #{largestChangeId}."
 
-    while data.pageToken
-      data = loadPageChange(data.pageToken,id).wait()
-      items = items.concat data.items
-
-    cb(null, items)
-    if id != largestChangeId
-      fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId:largestChangeId}
-
+  callback = (err, newId, items, pageToken) ->
+    largestChangeId = newId
+    if pageToken
+      drive.changes.list 
+      loadPageChange(pageToken, items, callback)
+    else
+      parseChanges(items)
     return
-  .run()
+
+  loadPageChange(id, [], callback)
+
+ 
+  return
+
+parseChanges = (items) ->
+  for i in items
+
+    if i.deleted #check if it is deleted
+      path = idToPath.get(i.fileId)      
+      if folderTree.has path #check to see if the file was not already removed from folderTree
+        logger.debug "#{path} was deleted"
+        folderTree.remove path
+        parent = folderTree.get pth.dirname(path)
+        idx = parent.children.indexOf pth.basename(path)
+        if idx >= 0
+          parent.children.splice(idx, 1)
+        idToPath.remove i.fileId
+      continue
+    else
+      cfile = i.file      
+
+      # if it is not deleted, check to see if it's been marked as trash
+      if cfile.labels.trashed
+        if folderTree.has path
+          folderTree.remove path
+          parent = folderTree.get pth.dirname(path)
+          idx = parent.children.indexOf pth.basename(path)
+          if idx >= 0
+            parent.children.splice(idx, 1)
+          idToPath.remove i.fileId
+        continue
+
+
+      #if it is not deleted or trashed, check to see if it's new or not
+      if idToPath.has(i.fileId)
+        logger.debug "#{path} was updated"
+        path = idToPath.get(i.fileId)
+        f = folderTree.get(path)
+        f.ctime = (new Date(cfile.createdDate)).getTime()
+        f.mtime = (new Date(cfile.modifiedDate)).getTime()
+        if f instanceof GFile
+          if cfile.downloadUrl
+            f.downloadUrl = cfile.downloadUrl
+        continue
+
+      else
+        parentId = cfile.parents[0].id
+        parentPath = idToPath.get(parentId)
+        parent = folderTree.get parentPath
+        path = pth.join parentPath, cfile.title
+        idToPath.set cfile.id, path
+        if cfile.mimeType == 'application/vnd.google-apps.folder'
+          logger.debug "#{path} is a new folder"          
+          folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable )
+        else
+          logger.debug "#{path} is a new file"
+          folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable)
+
+  if items.length > 0
+    fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}      
+    saveFolderTree()
+
+  setTimeout loadChanges, 60000 + Math.random() * (15000)
   return
 ####################################
 ###### Setting up the Client #######
@@ -321,9 +382,6 @@ else
 google.options({ auth: oauth2Client, user: config.email })
 GFile.oauth = oauth2Client;
 GFolder.oauth = oauth2Client;
-
-# loadChanges()
-# console.log getLargestChangeId().wait()
 
 module.exports.folderTree = folderTree
 module.exports.idToPath = idToPath
