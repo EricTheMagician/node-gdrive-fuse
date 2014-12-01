@@ -55,7 +55,7 @@ class GFile extends EventEmitter
       else
         #check to see if token is expired
         if (response.statusCode == 401) or (response.statusCode == 403)
-          logger.debug "There was an error while downloading."
+          logger.silly "There was an error while downloading."
           fn = ->            
             cb("expiredUrl")
             return
@@ -186,8 +186,8 @@ class GFile extends EventEmitter
         file.downloadUrl = res.downloadUrl
       else
         logger.debug "there was an error while updating url"
-        logger.debug "err"
-      cb(res.downloadUrl)
+        logger.debug "err", err
+      cb(file.downloadUrl)
       return
     return
 

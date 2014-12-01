@@ -19,7 +19,6 @@ f = require("./file");
 logger = f.logger
 GFile = f.GFile
 queue = require 'queue'
-q = queue({concurrency: 4, timeout: 7200000 })
 
 #read input config
 config = fs.readJSONSync 'config.json'
@@ -27,6 +26,7 @@ GFile.chunkSize = config.chunkSize
 GFile.GDrive = client.drive;
 GFolder.uploadChunkSize = config.uploadChunkSize
 uploadLocation = pth.join config.cacheLocation, 'upload'
+q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 })
 
 
 #http://lxr.free-electrons.com/source/include/uapi/asm-generic/errno-base.h#L23

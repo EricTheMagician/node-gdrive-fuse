@@ -265,8 +265,8 @@ loadChanges = (cb) ->
   return
 
 parseChanges = (items) ->
+  logger.debug "There was #{items.length} to parse"
   for i in items
-
     if i.deleted #check if it is deleted
       path = idToPath.get(i.fileId)      
       if folderTree.has path #check to see if the file was not already removed from folderTree
@@ -284,6 +284,7 @@ parseChanges = (items) ->
       # if it is not deleted, check to see if it's been marked as trash
       if cfile.labels.trashed
         if folderTree.has path
+          logger.debug "#{path} was trashed"
           folderTree.remove path
           parent = folderTree.get pth.dirname(path)
           idx = parent.children.indexOf pth.basename(path)
@@ -322,6 +323,7 @@ parseChanges = (items) ->
     fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}      
     saveFolderTree()
 
+  logger.debug "Finished parsing changes from google"
   setTimeout loadChanges, 60000 + Math.random() * (15000)
   return
 ####################################

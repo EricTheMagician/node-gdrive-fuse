@@ -8,5 +8,6 @@
   "uploadChunkSize": 16777216,
   "advancedChunks": 5,
   "cacheLocation": "/tmp/node-gdrive",
-  "maxCacheSize": 747520
+  "maxCacheSize": 747520,
+  "maxConcurrentUploads": 4
 }
