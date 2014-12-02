@@ -319,6 +319,8 @@ rmdir = (path, cb) ->
             if idx >= 0
               parent.children.splice idx, 1
             folderTree.remove path
+            client.idToPath.remove(folder.id)
+
             cb(0)
             client.saveFolderTree()
             return
@@ -399,6 +401,8 @@ unlink = (path, cb) ->
           parent.children.splice idx, 1
         folderTree.remove path
         client.saveFolderTree()
+        client.idToPath.remove(file.id)
+
         cb(0) #always return success
         return          
     else
@@ -472,9 +476,10 @@ uploadCallback = (path, cb) ->
         file.ctime = (new Date(result.createdDate)).getTime()
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
-        logger.debug "#{path} folderTree did not exist"
+        logger.debug "#{path} folderTree did not exist"        
         file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
 
+      client.idToPath.set( result.id, path)
       #update folder Tree
       if parent.children.indexOf( file.name ) < 0
         parent.children.push file.name
