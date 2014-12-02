@@ -520,7 +520,18 @@ release = (path, fd, cb) ->
 
       if folderTree.has path
         file = folderTree.get(path)
-        if file.size > 0
+        ###
+        three cases: 
+        if file size is 0: delete it and don't upload
+        if file size is <=10MB, just upload it directly
+        if file size is >10 MB, add to upload queue
+        ###
+
+        if 0 < file.size <=  10485760 #10MB 
+          cb = ->
+            return
+          parent.upload pth.basename(path), path, uploadCallback(path, cb)           
+        else if file.size >  10485760 
           fn = (cb)->
             parent.upload pth.basename(path), path, uploadCallback(path,cb)            
             return
