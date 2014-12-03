@@ -78,6 +78,8 @@ class GFile extends EventEmitter
   recursive: (start,end) =>
     file = @
     path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
+    if start >= @size
+      return
     unless file.open(start)
       unless downloadTree.has("#{file.id}-#{start}")
         downloadTree.set("#{file.id}-#{start}", 1)

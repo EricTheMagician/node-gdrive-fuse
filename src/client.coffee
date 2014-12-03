@@ -131,7 +131,8 @@ parseFilesFolders = (items) ->
 
       #make sure that the folder list is gettting smaller over time. 
     if left.length == notFound.length 
-      logger.info "There #{left.length} folders that were not possible to process"
+      logger.info "There was #{left.length} folders that were not possible to process"
+      logger.debug notFound
       break
     left = notFound
   
