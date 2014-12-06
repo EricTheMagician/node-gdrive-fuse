@@ -59,7 +59,6 @@ getPageFiles = (pageToken, items, cb) ->
         getPageFiles(pageToken, items, cb)
         return
       setTimeout(fn, 4000)
-      return
 
     cb(null, resp.nextPageToken, items.concat(resp.items))
     return
@@ -159,9 +158,9 @@ parseFilesFolders = (items) ->
   logger.info "Everything should be ready to use"
   saveFolderTree()
   getLargestChangeId()
-  setTimeout loadChanges, 90000
+  if require.main != module
+    setTimeout loadChanges, 90000
   return
-
 
 parseFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
@@ -187,12 +186,12 @@ parseFolderTree = ->
         folderTree.set key, new GFolder(o.id, o.parentid, o.name, new Date(o.ctime), new Date(o.mtime), o.permission, o.children)
 
     changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
-    fs.existsSync changeFile, (exists) ->
+    fs.exists changeFile, (exists) ->
       if exists
         fs.readJson changeFile, (err, data) ->
           largestChangeId = data.largestChangeId
-          loadChanges()
-          return
+          if require.main != module
+            loadChanges()
       return
     return
   return
