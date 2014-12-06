@@ -131,13 +131,16 @@ class GFile extends EventEmitter
     else
       end = Math.min(start + GFile.chunkSize, file.size ) - 1
       path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
-      if fs.existsSync( path)
-        fd = fs.openSync( path, 'r' )
-        openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
-        return fd
-      else
+      try
+        stats = fs.statSync path
+        if stats.size == (end - start + 1)
+          fd = fs.openSync( path, 'r' )
+          openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
+          return fd
+        else
+          return false
+      catch
         return false
-
   read: (start,end, readAhead, cb) =>
     _readAheadFn = ->
       if readAhead
