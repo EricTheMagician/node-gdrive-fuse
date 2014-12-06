@@ -21,12 +21,19 @@ GFile = f.GFile
 queue = require 'queue'
 
 #read input config
-config = fs.readJSONSync 'config.json'
-GFile.chunkSize = config.chunkSize
+if fs.existsSync 'config.json'
+  config = fs.readJSONSync 'config.json'
+else
+  config = {}
+
+
+config.mountPoint ||= "/tmp/mnt"
+config.cacheLocation ||=  '/tmp/cache'
+GFile.chunkSize ||= config.chunkSize 8388608 #8MB default
 GFile.GDrive = client.drive;
-GFolder.uploadChunkSize = config.uploadChunkSize
+GFolder.uploadChunkSize ||= 16777216 #16MB default
 uploadLocation = pth.join config.cacheLocation, 'upload'
-q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 })
+q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) #default to 4 concurrent uploads
 
 
 #http://lxr.free-electrons.com/source/include/uapi/asm-generic/errno-base.h#L23
@@ -598,18 +605,25 @@ fn = ->
   return
 setTimeout fn, 25000
 
+start = ->
+  if folderTree.count() > 1
+    try
+      logger.log "info", 'attempting to start f4js'
+      opts = switch os.type()
+        when 'Linux' then  []
+        when 'Darwin' then  ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
+        else []
+      if process.version < '0.11.0'
+        opts.push( "-o", "allow_other")
 
-try
-  logger.log "info", 'attempting to start f4js'
-  opts = switch os.type()
-    when 'Linux' then  []
-    when 'Darwin' then  ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
-    else []
-  if process.version < '0.11.0'
-    opts.push( "-o", "allow_other")
-  fs.ensureDirSync(config.mountPoint)
-  debug = false
-  f4js.start(config.mountPoint, handlers, debug, opts);
-  logger.log('info', "mount point: #{config.mountPoint}")
-catch e
-  logger.log( "error", "Exception when starting file system: #{e}")
+      fs.ensureDirSync(config.mountPoint)
+      debug = false
+      f4js.start(config.mountPoint, handlers, debug, opts);
+      logger.log('info', "mount point: #{config.mountPoint}")
+    catch e
+      logger.log( "error", "Exception when starting file system: #{e}")
+  else
+    setTimeout start, 500
+  return
+  
+start()  

@@ -10,8 +10,12 @@ GFolder = folder.GFolder
 f = require("./file")
 GFile = f.GFile
 uploadTree = folder.uploadTree
+
 #read input config
-config = fs.readJSONSync 'config.json'
+if fs.existsSync 'config.json'
+  config = fs.readJSONSync 'config.json'
+else
+  config = {}
 
 #get logger
 logger =  f.logger
@@ -29,10 +33,11 @@ idToPath = new hashmap()
 
 
 OAuth2Client = google.auth.OAuth2
-oauth2Client = new OAuth2Client(config.clientId, config.clientSecret, config.redirectUrl)
+oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
 drive = google.drive({ version: 'v2' })
 
-dataLocation = pth.join config.cacheLocation, 'data'
+config.cacheLocation ||=  "/tmp/cache" 
+dataLocation = pth.join( config.cacheLocation, 'data' )
 fs.ensureDirSync( dataLocation )
 
 largestChangeId = 1;
@@ -182,9 +187,12 @@ parseFolderTree = ->
         folderTree.set key, new GFolder(o.id, o.parentid, o.name, new Date(o.ctime), new Date(o.mtime), o.permission, o.children)
 
     changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
-    fs.readJson changeFile, (err, data) ->
-      largestChangeId = data.largestChangeId
-      loadChanges()
+    fs.existsSync changeFile, (exists) ->
+      if exists
+        fs.readJson changeFile, (err, data) ->
+          largestChangeId = data.largestChangeId
+          loadChanges()
+          return
       return
     return
   return
@@ -199,6 +207,7 @@ loadFolderTree = ->
       logger.log 'info', "Downloading full folder structure from google"
       getAllFiles()    
     return
+  return
 
 
 lockFolderTree = false
@@ -369,7 +378,7 @@ else
   console.log "Access Token Set"
   loadFolderTree()
 
-google.options({ auth: oauth2Client, user: config.email })
+google.options({ auth: oauth2Client })
 GFile.oauth = oauth2Client;
 GFolder.oauth = oauth2Client;
 

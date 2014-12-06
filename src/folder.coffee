@@ -7,14 +7,20 @@ hashmap = require('hashmap').HashMap
 f = require("./file")
 logger = f.logger
 
+if fs.existsSync 'config.json'
+  config = fs.readJSONSync 'config.json'
+else
+  config = {}
 
-config = fs.readJSONSync 'config.json'
+
+config.cacheLocation ||= '/tmp/cache'
 google = require 'googleapis'
 oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUrl)
 oauth2Client.setCredentials config.accessToken
 google.options({ auth: oauth2Client, user: config.email })
 drive = google.drive({ version: 'v2' })
 lockRefresh = false
+
 refreshToken =  (cb) ->
   unless lockRefresh
     lock = true

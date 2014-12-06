@@ -1,13 +1,10 @@
 {
-  "clientId": "520595891712-ofd914r711g7cuq8uofet8ekf7mneo2g.apps.googleusercontent.com",
-  "clientSecret": "dzxWOFdSUtT7RL8bvrVMOK9t",
-  "redirectUrl": "http://devbox.example.com/",
-  "email": "user email address",
   "mountPoint": "/tmp/mnt",
   "chunkSize": 8388608,
   "uploadChunkSize": 16777216,
   "advancedChunks": 5,
-  "cacheLocation": "/tmp/node-gdrive",
+  "cacheLocation": "/tmp/cache",
   "maxCacheSize": 747520,
-  "maxConcurrentUploads": 4
+  "maxConcurrentUploads": 4,
+  "debug": false
 }
