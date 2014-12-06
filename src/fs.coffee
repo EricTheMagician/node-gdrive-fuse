@@ -20,6 +20,8 @@ logger = f.logger
 GFile = f.GFile
 queue = require 'queue'
 
+{exec} = require('child_process')
+
 #read input config
 if fs.existsSync 'config.json'
   config = fs.readJSONSync 'config.json'
@@ -609,17 +611,25 @@ start = ->
   if folderTree.count() > 1
     try
       logger.log "info", 'attempting to start f4js'
-      opts = switch os.type()
-        when 'Linux' then  []
-        when 'Darwin' then  ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
-        else []
+      switch os.type()
+        when 'Linux' 
+          opts = []
+          command = "fusermount -u #{config.mountPoint}"          
+        when 'Darwin'
+          opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
+          command = "diskutil umount force #{config.mountPoint}"
+        else 
+          opts = []
+          command = "fusermount -u #{config.mountPoint}"
       if process.version < '0.11.0'
         opts.push( "-o", "allow_other")
 
       fs.ensureDirSync(config.mountPoint)
       debug = false
-      f4js.start(config.mountPoint, handlers, debug, opts);
-      logger.log('info', "mount point: #{config.mountPoint}")
+
+      exec command, (err, data) ->
+        f4js.start(config.mountPoint, handlers, debug, opts);
+        logger.log('info', "mount point: #{config.mountPoint}")
     catch e
       logger.log( "error", "Exception when starting file system: #{e}")
   else
