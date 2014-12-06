@@ -10,8 +10,12 @@ GFolder = folder.GFolder
 f = require("./file")
 GFile = f.GFile
 uploadTree = folder.uploadTree
+
 #read input config
-config = fs.readJSONSync 'config.json'
+if fs.existsSync 'config.json'
+  config = fs.readJSONSync 'config.json'
+else
+  config = {}
 
 #get logger
 logger =  f.logger
@@ -29,10 +33,11 @@ idToPath = new hashmap()
 
 
 OAuth2Client = google.auth.OAuth2
-oauth2Client = new OAuth2Client(config.clientId, config.clientSecret, config.redirectUrl)
+oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
 drive = google.drive({ version: 'v2' })
 
-dataLocation = pth.join config.cacheLocation, 'data'
+config.cacheLocation ||=  "/tmp/cache" 
+dataLocation = pth.join( config.cacheLocation, 'data' )
 fs.ensureDirSync( dataLocation )
 
 largestChangeId = 1;
@@ -40,49 +45,36 @@ largestChangeId = 1;
 ####### Client Functions ###########
 ####################################
 
-once = false
+
 getPageFiles = (pageToken, items, cb) ->
   opts =
     fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission),nextPageToken"
-    maxResults: 1000
+    maxResults: 500
     pageToken: pageToken
   drive.files.list opts, (err, resp) ->
     if err
+      logger.log 'error', "There was an error while downloading files from google, retrying"
       logger.error err
       fn = ->
         getPageFiles(pageToken, items, cb)
         return
-
-      if pageToken
-        logger.log 'error', "There was an error while downloading files from google, retrying"
-        setTimeout(fn, 4000)        
-      else
-        if once
-          logger.debug "retrying once a failed get page files"
-          cb(err, resp.nextPageToken, items)
-        else
-          setTimeout(fn, 4000)        
-          once = true
-
+      setTimeout(fn, 4000)
       return
-    once = false
+
     cb(null, resp.nextPageToken, items.concat(resp.items))
     return
   return
 
 getAllFiles = ()->
-  oauth2Client.refreshAccessToken (err,tokens) ->
-    oauth2Client.setCredentials(tokens)
-    callback = (err, nextPageToken, items) ->
-      if nextPageToken
-        getPageFiles(nextPageToken, items, callback)
-      else
-        logger.log 'info', "Finished downloading folder structure from google"
-        getLargestChangeId()
-        parseFilesFolders(items)
-      return
-    getPageFiles(null, [], callback)
+  callback = (err, nextPageToken, items) ->
+    if nextPageToken
+      getPageFiles(nextPageToken, items, callback)
+    else
+      logger.log 'info', "Finished downloading folder structure from google"
+      getLargestChangeId()
+      parseFilesFolders(items)
     return
+  getPageFiles(null, [], callback)
   return
 
 parseFilesFolders = (items) ->
@@ -144,7 +136,8 @@ parseFilesFolders = (items) ->
 
       #make sure that the folder list is gettting smaller over time. 
     if left.length == notFound.length 
-      logger.info "There #{left.length} folders that were not possible to process"
+      logger.info "There was #{left.length} folders that were not possible to process"
+      logger.debug notFound
       break
     left = notFound
   
@@ -194,9 +187,12 @@ parseFolderTree = ->
         folderTree.set key, new GFolder(o.id, o.parentid, o.name, new Date(o.ctime), new Date(o.mtime), o.permission, o.children)
 
     changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
-    fs.readJson changeFile, (err, data) ->
-      largestChangeId = data.largestChangeId
-      loadChanges()
+    fs.existsSync changeFile, (exists) ->
+      if exists
+        fs.readJson changeFile, (err, data) ->
+          largestChangeId = data.largestChangeId
+          loadChanges()
+          return
       return
     return
   return
@@ -211,6 +207,7 @@ loadFolderTree = ->
       logger.log 'info', "Downloading full folder structure from google"
       getAllFiles()    
     return
+  return
 
 
 lockFolderTree = false
@@ -278,8 +275,8 @@ loadChanges = (cb) ->
   return
 
 parseChanges = (items) ->
+  logger.debug "There was #{items.length} to parse"
   for i in items
-
     if i.deleted #check if it is deleted
       path = idToPath.get(i.fileId)      
       if folderTree.has path #check to see if the file was not already removed from folderTree
@@ -297,6 +294,7 @@ parseChanges = (items) ->
       # if it is not deleted, check to see if it's been marked as trash
       if cfile.labels.trashed
         if folderTree.has path
+          logger.debug "#{path} was trashed"
           folderTree.remove path
           parent = folderTree.get pth.dirname(path)
           idx = parent.children.indexOf pth.basename(path)
@@ -335,6 +333,7 @@ parseChanges = (items) ->
     fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}      
     saveFolderTree()
 
+  logger.debug "Finished parsing changes from google"
   setTimeout loadChanges, 60000 + Math.random() * (15000)
   return
 ####################################
@@ -379,7 +378,7 @@ else
   console.log "Access Token Set"
   loadFolderTree()
 
-google.options({ auth: oauth2Client, user: config.email })
+google.options({ auth: oauth2Client })
 GFile.oauth = oauth2Client;
 GFolder.oauth = oauth2Client;
 

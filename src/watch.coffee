@@ -10,7 +10,9 @@ uploadLocation = pth.join(config.cacheLocation, "upload")
 if config.maxCacheSize
   maxCache =  config.maxCacheSize * 1024 * 1024 
 else
-  console.log "max cache size was not. you should exit"
+  console.log "max cache size was not set. you should exit and manually set it"
+  console.log "defaulting to a 10 GB cache"
+  maxCache  = 10737418240  
 
 
 logger = new (winston.Logger)({

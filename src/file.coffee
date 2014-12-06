@@ -4,20 +4,17 @@ hashmap = require( 'hashmap' ).HashMap
 rest = require 'restler'
 winston = require 'winston'
 {EventEmitter} = require 'events'
-logger = new (winston.Logger)({
-    transports: [
-      new (winston.transports.Console)({ level: 'debug' }),
-      new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })
-    ]
-  })
-module.exports.logger = logger
+
 
 ######################################
 ######### Setup File Config ##########
 ######################################
+if fs.existsSync 'config.json'
+  config = fs.readJSONSync 'config.json'
+else
+  config = {}
 
-config = fs.readJSONSync 'config.json'
-
+config.cacheLocation ||=  '/tmp/cache'
 #download location
 downloadLocation = pth.join config.cacheLocation, 'download'
 fs.ensureDirSync downloadLocation
@@ -25,6 +22,20 @@ fs.ensureDirSync downloadLocation
 #upload location
 uploadLocation = pth.join config.cacheLocation, 'upload'
 fs.ensureDirSync uploadLocation
+
+#setup winston logger
+transports = [new (winston.transports.File)({ filename: '/tmp/GDriveF4JS.log', level:'debug' })]
+if config.debug
+  transports.push new (winston.transports.Console)({ level: 'debug' })
+else
+  transports.push new (winston.transports.Console)({ level: 'info' })
+
+logger = new (winston.Logger)({
+    transports: transports
+})
+
+module.exports.logger = logger
+config.advancedChunks ||= 5
 
 #opened files
 openedFiles = new hashmap()
@@ -55,7 +66,7 @@ class GFile extends EventEmitter
       else
         #check to see if token is expired
         if (response.statusCode == 401) or (response.statusCode == 403)
-          logger.debug "There was an error while downloading."
+          logger.silly "There was an error while downloading."
           fn = ->            
             cb("expiredUrl")
             return
@@ -78,6 +89,8 @@ class GFile extends EventEmitter
   recursive: (start,end) =>
     file = @
     path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
+    if start >= @size
+      return
     unless file.open(start)
       unless downloadTree.has("#{file.id}-#{start}")
         downloadTree.set("#{file.id}-#{start}", 1)
@@ -186,8 +199,8 @@ class GFile extends EventEmitter
         file.downloadUrl = res.downloadUrl
       else
         logger.debug "there was an error while updating url"
-        logger.debug "err"
-      cb(res.downloadUrl)
+        logger.debug "err", err
+      cb(file.downloadUrl)
       return
     return
 

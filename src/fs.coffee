@@ -19,14 +19,21 @@ f = require("./file");
 logger = f.logger
 GFile = f.GFile
 queue = require 'queue'
-q = queue({concurrency: 4, timeout: 7200000 })
 
 #read input config
-config = fs.readJSONSync 'config.json'
-GFile.chunkSize = config.chunkSize
+if fs.existsSync 'config.json'
+  config = fs.readJSONSync 'config.json'
+else
+  config = {}
+
+
+config.mountPoint ||= "/tmp/mnt"
+config.cacheLocation ||=  '/tmp/cache'
+GFile.chunkSize ||= config.chunkSize 8388608 #8MB default
 GFile.GDrive = client.drive;
-GFolder.uploadChunkSize = config.uploadChunkSize
+GFolder.uploadChunkSize ||= 16777216 #16MB default
 uploadLocation = pth.join config.cacheLocation, 'upload'
+q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) #default to 4 concurrent uploads
 
 
 #http://lxr.free-electrons.com/source/include/uapi/asm-generic/errno-base.h#L23
@@ -319,6 +326,8 @@ rmdir = (path, cb) ->
             if idx >= 0
               parent.children.splice idx, 1
             folderTree.remove path
+            client.idToPath.remove(folder.id)
+
             cb(0)
             client.saveFolderTree()
             return
@@ -399,6 +408,8 @@ unlink = (path, cb) ->
           parent.children.splice idx, 1
         folderTree.remove path
         client.saveFolderTree()
+        client.idToPath.remove(file.id)
+
         cb(0) #always return success
         return          
     else
@@ -472,9 +483,10 @@ uploadCallback = (path, cb) ->
         file.ctime = (new Date(result.createdDate)).getTime()
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
-        logger.debug "#{path} folderTree did not exist"
+        logger.debug "#{path} folderTree did not exist"        
         file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
 
+      client.idToPath.set( result.id, path)
       #update folder Tree
       if parent.children.indexOf( file.name ) < 0
         parent.children.push file.name
@@ -515,7 +527,18 @@ release = (path, fd, cb) ->
 
       if folderTree.has path
         file = folderTree.get(path)
-        if file.size > 0
+        ###
+        three cases: 
+        if file size is 0: delete it and don't upload
+        if file size is <=10MB, just upload it directly
+        if file size is >10 MB, add to upload queue
+        ###
+
+        if 0 < file.size <=  10485760 #10MB 
+          cb = ->
+            return
+          parent.upload pth.basename(path), path, uploadCallback(path, cb)           
+        else if file.size >  10485760 
           fn = (cb)->
             parent.upload pth.basename(path), path, uploadCallback(path,cb)            
             return
@@ -582,18 +605,25 @@ fn = ->
   return
 setTimeout fn, 25000
 
+start = ->
+  if folderTree.count() > 1
+    try
+      logger.log "info", 'attempting to start f4js'
+      opts = switch os.type()
+        when 'Linux' then  []
+        when 'Darwin' then  ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
+        else []
+      if process.version < '0.11.0'
+        opts.push( "-o", "allow_other")
 
-try
-  logger.log "info", 'attempting to start f4js'
-  opts = switch os.type()
-    when 'Linux' then  []
-    when 'Darwin' then  ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
-    else []
-  if process.version < '0.11.0'
-    opts.push( "-o", "allow_other")
-  fs.ensureDirSync(config.mountPoint)
-  debug = false
-  f4js.start(config.mountPoint, handlers, debug, opts);
-  logger.log('info', "mount point: #{config.mountPoint}")
-catch e
-  logger.log( "error", "Exception when starting file system: #{e}")
+      fs.ensureDirSync(config.mountPoint)
+      debug = false
+      f4js.start(config.mountPoint, handlers, debug, opts);
+      logger.log('info', "mount point: #{config.mountPoint}")
+    catch e
+      logger.log( "error", "Exception when starting file system: #{e}")
+  else
+    setTimeout start, 500
+  return
+  
+start()  
