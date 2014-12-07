@@ -616,7 +616,7 @@ start = ->
           opts = []
           command = "fusermount -u #{config.mountPoint}"          
         when 'Darwin'
-          opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
+          opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions", "-o", "auto_cache"]
           command = "diskutil umount force #{config.mountPoint}"
         else 
           opts = []
@@ -628,8 +628,13 @@ start = ->
       debug = false
 
       exec command, (err, data) ->
+        if err
+          logger.error "unmount error:", err
+        if data
+          logger.info "unmounting output:", data
         f4js.start(config.mountPoint, handlers, debug, opts);
         logger.log('info', "mount point: #{config.mountPoint}")
+        return
     catch e
       logger.log( "error", "Exception when starting file system: #{e}")
   else
