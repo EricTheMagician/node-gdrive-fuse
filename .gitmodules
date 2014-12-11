@@ -1,0 +1,7 @@
+[submodule "node_modules/fusejs"]
+	path = node_modules/fusejs
+	url = https://github.com/thejinx0r/fusejs
+	branch = dev
+[submodule "src/fusejs"]
+	path = src/fusejs
+	url = https://github.com/thejinx0r/fusejs

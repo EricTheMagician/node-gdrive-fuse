@@ -277,15 +277,25 @@ saveUploadTree = ->
 
 class GFolder
   @uploadChunkSize: 1024*1024*16
-  constructor: (@id, @parentid, @name, @ctime, @mtime, @permission, @children = []) ->
+  constructor: (@id, @parentid, @name, @ctime, @mtime, @inode, @permission, @children = []) ->
 
+  getAttrSync: () =>
+    attr =
+      mode: 0o40777,
+      size: 4096 #standard size of a directory
+      nlink: @children.length + 1,
+      mtime: @mtime,
+      ctime: @ctime,
+      inode: @inode
+    return attr
   getAttr: (cb) =>
     attr =
       mode: 0o40777,
       size: 4096 #standard size of a directory
       nlink: @children.length + 1,
-      mtime: new Date(@mtime),
-      ctime: new Date(@ctime)
+      mtime: @mtime,
+      ctime: @ctime,
+      inode: @inode
     cb(0,attr)
     return
 

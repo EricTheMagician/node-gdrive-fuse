@@ -28,8 +28,11 @@ logger =  f.logger
 #Create maps of name and files
 folderTree = new hashmap()
 now = (new Date).getTime()
-folderTree.set('/', new GFolder(null, null, 'root',now, now,true, ['loading data']))
+folderTree.set('/', new GFolder(null, null, 'root',now, now, 1, true, ['loading data']))
+inodeCount = 2
+
 idToPath = new hashmap()
+inodeToPath = new hashmap()
 
 
 OAuth2Client = google.auth.OAuth2
@@ -95,7 +98,7 @@ parseFilesFolders = (items) ->
       if i.mimeType == "application/vnd.google-apps.folder"
         unless rootFound
           if i.parents[0].isRoot
-            folderTree.set('/', new GFolder(i.parents[0].id, null, 'root',now, now,true))
+            folderTree.set('/', new GFolder(i.parents[0].id, null, 'root',now, now,1, true))
             idToPath.set(i.parents[0].id, '/')
             logger.log "info", "root node found"
             rootFound = true
@@ -129,7 +132,9 @@ parseFilesFolders = (items) ->
         else
           continue
         #set up the new folder
-        folderTree.set(path, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable ))
+        inodeToPath.set inodeCount, path
+        folderTree.set(path, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable ))
+        inodeCount++
       else
         notFound.push f
 
@@ -151,8 +156,10 @@ parseFilesFolders = (items) ->
 
       path = pth.join parentPath, f.title
       idToPath.set( f.id, path)
+      inodeToPath.set inodeCount, path
 
-      folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable)
+      folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable)
+      inodeCount++
 
   logger.info "Finished parsing files"
   logger.info "Everything should be ready to use"
@@ -165,11 +172,13 @@ parseFilesFolders = (items) ->
 parseFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
   now = Date.now()
-
+  inode = 1
   fs.readJson jsonFile, (err, data) ->
     for key in Object.keys(data)
       o = data[key]
-
+      inodeToPath.set inode, key
+      o.inode = inode
+      inode++
       #make sure parent directory exists
       unless folderTree.has(pth.dirname(key))
         continue
@@ -179,11 +188,11 @@ parseFolderTree = ->
       idToPath.set(o.parentid, pth.dirname(key))
 
       if o.size >= 0
-        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, new Date(o.ctime), new Date(o.mtime), o.permission )
+        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
       else
         # keep track of the conversion of bitcasa path to real path
         idToPath.set o.path, key
-        folderTree.set key, new GFolder(o.id, o.parentid, o.name, new Date(o.ctime), new Date(o.mtime), o.permission, o.children)
+        folderTree.set key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
 
     changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
     fs.exists changeFile, (exists) ->
@@ -193,6 +202,8 @@ parseFolderTree = ->
           if require.main != module
             loadChanges()
       return
+    
+    inodeCount = inode
     return
   return
 
@@ -275,6 +286,7 @@ loadChanges = (cb) ->
 
 parseChanges = (items) ->
   logger.debug "There was #{items.length} to parse"
+  notFound = []
   for i in items
     if i.deleted #check if it is deleted
       path = idToPath.get(i.fileId)      
@@ -323,11 +335,12 @@ parseChanges = (items) ->
         idToPath.set cfile.id, path
         if cfile.mimeType == 'application/vnd.google-apps.folder'
           logger.debug "#{path} is a new folder"          
-          folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable )
+          folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inodeCount, cfile.editable )
+          idToPath.set cfile.id, path
         else
           logger.debug "#{path} is a new file"
-          folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable)
-
+          folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inodeCount, cfile.editable)
+        inodeCount++
   if items.length > 0
     fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}      
     saveFolderTree()
@@ -386,3 +399,4 @@ module.exports.idToPath = idToPath
 module.exports.saveFolderTree = saveFolderTree
 module.exports.drive = drive
 module.exports.loadChanges = loadChanges
+module.exports.inodeToPath = inodeToPath
