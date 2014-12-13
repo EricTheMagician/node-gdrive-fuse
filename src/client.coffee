@@ -267,7 +267,7 @@ loadPageChange = (start, items, cb) ->
 
 
 loadChanges = (cb) ->
-  id = largestChangeId+1
+  id = largestChangeId
   logger.debug "Getting changes from Google Drive. The last change id was #{largestChangeId}."
 
   callback = (err, newId, items, pageToken) ->
@@ -307,11 +307,12 @@ parseChanges = (items) ->
         if folderTree.has path
           logger.debug "#{path} was trashed"
           folderTree.remove path
-          parent = folderTree.get pth.dirname(path)
-          idx = parent.children.indexOf pth.basename(path)
-          if idx >= 0
-            parent.children.splice(idx, 1)
           idToPath.remove i.fileId
+          parent = folderTree.get pth.dirname(path)
+          if parent
+            idx = parent.children.indexOf pth.basename(path)
+            if idx >= 0
+              parent.children.splice(idx, 1)
         continue
 
 
@@ -330,17 +331,26 @@ parseChanges = (items) ->
       else
         parentId = cfile.parents[0].id
         parentPath = idToPath.get(parentId)
+        unless parentPath
+          notFound.push i
+          continue
         parent = folderTree.get parentPath
         path = pth.join parentPath, cfile.title
         idToPath.set cfile.id, path
         if cfile.mimeType == 'application/vnd.google-apps.folder'
           logger.debug "#{path} is a new folder"          
           folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inodeCount, cfile.editable )
-          idToPath.set cfile.id, path
+          inodeToPath.set cfile.id, path
         else
           logger.debug "#{path} is a new file"
           folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inodeCount, cfile.editable)
+        inodeToPath.set inodeCount, path
         inodeCount++
+  
+  if notFound.length > 0 and notFound.length < items.length
+    parseChanges(notFound)
+    return
+
   if items.length > 0
     fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}      
     saveFolderTree()

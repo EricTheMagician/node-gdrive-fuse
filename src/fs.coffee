@@ -97,7 +97,6 @@ class GDriveFS extends fuse.FileSystem
 
   opendir: (context, inode, fileInfo, reply) ->
       console.log('Opendir was called!');
-      console.log inode, fileInfo
       # //reply.err(0);
       reply.open(fileInfo);
 
@@ -142,87 +141,83 @@ class GDriveFS extends fuse.FileSystem
 
   open: (context, inode, fileInfo, reply) ->
     console.log('Open was called!');
-    console.log inode
-    
-    err = 0 # assume success
-    flag = fileInfo.flags & 3
-    logger.log "silly", "opening file #{path} - flags: #{flags}/#{flag}"
+    console.log  fileInfo
+    path = inodeToPath.get inode
     parent = folderTree.get pth.dirname(path)
-    switch flag
-      when 0 #read only
-        if folderTree.has(path)
-          file = folderTree.get(path)
-          if file instanceof GFile
-            if file.downloadUrl #make sure that the file has been fully uploaded
-              cb(0,null)# // we don't return a file handle, so fuse4js will initialize it to 0
-            else
-              cb -errnoMap.EACCESS
+    flags = fileInfo.flags
+    if flags.rdonly #read only
+      if folderTree.has(path)
+        file = folderTree.get(path)
+        if file instanceof GFile
+          if file.downloadUrl #make sure that the file has been fully uploaded
+            reply.open(fileInfo)
           else
-            cb -errnoMap.EISDIR
-          return
+            reply.err -errnoMap.EACCESS
         else
-          cb(-errnoMap.ENOENT)
-          return
+          reply.err-errnoMap.EISDIR
+      else
+        reply.err -errnoMap.ENOENT
+      return
 
-      when 1 #write only
-        cache = MD5(path)
-        logger.log 'debug', "tried to open file \"#{path}\" for writing"
-        if folderTree.has(path) #if folderTree has path, make sure it's a file with size zero
-          file = folderTree.get(path)
-          if (file instanceof GFile)
-             if file.size == 0
-              logger.debug "#{path} size was 0"
-              fs.open pth.join(uploadLocation, cache), 'w', (err,fd) ->
-                if err
-                  logger.debug "could not open file for writing"
-                  logger.debug err
-                  cb -errnoMap[err.code]
-                else
-                  cb 0, fd
-                return
-
-             else
-               cb -errnoMap.EACCESS
-          else
-            cb -errnoMap.EISDIR
-          return
-        else #if it doesn't have the path, create the file
-          parent = folderTree.get pth.dirname(path)
-          if parent and parent instanceof GFolder
-            now = ( new Date()).getTime()
-            name = pth.basename(path)
-
-            file = new GFile(null, null, parent.id, name, 0, now, now, true)
-            folderTree.set path, file
-            upFile = 
-              cache: cache
-              uploading: false
-            uploadTree.set path, upFile
-            saveUploadTree()
-
-            if parent.children.indexOf(name) < 0
-              parent.children.push name
-
+    if flags.wronly #write only
+      cache = MD5(path)
+      logger.log 'debug', "tried to open file \"#{path}\" for writing"
+      reply.err -errnoMap.ENOENT
+      if folderTree.has(path) #if folderTree has path, make sure it's a file with size zero
+        file = folderTree.get(path)
+        if (file instanceof GFile)
+           if file.size == 0
+            logger.debug "#{path} size was 0"
             fs.open pth.join(uploadLocation, cache), 'w', (err,fd) ->
               if err
+                logger.debug "could not open file for writing"
+                logger.debug err
                 cb -errnoMap[err.code]
               else
                 cb 0, fd
               return
 
-            return
-          else
-            cb -errnoMap.EPERM
-            return
-
-        cb(-errnoMap.ENOENT)
+           else
+             cb -errnoMap.EACCESS
+        else
+          cb -errnoMap.EISDIR
         return
+      else #if it doesn't have the path, create the file
+        parent = folderTree.get pth.dirname(path)
+        if parent and parent instanceof GFolder
+          now = ( new Date()).getTime()
+          name = pth.basename(path)
 
-      when 2 #read/write
-        logger.log 'info', "tried to open file \"#{path}\" for r+w"
-        cb(-errnoMap.ENOENT)
+          file = new GFile(null, null, parent.id, name, 0, now, now, true)
+          folderTree.set path, file
+          upFile = 
+            cache: cache
+            uploading: false
+          uploadTree.set path, upFile
+          saveUploadTree()
 
-    reply.open(fileInfo);
+          if parent.children.indexOf(name) < 0
+            parent.children.push name
+
+          fs.open pth.join(uploadLocation, cache), 'w', (err,fd) ->
+            if err
+              cb -errnoMap[err.code]
+            else
+              cb 0, fd
+            return
+
+          return
+        else
+          cb -errnoMap.EPERM
+          return
+
+      cb(-errnoMap.ENOENT)
+      return
+
+    if flags.rdwr #read/write
+      logger.log 'info', "tried to open file \"#{path}\" for r+w"
+      reply.err -errnoMap.ENOENT
+
     return
   # /*
   #  * Handler for the read() system call.
@@ -234,22 +229,17 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  *     A positive value represents the number of bytes actually read.
   #  */
-  read: (context, inode, size, offset, fileInfo, reply) ->
-    console.log('Read was called!');
-    console.log context,inode    
-    reply.buffer(new Buffer('hellow world'));
-    return
+  read: (context, inode, len, offset, fileInfo, reply) ->
+    path = inodeToPath.get inode
+    console.log "#{len}, #{offset}, #{path}"
     logger.log "silly", "reading file #{path} - #{offset}:#{len}"
 
     if folderTree.has(path)
       callback = (dataBuf) ->
-        try
-          dataBuf.copy(buf)
-          cb(dataBuf.length)
-        catch error
-          logger.log( "error", "failed reading: #{error}")
-          cb(-errnoMap.EIO)
-        return
+        now = ->
+          reply.buffer(dataBuf,dataBuf.length)
+          return
+        process.nextTick now
 
       #make sure that we are only reading a file
       file = folderTree.get(path)
@@ -259,12 +249,12 @@ class GDriveFS extends fuse.FileSystem
         if offset < file.size
           file.read(offset, offset+len-1,true,callback)
         else
-          cb(-errnoMap.ESPIPE)
+          reply.err(-errnoMap.ESPIPE)
       else
-        cb(-errnoMap.EISDIR)
+        reply.err(-errnoMap.EISDIR)
 
     else
-      cb(-errnoMap.ENOENT)
+      reply.err(-errnoMap.ENOENT)
 
     return
 
@@ -539,20 +529,16 @@ class GDriveFS extends fuse.FileSystem
         reply.err PosixError.ENOENT
 
   lookup: (context, parent, name, reply) ->
-      console.log('Lookup!');
-      console.log('Name -> ' + name);
+      console.log('Lookup -> Name -> ' + name);
       parentPath = inodeToPath.get parent
       # parent = folderTree.get parentPath
       childPath =  pth.join(parentPath, name)
       parent = folderTree.get(parentPath)
       child = folderTree.get childPath
-      console.log "parentPath: #{parentPath}, childPath: #{childPath}, children: #{parent.children}, child: #{child}"
       if folderTree.has childPath
-        console.log "had childpath: #{child.name}"        
         child = folderTree.get childPath
         attr = child.getAttrSync()
         attr.size ||= 4096
-        console.log attr
         entry = {
             inode: attr.inode,
             # generation: 2,
@@ -709,8 +695,11 @@ start = ->
           logger.error "unmount error:", err
         if data
           logger.info "unmounting output:", data
-        opts.push config.mountPoint
-        opts.push "-s"
+        opts =  ["GDrive",  "-s", "-f", "-o",  "noappledouble", "-o",'daemon_timeout=0',config.mountPoint]
+        # opts.push "-s"
+        # opts.push "-f"
+
+        # opts.push "-mt"
         # opts.push "-d"
         fuse.fuse.mount
           filesystem: GDriveFS

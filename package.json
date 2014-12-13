@@ -19,7 +19,7 @@
     "async": "^0.9.0",
     "coffee-script": "~1.8.0",
     "fs-extra": "^0.10.0",
-    "fuse4js": "~0.1.9",
+    "fusejs": "~0.0.1",
     "googleapis": "^1.0.20",
     "hashmap": "^1.1.0",
     "limiter": "~1.0.5",

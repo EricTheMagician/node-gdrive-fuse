@@ -83,7 +83,6 @@ class GFile extends EventEmitter
       mtime: @mtime,
       ctime: @ctime
       inode: @inode
-    console.log @name, attr
     return attr
   getAttr: (cb) =>
     attr =
@@ -259,6 +258,7 @@ class GFile extends EventEmitter
           cb(result)
         file.emit 'downloaded', chunkStart, result
         return
+      console.log file
       GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, callback)
 
     else if nChunks < 2      
