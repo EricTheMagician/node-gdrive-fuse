@@ -52,7 +52,7 @@ class GFile extends EventEmitter
 
   constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @inode, @permission) ->
 
-  @download = (url, start,end, size, cb ) ->
+  @download = (url, start,end, size, cb ) ->    
     rest.get url, {
       decoding: "buffer"
       timeout: 300000
@@ -61,6 +61,7 @@ class GFile extends EventEmitter
         "Range": "bytes=#{start}-#{end}"
     }
     .on 'complete', (result, response) ->
+      console.log "Finished downloading, #{result}"
       if result instanceof Error        
         cb(result)
       else
@@ -258,7 +259,6 @@ class GFile extends EventEmitter
           cb(result)
         file.emit 'downloaded', chunkStart, result
         return
-      console.log file
       GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, callback)
 
     else if nChunks < 2      
