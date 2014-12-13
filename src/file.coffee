@@ -52,7 +52,7 @@ class GFile extends EventEmitter
 
   constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @inode, @permission) ->
 
-  @download = (url, start,end, size, cb ) ->    
+  @download: (url, start,end, size, cb ) ->    
     rest.get url, {
       decoding: "buffer"
       timeout: 300000
