@@ -7,7 +7,6 @@ pth = require 'path'
 fuse = require 'fusejs'
 os = require 'os'
 MD5 = require 'MD5'
-
 PosixError = fuse.PosixError;
 
 
@@ -141,7 +140,7 @@ class GDriveFS extends fuse.FileSystem
 
   open: (context, inode, fileInfo, reply) ->
     console.log('Open was called!');
-    console.log  fileInfo
+    # console.log  fileInfo
     path = inodeToPath.get inode
     parent = folderTree.get pth.dirname(path)
     flags = fileInfo.flags
@@ -231,15 +230,12 @@ class GDriveFS extends fuse.FileSystem
   #  */
   read: (context, inode, len, offset, fileInfo, reply) ->
     path = inodeToPath.get inode
-    console.log "#{len}, #{offset}, #{path}"
     logger.log "silly", "reading file #{path} - #{offset}:#{len}"
 
     if folderTree.has(path)
       callback = (dataBuf) ->
-        now = ->
-          reply.buffer(dataBuf,dataBuf.length)
-          return
-        process.nextTick now
+        reply.buffer(dataBuf, dataBuf.length)
+        return
 
       #make sure that we are only reading a file
       file = folderTree.get(path)
@@ -255,6 +251,8 @@ class GDriveFS extends fuse.FileSystem
 
     else
       reply.err(-errnoMap.ENOENT)
+
+
 
     return
 
@@ -520,16 +518,17 @@ class GDriveFS extends fuse.FileSystem
 
   getxattr: (context, inode, name, size, position, reply) ->
       console.log('GetXAttr was called!')
-      console.log('Extended attribute name -> ' + name, inode,name,size,position)
       parentPath = inodeToPath.get inode
       childPath = pth.join(parentPath, name)
       if folderTree.has childPath
         reply.err 0
       else
         reply.err PosixError.ENOENT
+  access: (context, inode, mask, reply) ->
+      console.log('Access was called!');
+      reply.err(0);
 
   lookup: (context, parent, name, reply) ->
-      console.log('Lookup -> Name -> ' + name);
       parentPath = inodeToPath.get parent
       # parent = folderTree.get parentPath
       childPath =  pth.join(parentPath, name)
@@ -695,7 +694,7 @@ start = ->
           logger.error "unmount error:", err
         if data
           logger.info "unmounting output:", data
-        opts =  ["GDrive",  "-s", "-f", "-o",  "noappledouble", "-o",'daemon_timeout=0',config.mountPoint]
+        opts =  ["GDrive", "-s", "-f", "-o", "allow_other", config.mountPoint]
         # opts.push "-s"
         # opts.push "-f"
 

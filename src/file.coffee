@@ -5,7 +5,6 @@ rest = require 'restler'
 winston = require 'winston'
 {EventEmitter} = require 'events'
 
-
 ######################################
 ######### Setup File Config ##########
 ######################################
@@ -61,7 +60,6 @@ class GFile extends EventEmitter
         "Range": "bytes=#{start}-#{end}"
     }
     .on 'complete', (result, response) ->
-      console.log "Finished downloading, #{result}"
       if result instanceof Error        
         cb(result)
       else
