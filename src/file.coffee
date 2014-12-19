@@ -113,6 +113,7 @@ class GFile extends EventEmitter
                 file.emit 'downloaded', start, result
                 return
             else
+              downloadTree.remove("#{file.id}-#{start}")
               file.emit 'downloaded', start, buf0
 
           return
@@ -161,9 +162,9 @@ class GFile extends EventEmitter
     chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1
 
     path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
-    listenCallback = (chunkStart, buffer)  ->      
-      if (chunkStart <= start <= (chunkEnd)  ) and (buffer instanceof Buffer)
-        cb buffer.slice(start - chunkStart, chunkEnd - end )
+    listenCallback = (cStart, buffer)  ->      
+      if ( cStart <= start < (cStart + GFile.chunkSize-1)  ) and (buffer instanceof Buffer) and buffer.length > 0
+        cb buffer.slice(start - chunkStart, end - chunkStart )
         file.removeListener 'downloaded', listenCallback
       return
 
@@ -245,12 +246,14 @@ class GFile extends EventEmitter
           path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
           fs.writeFile path, result, (err) ->
             if err
+              downloadTree.remove("#{file.id}-#{start}")
               logger.error "there was an error saving #{path}"
               logger.error err
               cb( buf0)
             else
               downloadTree.remove("#{file.id}-#{start}")
-              cb result.slice(start - chunkStart, chunkEnd - end )
+              console.log "downloads start: #{start}, end: #{end}, chunkStart: #{chunkStart}, chunkEnd: #{chunkEnd},slices: (#{start-chunkStart}, #{end-chunkStart}"
+              cb result.slice(start - chunkStart,  end-chunkStart )
             return
             
         else

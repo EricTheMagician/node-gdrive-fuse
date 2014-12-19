@@ -317,14 +317,15 @@ parseChanges = (items) ->
 
       #if it is not deleted or trashed, check to see if it's new or not
       if idToPath.has(i.fileId)
-        logger.debug "#{path} was updated"
         path = idToPath.get(i.fileId)
-        f = folderTree.get(path)
-        f.ctime = (new Date(cfile.createdDate)).getTime()
-        f.mtime = (new Date(cfile.modifiedDate)).getTime()
-        if f instanceof GFile
-          if cfile.downloadUrl
-            f.downloadUrl = cfile.downloadUrl
+        if folderTree.has(path)
+          logger.debug "#{path} was updated"          
+          f = folderTree.get(path)
+          f.ctime = (new Date(cfile.createdDate)).getTime()
+          f.mtime = (new Date(cfile.modifiedDate)).getTime()
+          if f instanceof GFile
+            if cfile.downloadUrl
+              f.downloadUrl = cfile.downloadUrl
         continue
 
       else

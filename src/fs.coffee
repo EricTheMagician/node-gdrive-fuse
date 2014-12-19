@@ -83,7 +83,6 @@ class GDriveFS extends fuse.FileSystem
 
   getattr: (context, inode, reply) ->
     path = inodeToPath.get inode
-    console.log "get attr #{path}, #{inode}"
     if folderTree.has(path)
       callback = (status, attr)->
         reply.attr(attr, 5)
