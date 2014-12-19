@@ -151,15 +151,16 @@ class GFile extends EventEmitter
       catch
         return false
   read: (start,end, readAhead, cb) =>
+    file = @
+    chunkStart = Math.floor((start)/GFile.chunkSize)* GFile.chunkSize
+    chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1
+
     _readAheadFn = ->
       if readAhead
         if chunkStart <= start < (chunkStart + 131072)
           file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
           file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
 
-    file = @
-    chunkStart = Math.floor((start)/GFile.chunkSize)* GFile.chunkSize
-    chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1
 
     path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
     listenCallback = (cStart, buffer)  ->      
@@ -173,7 +174,7 @@ class GFile extends EventEmitter
       _readAheadFn()
       return
 
-    downloadTree.set("#{file.id}-#{start}", 1)
+    downloadTree.set("#{file.id}-#{chunkStart}", 1)
     #try to open the file or get the file descriptor
     fd = @open(chunkStart)
 
@@ -183,7 +184,7 @@ class GFile extends EventEmitter
       _readAheadFn()
       return
 
-    downloadTree.remove("#{file.id}-#{start}")
+    downloadTree.remove("#{file.id}-#{chunkStart}")
 
     #if the file is opened, read from it
     readSize = end-start;
