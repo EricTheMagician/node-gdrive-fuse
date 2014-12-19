@@ -239,20 +239,20 @@ class GFile extends EventEmitter
             logger.error "there was an error downloading file"
             logger.error err
             cb(buf0)
-            downloadTree.remove("#{file.id}-#{start}")
+            downloadTree.remove("#{file.id}-#{chunkStart}")
             file.emit 'downloaded', chunkStart, buf0
             return
         if result instanceof Buffer
           path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
           fs.writeFile path, result, (err) ->
             if err
-              downloadTree.remove("#{file.id}-#{start}")
+              downloadTree.remove("#{file.id}-#{chunkStart}")
               logger.error "there was an error saving #{path}"
               logger.error err
               cb( buf0)
             else
-              downloadTree.remove("#{file.id}-#{start}")
-              console.log "downloads start: #{start}, end: #{end}, chunkStart: #{chunkStart}, chunkEnd: #{chunkEnd},slices: (#{start-chunkStart}, #{end-chunkStart}"
+              downloadTree.remove("#{file.id}-#{chunkStart}")
+              console.log "downloads start: #{start}, end: #{end}, chunkStart: #{chunkStart}, chunkEnd: #{chunkEnd},slices: (#{start-chunkStart}, #{end-chunkStart})"
               cb result.slice(start - chunkStart,  end-chunkStart )
             return
             
