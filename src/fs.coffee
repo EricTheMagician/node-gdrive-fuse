@@ -83,20 +83,18 @@ class GDriveFS extends fuse.FileSystem
 
   getattr: (context, inode, reply) ->
     path = inodeToPath.get inode
-    console.log "getattr inode#: #{inode} which is #{path}"
+    console.log "get attr #{path}, #{inode}"
     if folderTree.has(path)
       callback = (status, attr)->
-        reply.attr(attr, 30)
+        reply.attr(attr, 5)
         return
       folderTree.get(path).getAttr(callback)
         
     else
-      reply.err(-errnoMap.ENOENT)
+      reply.err(errnoMap.ENOENT)
     return
 
   opendir: (context, inode, fileInfo, reply) ->
-      console.log('Opendir was called!');
-      # //reply.err(0);
       reply.open(fileInfo);
 
   releasedir: (context, inode, fileInfo, reply) ->
@@ -112,35 +110,44 @@ class GDriveFS extends fuse.FileSystem
   #  */
   readdir: (context, inode, requestedSize, offset, fileInfo, reply) ->
     path = inodeToPath.get inode
-    console.log "readdir #{path}, #{offset}, #{requestedSize}"
     # console.log path
     if folderTree.has(path)
       object = folderTree.get(path)
       if object instanceof GFile
-        reply.err -errnoMap.ENOTDIR
+        reply.err errnoMap.ENOTDIR
       else if object instanceof GFolder
         size = Math.max( requestedSize , object.children.length * 64)
         # size = requestedSize
         parent = folderTree.get pth.dirname(path)
         totalSize = 0
-        totalSize += reply.addDirEntry('.', requestedSize, {inode: object.inode}, offset);
-        totalSize += reply.addDirEntry('..', requestedSize, {inode: parent.inode}, offset);
+        #totalSize += reply.addDirEntry('.', requestedSize, {inode: object.inode}, offset);
+        # totalSize += reply.addDirEntry('..', requestedSize, {inode: parent.inode}, offset);
         for child in object.children
           cpath = pth.join(path,child)
           cnode = folderTree.get cpath
           attr = cnode.getAttrSync()
           len = reply.addDirEntry(child, requestedSize, {inode: cnode.inode}, offset);          
           totalSize += len
-        reply.buffer(new Buffer(0), requestedSize)
+        if object.children.length == 0
+          reply.buffer(new Buffer(0), 0)
+        else
+          reply.buffer(new Buffer(0), requestedSize)
       else
-        reply.err -errnoMap.ENOENT
+        reply.err errnoMap.ENOENT
     else
-      reply.err -errnoMap.ENOENT
+      reply.err errnoMap.ENOENT
     return
 
+  setattr: (context, inode, attrs, reply) ->
+    path = inodeToPath.get inode
+    file = folderTree.get path
+    if 'size' in attrs
+      file.size = attrs.size
+
+    reply.attr(file.getAttrSync(), 5);
+
+
   open: (context, inode, fileInfo, reply) ->
-    console.log('Open was called!');
-    # console.log  fileInfo
     path = inodeToPath.get inode
     parent = folderTree.get pth.dirname(path)
     flags = fileInfo.flags
@@ -151,17 +158,16 @@ class GDriveFS extends fuse.FileSystem
           if file.downloadUrl #make sure that the file has been fully uploaded
             reply.open(fileInfo)
           else
-            reply.err -errnoMap.EACCESS
+            reply.err errnoMap.EACCESS
         else
-          reply.err-errnoMap.EISDIR
+          reply.errerrnoMap.EISDIR
       else
-        reply.err -errnoMap.ENOENT
+        reply.err errnoMap.ENOENT
       return
 
     if flags.wronly #write only
       cache = MD5(path)
       logger.log 'debug', "tried to open file \"#{path}\" for writing"
-      reply.err -errnoMap.ENOENT
       if folderTree.has(path) #if folderTree has path, make sure it's a file with size zero
         file = folderTree.get(path)
         if (file instanceof GFile)
@@ -171,15 +177,16 @@ class GDriveFS extends fuse.FileSystem
               if err
                 logger.debug "could not open file for writing"
                 logger.debug err
-                cb -errnoMap[err.code]
+                reply.err errnoMap[err.code]
               else
-                cb 0, fd
+                fileInfo.fh = fd
+                reply.open(fileInfo)
               return
 
            else
-             cb -errnoMap.EACCESS
+             reply.err errnoMap.EACCESS
         else
-          cb -errnoMap.EISDIR
+          reply.err errnoMap.EISDIR
         return
       else #if it doesn't have the path, create the file
         parent = folderTree.get pth.dirname(path)
@@ -215,19 +222,10 @@ class GDriveFS extends fuse.FileSystem
 
     if flags.rdwr #read/write
       logger.log 'info', "tried to open file \"#{path}\" for r+w"
-      reply.err -errnoMap.ENOENT
+      reply.err errnoMap.ENOENT
 
     return
-  # /*
-  #  * Handler for the read() system call.
-  #  * path: the path to the file
-  #  * offset: the file offset to read from
-  #  * len: the number of bytes to read
-  #  * buf: the Buffer to write the data to
-  #  * fh:  the optional file handle originally returned by open(), or 0 if it wasn't
-  #  * cb: a callback of the form cb(err), where err is the Posix return code.
-  #  *     A positive value represents the number of bytes actually read.
-  #  */
+
   read: (context, inode, len, offset, fileInfo, reply) ->
     path = inodeToPath.get inode
     logger.log "silly", "reading file #{path} - #{offset}:#{len}"
@@ -245,43 +243,36 @@ class GDriveFS extends fuse.FileSystem
         if offset < file.size
           file.read(offset, offset+len-1,true,callback)
         else
-          reply.err(-errnoMap.ESPIPE)
+          reply.err(errnoMap.ESPIPE)
       else
-        reply.err(-errnoMap.EISDIR)
+        reply.err(errnoMap.EISDIR)
 
     else
-      reply.err(-errnoMap.ENOENT)
+      reply.err(errnoMap.ENOENT)
 
 
 
     return
 
-  # /*
-  #  * Handler for the write() system call.
-  #  * path: the path to the file
-  #  * position: the file offset to write to
-  #  * len: the number of bytes to write
-  #  * buf: the Buffer to read data from
-  #  * fd:  the optional file handle originally returned by open(), or 0 if it wasn't
-  #  * cb: a callback of the form cb(err), where err is the Posix return code.
-  #  *     A positive value represents the number of bytes actually written.
-  #  */
-  write: (path, position, len, buf, fd, cb) ->
+  write: (context, inode, buffer, position, fileInfo, reply) ->
     # logger.log "debug", "writing to file #{path} - position: #{position}, length: #{len}"
+
+    path = inodeToPath.get inode
+
     file = folderTree.get path  
     size = file.size
-    fs.write fd, buf, 0, len, position, (err, bytesWritten, buffer) ->
+    fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
       if (err)
         logger.debug "there was an error writing to the #{path}, #{file}"
         logger.debug err
         logger.debug err.code
-        cb(-errnoMap[err.code])
+        reply.err(errnoMap[err.code])
         return
 
       #it is simportant to update the file size as we copy in to it. sometimes, cp and mv will check the progress by scanning the filesystem
-      if size < (position + len)
-        file.size = position + len
-      cb(bytesWritten)
+      if size < (position + buffer.length)
+        file.size = position + buffer.length
+      reply.write(bytesWritten)
       return
     return
 
@@ -296,15 +287,16 @@ class GDriveFS extends fuse.FileSystem
   #  * mode: the desired permissions of the new directory
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
-  mkdir: (path, mode, cb) ->
+  mkdir: (context, parentInode, name, mode, reply) ->
+    parentPath = inodeToPath.get parentInode
+    path = pth.join parentPath, name
     logger.debug "creating folder #{path}"
-    parent = folderTree.get pth.dirname(path)
+
+    parent = folderTree.get parentPath
     if parent #make sure that the parent exists
       if parent instanceof GFolder #make sure that the parent is a folder
-        name = pth.basename path
         unless parent.children.indexOf name < 0 #make sure that the child doesn't already exist
-          console.log parent.children
-          cb(-errnoMap.EEXIST)
+          reply.err errnoMap.EEXIST
           return
         folder =
           resource:
@@ -315,19 +307,31 @@ class GDriveFS extends fuse.FileSystem
         drive.files.insert folder, (err, res) ->
           if err
             logger.log "error", err
-            cb(-errnoMap.EIO)
+            reply.err(errnoMap.EIO)
             return
           else
             parent.children.push name
-            folderTree.set path, new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
+            inode = Math.max.apply(null, inodeToPath.keys()) + 1
+            folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), inode, res.editable, [], mode)
+            folderTree.set path, folder
+            inodeToPath.set inode, path 
+            # idToPath.set res.id, path
             client.idToPath.set(res.id, path)
-            cb(0)
+            attr = folder.getAttrSync()
+            entry = {
+                inode: attr.inode,
+                generation: 2,
+                attr: attr,
+                attr_timeout: 5,
+                entry_timeout: 5
+            }
+            reply.entry(entry)
             client.saveFolderTree()
           return
       else
-        cb(-errnoMap.ENOTDIR)
+        reply.err(errnoMap.ENOTDIR)
     else
-      cb(-errnoMap.ENOENT)
+      reply.err(errnoMap.ENOENT)
     return
 
   # /*
@@ -335,7 +339,9 @@ class GDriveFS extends fuse.FileSystem
   #  * path: the path of the directory to remove
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
-  rmdir: (path, cb) ->
+  rmdir: (context, parentInode, name, reply) ->
+    parentPath = inodeToPath.get parentInode
+    path = pth.join parentPath, name 
     logger.log "debug", "removing folder #{path}"
     if folderTree.has path #make sure that the path exists
       folder = folderTree.get path
@@ -344,10 +350,9 @@ class GDriveFS extends fuse.FileSystem
           drive.files.trash {fileId: folder.id}, (err, res) ->
             if err
               logger.log "error", "unable to remove folder #{path}"
-              cb -errnoMap.EIO
+              reply.err errnoMap.EIO
               return
             else
-              console.log res
               parent = folderTree.get pth.dirname(path)
               name = pth.basename path
               idx = parent.children.indexOf name
@@ -356,32 +361,54 @@ class GDriveFS extends fuse.FileSystem
               folderTree.remove path
               client.idToPath.remove(folder.id)
 
-              cb(0)
+              reply.err 0
               client.saveFolderTree()
               return
             return  
         else
-          cb -errnoMap.ENOTEMPTY
+          reply.err errnoMap.ENOTEMPTY
           return
       else
-        cb -errnoMap.ENOTDIR
+        reply.err errnoMap.ENOTDIR
         return
 
     else
-      cb -errnoMap.ENOENT
+      reply.err errnoMap.ENOENT
       return
     return
 
+  mknod: (context, parentInode, name, mode, rdev, reply) ->
+    parentPath = inodeToPath.get parentInode
+    parent = folderTree.get parentPath
+    logger.log "debug", "adding #{name} to #{parentPath}, #{parentInode}"
+    path = pth.join parentPath, name
+    now = (new Date).getTime()
+    inode = Math.max.apply(null, inodeToPath.keys()) + 1
+    inodeToPath.set inode, path
 
-   #  /*
-   # * Handler for the create() system call.
-   # * path: the path of the new file
-   # * mode: the desired permissions of the new file
-   # * cb: a callback of the form cb(err, [fh]), where err is the Posix return code
-   # *     and fh is an optional numerical file handle, which is passed to subsequent
-   # *     read(), write(), and release() calls (it's set to 0 if fh is unspecified)
-   # */
-  create: (path, mode, cb) ->
+    file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
+    folderTree.set path, file
+
+    if parent.children.indexOf(name) < 0 #TODO: if file exists, delete it first
+
+      parent.children.push name
+
+
+    attr = file.getAttrSync()
+
+    entry = 
+        inode: attr.inode
+        generation: 2
+        attr: attr
+        # attr_timeout: 30,
+        # entry_timeout: 60
+    
+    reply.entry(entry)
+
+
+  create: (context, parentInode, name, mode, fileInfo, reply) ->
+    parentPath = inodeToPath.get parentInode
+    path = pth.join parentPath, name
     cache = MD5(path)
     systemPath = pth.join(uploadLocation, cache);
     logger.log "debug", "creating file"
@@ -395,34 +422,46 @@ class GDriveFS extends fuse.FileSystem
         parent.children.push name
       now = (new Date).getTime()
       logger.log "debug", "adding #{path} to folderTree"
-      folderTree.set path, new GFile(null, null, parent.id, name, 0, now, now, true)
+      inode = Math.max.apply(null, inodeToPath.keys()) + 1
+      file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
+      folderTree.set path, file
+      inodeToPath.set inode, path
+
       client.saveFolderTree()
 
 
-      fs.open systemPath, 'w', (err, fd) ->
+      fs.open systemPath, 'w+', (err, fd) ->
         if (err)
           logger.log "error", "unable to createfile #{path}, #{err}"
-          cb(-errnoMap[err.code])
+          reply.err(errnoMap[err.code])
           return
-
+        fileInfo.fh = fd
         logger.log "debug", "setting upload Tree"
         upFile = 
           cache: cache
           uploading: false
         uploadTree.set path, upFile
         saveUploadTree()
-        cb(0, fd);
+        attr = 
+          inode: inode #parent.inode
+          generation: 1
+          attr:file
+
+        reply.create attr, fileInfo
         return
     else
-      cb( -errnoMap.ENOENT )
+      reply.err( errnoMap.ENOENT )
     return
   # /*
   #  * Handler for the unlink() system call.
   #  * path: the path to the file
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
-  unlink: (path, cb) ->
-    logger.log "debug", "removing file #{path}"
+  unlink: (context, parentInode, name, reply) ->
+    parentPath = inodeToPath.get parentInode
+    path = pth.join parentPath, name
+
+    logger.log "debug", "removing file #{path}, name is #{name}-#{folderTree.has path}"
     if folderTree.has path #make sure that the path exists
       file = folderTree.get path
       if file instanceof GFile #make sure that the folder is in fact a folder
@@ -438,12 +477,12 @@ class GDriveFS extends fuse.FileSystem
           client.saveFolderTree()
           client.idToPath.remove(file.id)
 
-          cb(0) #always return success
+          reply.err 0 #always return success
           return          
       else
-        cb -errnoMap.EISDIR    
+        reply.err errnoMap.EISDIR    
     else
-      cb -errnoMap.EEXIST
+      reply.err errnoMap.EEXIST
     return
 
 
@@ -454,19 +493,17 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
   release: (context, inode, fileInfo, reply) ->
-    console.log('Release was called!');
-    reply.err(0);
-    return
     logger.silly "closing file #{path}"
+    path = inodeToPath.get inode
     if uploadTree.has path
       logger.log "debug", "#{path} was in the upload tree"
       client.saveFolderTree()
       #close the file
-      fs.close fd, (err) ->
+      fs.close fileInfo.fh, (err) ->
         if (err)
           cb(-errnoMap[err.code])
           return
-        cb(0)
+        reply.err(0)
         #upload file once file is closed
         parent = folderTree.get pth.dirname(path)
 
@@ -494,11 +531,10 @@ class GDriveFS extends fuse.FileSystem
             saveUploadTree()      
 
           return
-        console.log "no uploading"
         return
 
     else
-      cb(0)
+      reply.err(0)
     return
 
   statfs: (context, inode, reply) ->
@@ -538,28 +574,12 @@ class GDriveFS extends fuse.FileSystem
         child = folderTree.get childPath
         attr = child.getAttrSync()
         attr.size ||= 4096
-        entry = {
-            inode: attr.inode,
-            # generation: 2,
-            attr: attr,
-              # {
-                # # dev: 234881026,
-                # # ino: 13420595,
-                # mode: 33188,
-                # nlink: 1,
-                # uid: context.uid,
-                # gid: context.gid,
-                # rdev: 0,
-                # size: child.size || 4096,
-                # # blksize: 4096,
-                # # blocks: 8,
-                # atime: 1331780451475, 
-                # mtime: 1331780451475, 
-                # ctime: 1331780451475, 
-            # },
-            attr_timeout: 30,
-            entry_timeout: 60
-        }
+        entry = 
+            inode: attr.inode
+            generation: 2
+            attr: attr
+            # attr_timeout: 5,
+            # entry_timeout: 5
         reply.entry(entry)
       else
         reply.err PosixError.ENOENT
@@ -631,9 +651,10 @@ uploadCallback = (path, cb) ->
         file.ctime = (new Date(result.createdDate)).getTime()
         file.mtime =  (new Date(result.modifiedDate)).getTime()
       else
-        logger.debug "#{path} folderTree did not exist"        
-        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), true)        
-
+        logger.debug "#{path} folderTree did not exist"     
+        inode = Math.max.apply(null, inodeToPath.keys()) + 1
+        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)        
+        inodeToPath.set inode, path
       client.idToPath.set( result.id, path)
       #update folder Tree
       if parent.children.indexOf( file.name ) < 0
@@ -675,13 +696,13 @@ start = ->
       logger.log "info", 'attempting to start f4js'
       switch os.type()
         when 'Linux' 
-          opts = []
+          add_opts = []
           command = "fusermount -u #{config.mountPoint}"          
         when 'Darwin'
-          opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc", "-o", "default_permissions"]
+          add_opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc"]
           command = "diskutil umount force #{config.mountPoint}"
         else 
-          opts = []
+          add_opts = []
           command = "fusermount -u #{config.mountPoint}"
       if process.version < '0.11.0'
         opts.push( "-o", "allow_other")
@@ -702,7 +723,7 @@ start = ->
         # opts.push "-d"
         fuse.fuse.mount
           filesystem: GDriveFS
-          options: opts
+          options: opts.concat(add_opts)
         logger.log('info', "mount point: #{config.mountPoint}")
         return
     catch e

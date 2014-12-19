@@ -29,11 +29,10 @@ logger =  f.logger
 folderTree = new hashmap()
 now = (new Date).getTime()
 folderTree.set('/', new GFolder(null, null, 'root',now, now, 1, true, ['loading data']))
-inodeCount = 2
 
 idToPath = new hashmap()
 inodeToPath = new hashmap()
-
+inodeToPath.set 1, '/'
 
 OAuth2Client = google.auth.OAuth2
 oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
@@ -51,7 +50,7 @@ largestChangeId = 1;
 
 getPageFiles = (pageToken, items, cb) ->
   opts =
-    fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission),nextPageToken"
+    fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission, version),nextPageToken"
     maxResults: 500
     pageToken: pageToken
   drive.files.list opts, (err, resp) ->
@@ -84,7 +83,7 @@ parseFilesFolders = (items) ->
   folders = []
   rootFound = false  
   now = (new Date).getTime()
-
+  inodeCount = 2
   logger.info "Parinsg data, looking for root foolder"
   # google does not return the list of files and folders in a particular order.
   # so find the root folder first,
@@ -203,7 +202,6 @@ parseFolderTree = ->
             loadChanges()
       return
     
-    inodeCount = inode
     return
   return
 
@@ -287,6 +285,7 @@ loadChanges = (cb) ->
 parseChanges = (items) ->
   logger.debug "There was #{items.length} to parse"
   notFound = []
+  inodeCount = Math.max.apply(null, inodeToPath.keys()) + 1
   for i in items
     if i.deleted #check if it is deleted
       path = idToPath.get(i.fileId)      

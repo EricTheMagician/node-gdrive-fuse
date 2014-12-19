@@ -49,7 +49,7 @@ class GFile extends EventEmitter
 
   @chunkSize: 1024*1024*16 #set default chunk size to 16. this should be changed at run time
 
-  constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @inode, @permission) ->
+  constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @inode, @permission, @mode = 0o100777) ->
 
   @download: (url, start,end, size, cb ) ->    
     rest.get url, {
@@ -76,7 +76,7 @@ class GFile extends EventEmitter
     return
   getAttrSync: () =>
     attr =
-      mode: 0o100777,
+      mode: @mode,
       size: @size,
       nlink: 1,
       mtime: @mtime,
@@ -85,7 +85,7 @@ class GFile extends EventEmitter
     return attr
   getAttr: (cb) =>
     attr =
-      mode: 0o100777,
+      mode: @mode,
       size: @size,
       nlink: 1,
       mtime: @mtime,
