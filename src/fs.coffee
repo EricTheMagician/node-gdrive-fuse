@@ -516,7 +516,7 @@ class GDriveFS extends fuse.FileSystem
       #close the file
       fs.close fileInfo.fh, (err) ->
         if (err)
-          cb(-errnoMap[err.code])
+          reply.err err.errno
           return
         reply.err(0)
         #upload file once file is closed
