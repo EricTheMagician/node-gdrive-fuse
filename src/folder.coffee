@@ -326,6 +326,9 @@ class GFolder
 
       fn = ->
         fs.stat filePath, (err, stats2) ->
+          if err or stats2 == undefined
+            logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
+            return
           if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
             fn2 = ->
               folder.upload(fileName, originalPath, cb)
