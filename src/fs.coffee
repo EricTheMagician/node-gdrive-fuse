@@ -266,7 +266,7 @@ class GDriveFS extends fuse.FileSystem
         logger.debug "there was an error writing to the #{path}, #{file}"
         logger.debug err
         logger.debug err.code
-        reply.err(errnoMap[err.code])
+        reply.err(err.errno)
         return
 
       #it is simportant to update the file size as we copy in to it. sometimes, cp and mv will check the progress by scanning the filesystem
@@ -470,10 +470,11 @@ class GDriveFS extends fuse.FileSystem
     logger.log "debug", "removing file #{path}, name is #{name}-#{folderTree.has path}"
     if folderTree.has path #make sure that the path exists
       file = folderTree.get path
-      if file instanceof GFile #make sure that the folder is in fact a folder
+      if file instanceof GFile #make sure that the file is in fact a file
+
         drive.files.trash {fileId: file.id}, (err, res) ->
           if err
-            logger.log "error", "unable to remove file #{path}"
+            logger.log "debug", "unable to remove file #{path}"
           parent = folderTree.get pth.dirname(path)
           name = pth.basename path
           idx = parent.children.indexOf name
@@ -485,6 +486,14 @@ class GDriveFS extends fuse.FileSystem
 
           reply.err 0 #always return success
           return          
+      
+        #check if file was being uploaded
+        if uploadTree.has path
+          cache = uploadTree.get(path).cache
+          uploadTree.remove path
+          fs.unlink pth.join(uploadLocation,cache), (err)->
+          
+
       else
         reply.err errnoMap.EISDIR    
     else
