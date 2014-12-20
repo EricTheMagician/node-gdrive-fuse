@@ -690,7 +690,7 @@ uploadCallback = (path, cb) ->
     return
 
 #resume file uploading
-fn = ->
+resumeUpload = ->
   q.start()
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
@@ -703,7 +703,6 @@ fn = ->
           q.push(_fn)
           q.start()
   return
-setTimeout fn, 25000
 
 start = ->
   if folderTree.count() > 1
@@ -740,6 +739,7 @@ start = ->
           filesystem: GDriveFS
           options: opts.concat(add_opts)
         logger.log('info', "mount point: #{config.mountPoint}")
+        resumeUpload()
         return
     catch e
       logger.log( "error", "Exception when starting file system: #{e}")
