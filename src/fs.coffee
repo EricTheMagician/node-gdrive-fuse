@@ -393,8 +393,14 @@ class GDriveFS extends fuse.FileSystem
 
       parent.children.push name
 
-
     attr = file.getAttrSync()
+
+    upFile = 
+      cache: MD5(path)
+      uploading: false
+    uploadTree.set path, upFile
+    saveUploadTree()
+
 
     entry = 
         inode: attr.inode
