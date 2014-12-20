@@ -125,8 +125,9 @@ class GDriveFS extends fuse.FileSystem
           cpath = pth.join(path,child)
           cnode = folderTree.get cpath
           attr = cnode.getAttrSync()
-          len = reply.addDirEntry(child, requestedSize, {inode: cnode.inode}, offset);          
+          len = reply.addDirEntry(child, size, {inode: cnode.inode}, offset);          
           totalSize += len
+
         if object.children.length == 0
           reply.buffer(new Buffer(0), 0)
         else
