@@ -312,6 +312,10 @@ class GFolder
 
 
     fs.stat filePath, (err, stats) ->
+      if err or stats == undefined        
+        logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
+        logger.debug err
+        return
       size = stats.size
 
       #sometimes, the operating system will create a file of size 0. Simply delete it.
