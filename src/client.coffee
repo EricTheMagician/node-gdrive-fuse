@@ -132,7 +132,7 @@ parseFilesFolders = (items) ->
           continue
         #set up the new folder
         inodeToPath.set inodeCount, path
-        folderTree.set(path, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable ))
+        folderTree.set(path, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable , []))
         inodeCount++
       else
         notFound.push f
@@ -150,6 +150,8 @@ parseFilesFolders = (items) ->
     parentPath = idToPath.get(pid)
     if parentPath
       parent = folderTree.get parentPath
+      unless parent.children
+        continue
       if parent.children.indexOf(f.title) < 0
         parent.children.push f.title
 

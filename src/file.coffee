@@ -1,9 +1,9 @@
 pth = require 'path'
 fs = require 'fs-extra'
 hashmap = require( 'hashmap' ).HashMap
-rest = require 'restler'
 winston = require 'winston'
 {EventEmitter} = require 'events'
+request = require 'request'
 
 ######################################
 ######### Setup File Config ##########
@@ -51,29 +51,38 @@ class GFile extends EventEmitter
 
   constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @inode, @permission, @mode = 0o100777) ->
 
-  @download: (url, start,end, size, cb ) ->    
-    rest.get url, {
-      decoding: "buffer"
-      timeout: 300000
+  @download: (url, start,end, size, saveLocation, cb ) ->   
+    options =
+      url: url
+      encoding: null
       headers:
         "Authorization": "Bearer #{config.accessToken.access_token}"
         "Range": "bytes=#{start}-#{end}"
-    }
-    .on 'complete', (result, response) ->
-      if result instanceof Error        
-        cb(result)
-      else
-        #check to see if token is expired
-        if (response.statusCode == 401) or (response.statusCode == 403)
-          logger.silly "There was an error while downloading."
-          fn = ->            
-            cb("expiredUrl")
-            return
+
+    ws = null
+    once = false
+    request(options)
+    .on 'response', (resp) ->
+      if resp.statusCode == 401 or resp.statusCode == 403        
+        unless once
+          once = true
+          fn = ->
+            cb("expiredUrl");
           setTimeout fn, 2000
-        else
-          cb(null, result)
-      return
+    .on 'error', (err)->
+      console.log "error"
+      console.log err
+      cb(err)
+    .pipe(
+      fs.createWriteStream(saveLocation)
+    ).on 'close', ->
+      unless once
+        once = true
+        cb(null)
+    
+
     return
+  
   getAttrSync: () =>
     attr =
       mode: @mode,
@@ -83,6 +92,7 @@ class GFile extends EventEmitter
       ctime: @ctime
       inode: @inode
     return attr
+
   getAttr: (cb) =>
     attr =
       mode: @mode,
@@ -94,7 +104,7 @@ class GFile extends EventEmitter
     cb(0,attr)
     return
 
-  recursive: (start,end) =>
+  recursive: (start,end) =>    
     file = @
     path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
     if start >= @size
@@ -102,22 +112,12 @@ class GFile extends EventEmitter
     unless file.open(start)
       unless downloadTree.has("#{file.id}-#{start}")
         downloadTree.set("#{file.id}-#{start}", 1)
-        callback = (err,result) ->
-          if err
-            downloadTree.remove("#{file.id}-#{start}")
-            file.emit 'downloaded', start, buf0
-          else
-            if result instanceof Buffer
-              fs.writeFile path,result, (err) ->
-                downloadTree.remove("#{file.id}-#{start}")
-                file.emit 'downloaded', start, result
-                return
-            else
-              downloadTree.remove("#{file.id}-#{start}")
-              file.emit 'downloaded', start, buf0
-
+        callback =  ->
+          downloadTree.remove("#{file.id}-#{start}")
+          file.emit 'downloaded', start
           return
-        GFile.download(file.downloadUrl, start,end, file.size,callback)
+
+        GFile.download(file.downloadUrl, start,end, file.size, path, callback)
         return
 
     return
@@ -163,9 +163,9 @@ class GFile extends EventEmitter
 
 
     path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
-    listenCallback = (cStart, buffer)  ->      
-      if ( cStart <= start < (cStart + GFile.chunkSize-1)  ) and (buffer instanceof Buffer) and buffer.length > 0
-        cb buffer.slice(start - chunkStart, end - chunkStart )
+    listenCallback = (cStart)  ->      
+      if ( cStart <= start < (cStart + GFile.chunkSize-1)  )
+        file.read(start,end, readAhead, cb)
         file.removeListener 'downloaded', listenCallback
       return
 
@@ -205,15 +205,16 @@ class GFile extends EventEmitter
       acknowledgeAbuse  : true
       fields: "downloadUrl"    
     GFile.GDrive.files.get data, (err, res) ->
-      config.accessToken = GFile.oauth.credentials
+      file.downloadUrl = res.downloadUrl
+      
+      GFile.oauth.refreshAccessToken (err, tokens) ->
 
-
-      unless err
-        file.downloadUrl = res.downloadUrl
-      else
-        logger.debug "there was an error while updating url"
-        logger.debug "err", err
-      cb(file.downloadUrl)
+        config.accessToken = tokens
+        unless err
+        else
+          logger.debug "there was an error while updating url"
+          logger.debug "err", err
+        cb(file.downloadUrl)
       return
     return
 
@@ -227,41 +228,27 @@ class GFile extends EventEmitter
 
     if nChunks < 1
       logger.debug "starting to download #{file.name}, chunkStart: #{chunkStart}"
-      callback = (err, result)->          
+      path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
+      callback = (err)->   
         if err
           if err == "expiredUrl"
             fn = (url) ->
-              GFile.download(url, chunkStart, chunkEnd, file.size, callback)
+              GFile.download(url, chunkStart, chunkEnd, file.size, path, callback)
               return
             file.updateUrl(fn)       
-            return       
-
           else
             logger.error "there was an error downloading file"
             logger.error err
             cb(buf0)
             downloadTree.remove("#{file.id}-#{chunkStart}")
-            file.emit 'downloaded', chunkStart, buf0
-            return
-        if result instanceof Buffer
-          path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
-          fs.writeFile path, result, (err) ->
-            if err
-              downloadTree.remove("#{file.id}-#{chunkStart}")
-              logger.error "there was an error saving #{path}"
-              logger.error err
-              cb( buf0)
-            else
-              downloadTree.remove("#{file.id}-#{chunkStart}")
-              console.log "downloads start: #{start}, end: #{end}, chunkStart: #{chunkStart}, chunkEnd: #{chunkEnd},slices: (#{start-chunkStart}, #{end-chunkStart})"
-              cb result.slice(start - chunkStart,  end-chunkStart )
-            return
-            
-        else
-          cb(result)
-        file.emit 'downloaded', chunkStart, result
+            file.emit 'downloaded', chunkStart
+          return
+
+        downloadTree.remove("#{file.id}-#{chunkStart}")
+        file.read(start,end, readAhead, cb)
+        file.emit 'downloaded', chunkStart
         return
-      GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, callback)
+      GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, path, callback)
 
     else if nChunks < 2      
       end1 = chunkStart + GFile.chunkSize - 1
