@@ -158,12 +158,10 @@ getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
     return
 
   return
-uploadData = (location, fileLocation, start, fileSize, mime, fd, cb) ->
+uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
 
   #read the data
   readStreamOptions = 
-    fd: fd 
-    autoClose: false 
     start: start
 
   requestOptions = 
@@ -171,64 +169,28 @@ uploadData = (location, fileLocation, start, fileSize, mime, fd, cb) ->
     headers:
       "Authorization": "Bearer #{config.accessToken.access_token}"
       "Content-Length": (fileSize-1) - start
-      "Content-Range": "bytes #{start}-#{fileSize}/#{fileSize}"
+      "Content-Range": "bytes #{start}-#{fileSize-1}/#{fileSize}"
 
+  once = false
   fs.createReadStream( fileLocation, readStreamOptions)
   .pipe(
     request.put(requestOptions)
-    # .on 'response2', (resp) ->
-    #   if resp.statusCode == 400 or resp.statusCode == 401
-    #     logger.debug "there was an error uploading data"
-    #     callback = (err,end) ->
-    #       cb err, fd, {
-    #         statusCode: resp.statusCode
-    #         rangeEnd: end
-    #       }
-    #       return
-
-    #     getNewRangeEnd(location, fileSize, callback)
-        
-        
-    #     return
-
-    #   if 200 <= resp.statusCode <= 201
-    #     cb null, fd, {
-    #       statusCode: 201
-    #       result: res
-    #     }
-    #     return
-
-    #   if resp.statusCode == 410
-    #     logger.debug "got status code 410 while uploading"
-    #     logger.debug "result", res
-    #     logger.debug "response",resp
-        
-    #     cb resp.statusCode, fd, {
-    #       statusCode: resp.statusCode
-    #       rangeEnd: end
-    #     }
-
-    #     return
-
-    #   if resp.statusCode >= 500
-    #     logger.debug resp
-    #     logger.debug res
-    #     callback = (err,end) ->
-    #       cb null, fd, {
-    #         statusCode: resp.statusCode
-    #         rangeEnd: end
-    #       }
-    #       return
-
-
-    #     getNewRangeEnd(location, fileSize, callback)
-      
-    #     return
 
   )
+  .on 'response', (resp) ->
+    console.log resp
   .on 'error', (err)->
-    console.log 'error'
+    logger.debug "There was an error while uploading"
     console.log err
+    unless once
+      once = true
+      cb(err)
+  .on 'close', ->
+    unless once
+      once = true
+      cb(null, {statusCode: 201})
+
+
 
   return
 
@@ -343,34 +305,26 @@ class GFolder
             if mime == 'binary'
               mime = 'application/octet-stream'
 
-            cbUploadData = (err, fd, res) ->
+            cbUploadData = (err, res) ->
               if err
                 logger.debug "There was an error with uploading data"
                 logger.debug err
-                fs.close fd, (err) ->
-                  if err
-                    logger.debug "unable to file close before retrying to upload"
-                  cbfn = -> 
-                    up = uploadTree.get(originalPath)
-                    up.uploading = false
-                    delete up.location               
-                    folder.upload(fileName, originalPath, cb)
-                    return
-                  setTimeout cbfn, 60000
+                cbfn = -> 
+                  up = uploadTree.get(originalPath)
+                  up.uploading = false
+                  delete up.location               
+                  folder.upload(fileName, originalPath, cb)
                   return
+                setTimeout cbfn, 60000
+                return
               else
                 start = res.rangeEnd + 1
                 if start < size              
-                  uploadData upFile.location, filePath, start, size, mime, fd, buffer, cbUploadData
+                  uploadData upFile.location, filePath, start, size, mime, cbUploadData
                 else
-                  fs.close fd, (err) ->
-                    if err
-                      logger.debug "unable to close file after uploading", err
-                    else
-                      logger.debug "successfully uploaded file #{originalPath}"
-                      cb(null, res.result)
-                      
-                    return                    
+                  logger.debug "successfully uploaded file #{originalPath}"
+                  cb(null, res.result)                      
+                return                    
               return
             cbNewLink = (err, location) ->
               if err
@@ -382,7 +336,7 @@ class GFolder
               saveUploadTree()
 
               #once new link is obtained, start uploading
-              uploadData location, filePath, 0, size, mime, fd, cbUploadData
+              uploadData location, filePath, 0, size, mime, cbUploadData
               return
 
             cbNewEnd = (err, end) ->
@@ -402,12 +356,7 @@ class GFolder
                 start = end + 1
                 logger.debug "got new range end for #{originalPath}: #{end}"
                 #once new range end is obtained, start uploading in chunks
-                fs.open filePath, 'r', (err, fd) ->
-                  if err
-                    logger.debug "there was a problem with opening for uploading #{originalPath}"
-                  else                    
-                    uploadData location, filePath, start, size, mime, fd, buffer, cbUploadData
-                  return
+                uploadData location, filePath, start, size, mime, cbUploadData
               return
 
 
