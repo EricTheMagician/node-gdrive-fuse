@@ -165,30 +165,36 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
     start: start
 
   requestOptions = 
+    method: "PUT"
     url: location
     headers:
+      "content-type": mime
       "Authorization": "Bearer #{config.accessToken.access_token}"
-      "Content-Length": (fileSize-1) - start
+      "Content-Length": (fileSize) - start
       "Content-Range": "bytes #{start}-#{fileSize-1}/#{fileSize}"
 
   once = false
   fs.createReadStream( fileLocation, readStreamOptions)
   .pipe(
-    request.put(requestOptions)
+    request(requestOptions)
+    # .on 'response', (resp)->
+    #   console.log resp.headers, resp.statusCode
+    #   if resp.statusCode >= 500
+    #     cb(resp.statusCode)
+    # .on 'error', (err)->
+    #   console.log "error", err
+    # .on 'finish', ->
+    #   console.log fileLocation, "is now fnished from uploading "
 
   )
-  .on 'response', (resp) ->
-    console.log resp
   .on 'error', (err)->
-    logger.debug "There was an error while uploading"
-    console.log err
-    unless once
-      once = true
-      cb(err)
-  .on 'close', ->
-    unless once
-      once = true
-      cb(null, {statusCode: 201})
+    console.log "error", err
+  .on 'complete', ->
+    console.log "complete"
+    console.log location, fileLocation, start, fileSize, mime, cb
+  .on 'finish', ->
+    console.log fileLocation, "is now fnished from uploading "
+
 
 
 
@@ -373,7 +379,7 @@ class GFolder
 
           return
         return
-      setTimeout fn, 25000
+      setTimeout fn, 5000
       return
     return
 

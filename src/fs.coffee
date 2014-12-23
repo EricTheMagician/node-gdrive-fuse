@@ -699,7 +699,6 @@ resumeUpload = ->
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
     for path in uploadTree.keys()
-      console.log path
       if folderTree.has pth.dirname(path)
         parent = folderTree.get pth.dirname(path)          
         _fn = (cb) ->
