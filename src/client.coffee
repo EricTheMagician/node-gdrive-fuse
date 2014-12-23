@@ -188,7 +188,7 @@ parseFolderTree = ->
       idToPath.set(o.id,key)
       idToPath.set(o.parentid, pth.dirname(key))
 
-      if o.size >= 0
+      if 'size' in o
         folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
       else
         # keep track of the conversion of bitcasa path to real path
