@@ -279,7 +279,6 @@ class GFolder
 
   upload: (fileName, originalPath, cb) =>
     folder = @
-    console.log "upload part 1"
     upFile = uploadTree.get originalPath
     unless upFile
       return
@@ -291,11 +290,14 @@ class GFolder
 
 
     fs.stat filePath, (err, stats) ->
-      console.log "upload part 2"
-
       if err or stats == undefined        
         logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
         logger.debug err
+        if err.code == "ENOENT"
+          #file was delete
+          uploadTree.remove originalPath
+        cb(err)
+
         return
       size = stats.size
 
@@ -315,6 +317,11 @@ class GFolder
 
           if err or stats2 == undefined
             logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
+            if err.code == "ENOENT"
+              #file was delete
+              uploadTree.remove originalPath
+            cb(err)
+
             return
           if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
             fn2 = ->

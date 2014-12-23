@@ -34,9 +34,8 @@ else
 
 config.mountPoint ||= "/tmp/mnt"
 config.cacheLocation ||=  '/tmp/cache'
-GFile.chunkSize ||= config.chunkSize 8388608 #8MB default
+GFile.chunkSize =  config.chunkSize || GFile.chunkSize #8388608 #MB default
 GFile.GDrive = client.drive;
-GFolder.uploadChunkSize ||= 16777216 #16MB default
 uploadLocation = pth.join config.cacheLocation, 'upload'
 q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) #default to 4 concurrent uploads
 
@@ -221,7 +220,7 @@ class GDriveFS extends fuse.FileSystem
       return
 
     if flags.rdwr #read/write
-      logger.log 'info', "tried to open file \"#{path}\" for r+w"
+      # logger.log 'info', "tried to open file \"#{path}\" for r+w"
       reply.err errnoMap.ENOENT
 
     return
@@ -263,9 +262,9 @@ class GDriveFS extends fuse.FileSystem
     size = file.size
     fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
       if (err)
-        logger.debug "there was an error writing to the #{path}, #{file}"
+        logger.debug "there was an error writing to #{path}, #{file}"
         logger.debug err
-        logger.debug err.code
+        logger.debug "position", position, "fh", fileInfo.fh
         reply.err(err.errno)
         return
 
@@ -398,8 +397,8 @@ class GDriveFS extends fuse.FileSystem
     upFile = 
       cache: MD5(path)
       uploading: false
-    uploadTree.set path, upFile
-    saveUploadTree()
+    # uploadTree.set path, upFile
+    # saveUploadTree()
 
 
     entry = 
@@ -509,6 +508,7 @@ class GDriveFS extends fuse.FileSystem
   #  */
   release: (context, inode, fileInfo, reply) ->
     logger.silly "closing file #{path}"
+    console.log "released called"
     path = inodeToPath.get inode
     if uploadTree.has path
       logger.log "debug", "#{path} was in the upload tree"
@@ -641,6 +641,10 @@ uploadCallback = (path, cb) ->
         logger.debug "the mimetype of #{path} was invalid"
         cb()
         return
+      if err.code == "ENOENT"
+        cb()
+        return
+
       logger.debug "failed to upload \"#{path}\". Retrying"
       fn = (cb) ->
         parent.upload pth.basename(path), path , callback(path,cb)
@@ -695,13 +699,14 @@ resumeUpload = ->
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
     for path in uploadTree.keys()
-        if folderTree.has pth.dirname(path)
-          parent = folderTree.get pth.dirname(path)
-          _fn = (cb) ->
-            parent.upload pth.basename(path), path, uploadCallback(path,cb)
-            return
-          q.push(_fn)
-          q.start()
+      console.log path
+      if folderTree.has pth.dirname(path)
+        parent = folderTree.get pth.dirname(path)          
+        _fn = (cb) ->
+          parent.upload pth.basename(path), path, uploadCallback(path,cb)
+          return
+        q.push(_fn)
+        q.start()
   return
 
 start = ->
