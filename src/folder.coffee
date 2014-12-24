@@ -210,7 +210,7 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       cb null, {
         statusCode: 201
         rangeEnd: fileSize
-        result: body
+        result: JSON.parse(body)
       }
       return
 
