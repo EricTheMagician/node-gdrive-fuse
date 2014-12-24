@@ -172,31 +172,30 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       "Authorization": "Bearer #{config.accessToken.access_token}"
       "Content-Length": (fileSize) - start
       "Content-Range": "bytes #{start}-#{fileSize-1}/#{fileSize}"
+  requestCallback = (err, resp, body) ->
+    if err
+      console.log err
+      cb(err)
+      return
+
+    console.log resp.headers
+    console.log body    
 
   once = false
+
   fs.createReadStream( fileLocation, readStreamOptions)
   .pipe(
-    request(requestOptions)
-    # .on 'response', (resp)->
-    #   console.log resp.headers, resp.statusCode
-    #   if resp.statusCode >= 500
-    #     cb(resp.statusCode)
-    # .on 'error', (err)->
-    #   console.log "error", err
-    # .on 'finish', ->
-    #   console.log fileLocation, "is now fnished from uploading "
-
+    request(requestOptions, requestCallback)
   )
   .on 'error', (err)->
     console.log "error", err
+    logger.error err
   .on 'resp', (resp) ->
     console.log resp.headers
     console.log resp.statusCode
   .on 'complete', ->
     console.log "complete"
     console.log location, fileLocation, start, fileSize, mime
-  .on 'finish', ->
-    console.log fileLocation, "is now fnished from uploading "
 
 
 
@@ -284,8 +283,6 @@ class GFolder
 
       fn = ->
         fs.stat filePath, (err, stats2) ->
-          console.log "upload part 3"
-
           if err or stats2 == undefined
             logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
             if err.code == "ENOENT"

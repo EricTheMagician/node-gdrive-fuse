@@ -180,7 +180,6 @@ class GDriveFS extends fuse.FileSystem
               return
 
             fileInfo.fh = fd
-            console.log "open fd", fd, fileInfo.fh
             reply.open(fileInfo)
             return
 
@@ -263,7 +262,6 @@ class GDriveFS extends fuse.FileSystem
     file = folderTree.get path  
     size = file.size
     fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
-      console.log "write", fileInfo.fh, position, buffer.length, position + buffer.length      
       if (err)
         logger.debug "there was an error writing to #{path}"
         logger.debug err
