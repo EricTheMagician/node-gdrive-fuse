@@ -61,6 +61,7 @@ getPageFiles = (pageToken, items, cb) ->
         getPageFiles(pageToken, items, cb)
         return
       setTimeout(fn, 4000)
+      return
 
     cb(null, resp.nextPageToken, items.concat(resp.items))
     return
