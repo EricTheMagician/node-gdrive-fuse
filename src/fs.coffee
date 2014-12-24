@@ -170,24 +170,26 @@ class GDriveFS extends fuse.FileSystem
       if folderTree.has(path) #if folderTree has path, make sure it's a file with size zero
         file = folderTree.get(path)
         if (file instanceof GFile)
-           if file.size == 0
-            logger.debug "#{path} size was 0"
-            fs.open pth.join(uploadLocation, cache), 'w', (err,fd) ->
-              if err
-                logger.debug "could not open file for writing"
-                logger.debug err
-                reply.err errnoMap[err.code]
-              else
-                fileInfo.fh = fd
-                reply.open(fileInfo)
+         if file.size == 0
+          logger.debug "#{path} size was 0"
+          fs.open pth.join(uploadLocation, cache), 'w+', (err,fd) ->
+            if err
+              logger.debug "could not open file for writing"
+              logger.debug err
+              reply.err errnoMap[err.code]
               return
 
-           else
-             reply.err errnoMap.EACCESS
+            fileInfo.fh = fd
+            console.log "open fd", fd, fileInfo.fh
+            reply.open(fileInfo)
+            return
+
+         else
+           reply.err errnoMap.EACCESS
         else
           reply.err errnoMap.EISDIR
         return
-      else #if it doesn't have the path, create the file
+      if flags.rdwr #if it doesn't have the path, create the file
         parent = folderTree.get pth.dirname(path)
         if parent and parent instanceof GFolder
           now = ( new Date()).getTime()
@@ -261,8 +263,9 @@ class GDriveFS extends fuse.FileSystem
     file = folderTree.get path  
     size = file.size
     fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
+      console.log "write", fileInfo.fh, position, buffer.length, position + buffer.length      
       if (err)
-        logger.debug "there was an error writing to #{path}, #{file}"
+        logger.debug "there was an error writing to #{path}"
         logger.debug err
         logger.debug "position", position, "fh", fileInfo.fh
         reply.err(err.errno)
@@ -397,8 +400,8 @@ class GDriveFS extends fuse.FileSystem
     upFile = 
       cache: MD5(path)
       uploading: false
-    # uploadTree.set path, upFile
-    # saveUploadTree()
+    uploadTree.set path, upFile
+    saveUploadTree()
 
 
     entry = 

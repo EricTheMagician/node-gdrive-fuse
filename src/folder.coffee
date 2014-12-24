@@ -189,9 +189,12 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
   )
   .on 'error', (err)->
     console.log "error", err
+  .on 'resp', (resp) ->
+    console.log resp.headers
+    console.log resp.statusCode
   .on 'complete', ->
     console.log "complete"
-    console.log location, fileLocation, start, fileSize, mime, cb
+    console.log location, fileLocation, start, fileSize, mime
   .on 'finish', ->
     console.log fileLocation, "is now fnished from uploading "
 
