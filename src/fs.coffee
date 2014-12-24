@@ -532,11 +532,13 @@ class GDriveFS extends fuse.FileSystem
           ###
 
           if 0 < file.size <=  10485760 #10MB 
+            logger.info "Starting to upload #{path}"
             cb = ->
               return
             parent.upload pth.basename(path), path, uploadCallback(path, cb)           
-          else if file.size >  10485760 
+          else if file.size >  10485760           
             fn = (cb)->
+              logger.info "Starting to upload #{path}"
               parent.upload pth.basename(path), path, uploadCallback(path,cb)            
               return
             q.push fn
@@ -642,6 +644,7 @@ uploadCallback = (path, cb) ->
         cb()
         return
       if err.code == "ENOENT"
+        uploadTree.remove(path)
         cb()
         return
 

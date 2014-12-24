@@ -22,17 +22,21 @@ fs.ensureDirSync downloadLocation
 uploadLocation = pth.join config.cacheLocation, 'upload'
 fs.ensureDirSync uploadLocation
 
+printDate = ->
+  d = new Date
+  return "#{d.getFullYear()}-#{d.getMonth()+1}-#{d.getDate()}T#{d.getHours()}:#{d.getMinutes()}::#{d.getSeconds()}"
+
 #setup winston logger
 transports = [new (winston.transports.File)({ 
   filename: '/tmp/GDriveF4JS.log', 
   level:'debug' ,
-  maxsize: 10485760,
+  maxsize: 10485760, #10mb
   maxFiles: 3
   })]
 if config.debug
-  transports.push new (winston.transports.Console)({ level: 'debug', timestamp: true,colorize: true })
+  transports.push new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true })
 else
-  transports.push new (winston.transports.Console)({ level: 'info', timestamp: true,colorize: true })
+  transports.push new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true })
 
 logger = new (winston.Logger)({
     transports: transports
