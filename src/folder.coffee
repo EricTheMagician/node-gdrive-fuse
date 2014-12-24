@@ -173,13 +173,79 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       "Content-Length": (fileSize) - start
       "Content-Range": "bytes #{start}-#{fileSize-1}/#{fileSize}"
   requestCallback = (err, resp, body) ->
+
     if err
-      console.log err
-      cb(err)
+      logger.log err
+      callback = (err,end) ->
+        cb err, {
+          rangeEnd: end
+        }
+        return
+      getNewRangeEnd(location, fileSize, callback)
       return
 
-    console.log resp.headers
-    console.log body    
+    if resp.statusCode == 400 or resp.statusCode == 401 or resp.statusCode == 410
+      logger.debug "there was an error uploading data"
+      callback = (err,end) ->
+        cb err, {
+          statusCode: resp.statusCode
+          rangeEnd: end
+        }
+        return
+
+      getNewRangeEnd(location, fileSize, callback)
+      
+      
+      return
+
+    if resp.statusCode == 308 #success on resume
+      rangeEnd = getRangeEnd(resp.headers.range)
+      cb null, {
+        statusCode: 308
+        rangeEnd: rangeEnd
+      }
+      return
+
+    if 200 <= resp.statusCode <= 201
+      cb null, {
+        statusCode: 201
+        rangeEnd: fileSize
+        result: body
+      }
+      return
+
+
+    if resp.statusCode >= 500
+      logger.debug "first time getting a resp code > 500"
+      logger.debug resp
+      logger.debug res
+      callback = (err,end) ->
+        cb null, fd, {
+          statusCode: resp.statusCode
+          rangeEnd: end
+        }
+        return
+
+
+      getNewRangeEnd(location, fileSize, callback)
+
+      return
+
+
+    logger.error "uncaugt state for file uploading"
+    logger.error resp.statusCode
+    logger.error resp.headers
+    logger.error body    
+    callback = (err,end) ->
+      cb err, {
+        statusCode: resp.statusCode
+        rangeEnd: end
+      }
+      return
+
+    getNewRangeEnd(location, fileSize, callback)
+
+
 
   once = false
 
@@ -188,14 +254,8 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
     request(requestOptions, requestCallback)
   )
   .on 'error', (err)->
-    console.log "error", err
+    logger.log "error", err
     logger.error err
-  .on 'resp', (resp) ->
-    console.log resp.headers
-    console.log resp.statusCode
-  .on 'complete', ->
-    console.log "complete"
-    console.log location, fileLocation, start, fileSize, mime
 
 
 

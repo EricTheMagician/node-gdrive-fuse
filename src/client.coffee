@@ -387,7 +387,7 @@ if not (config.accessToken)
     oauth2Client.getToken code, (err,tokens) ->
       oauth2Client.setCredentials(tokens)
       config.accessToken = tokens
-      console.log "Access Token Set"
+      logger.info "Access Token Set"
       loadFolderTree()
 
       fs.outputJsonSync 'config.json', config
