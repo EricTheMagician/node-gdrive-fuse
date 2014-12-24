@@ -509,7 +509,6 @@ class GDriveFS extends fuse.FileSystem
   #  */
   release: (context, inode, fileInfo, reply) ->
     logger.silly "closing file #{path}"
-    console.log "released called"
     path = inodeToPath.get inode
     if uploadTree.has path
       logger.log "debug", "#{path} was in the upload tree"
