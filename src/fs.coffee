@@ -318,6 +318,7 @@ class GDriveFS extends fuse.FileSystem
             # idToPath.set res.id, path
             client.idToPath.set(res.id, path)
             attr = folder.getAttrSync()
+            console.log attr
             entry = {
                 inode: attr.inode,
                 generation: 2,
@@ -697,7 +698,7 @@ uploadCallback = (path, cb) ->
     return
 
 #resume file uploading
-resumeUpload = ->
+resumeUpload = ->  
   q.start()
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
@@ -746,7 +747,7 @@ start = ->
           filesystem: GDriveFS
           options: opts.concat(add_opts)
         logger.log('info', "mount point: #{config.mountPoint}")
-        resumeUpload()
+        setTimeout resumeUpload, 8000
         return
     catch e
       logger.log( "error", "Exception when starting file system: #{e}")
