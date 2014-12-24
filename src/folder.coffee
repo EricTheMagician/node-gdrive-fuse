@@ -256,6 +256,7 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
   .on 'error', (err)->
     logger.log "error", err
     logger.error err
+    cb(err, {rangeEnd: start-1})
 
 
 
