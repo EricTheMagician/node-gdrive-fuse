@@ -312,7 +312,7 @@ class GDriveFS extends fuse.FileSystem
           else
             parent.children.push name
             inode = Math.max.apply(null, inodeToPath.keys()) + 1
-            folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), inode, res.editable, [], mode)
+            folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), inode, res.editable, [])
             folderTree.set path, folder
             inodeToPath.set inode, path 
             # idToPath.set res.id, path
