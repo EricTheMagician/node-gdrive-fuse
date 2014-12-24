@@ -95,6 +95,8 @@ getNewRangeEnd = (location, fileSize, cb) ->
 
       range = resp.headers.range || resp.headers.Range
       unless range #sometimes, it doesn't return the range, so assume it is 0.
+        logger.error resp.headers
+        logger.error res
         cb(resp.statusCode, -1)
         return
       
@@ -128,8 +130,8 @@ getUploadResumableLink =  (parentId, fileName, fileSize, mime, cb) ->
     else
       if resp.statusCode == 401 or resp.statusCode == 400
         if parseInt(resp.headers['content-length']) > 0
-          logger.debug result
-          logger.debug "type is ", typeof(result)
+          logger.error "There was an error with getting a new resumable link"
+          logger.error result
           if result.error
             error = result.error.errors[0]
             idx = error.message.indexOf("Media type")   
@@ -175,7 +177,6 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
   requestCallback = (err, resp, body) ->
 
     if err
-      logger.log err
       callback = (err,end) ->
         cb err, {
           rangeEnd: end
@@ -185,8 +186,8 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       return
 
     if resp.statusCode == 400 or resp.statusCode == 401 or resp.statusCode == 410
-      logger.debug "there was an error uploading data"
       callback = (err,end) ->
+        logger.debug end
         cb err, {
           statusCode: resp.statusCode
           rangeEnd: end
@@ -198,6 +199,8 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       
       return
 
+    if resp.statusCode == 404
+      cb 404, JSON.parse(body)
     if resp.statusCode == 308 #success on resume
       rangeEnd = getRangeEnd(resp.headers.range)
       cb null, {
@@ -207,6 +210,8 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       return
 
     if 200 <= resp.statusCode <= 201
+      logger.info "Finished uploading?"
+      logger.info JSON.parse(body)
       cb null, {
         statusCode: 201
         rangeEnd: fileSize
@@ -216,9 +221,6 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
 
 
     if resp.statusCode >= 500
-      logger.debug "first time getting a resp code > 500"
-      logger.debug resp
-      logger.debug res
       callback = (err,end) ->
         cb null, fd, {
           statusCode: resp.statusCode
@@ -374,8 +376,9 @@ class GFolder
 
             cbUploadData = (err, res) ->
               if err
-                logger.debug "There was an error with uploading data"
-                logger.debug err
+                logger.error "There was an error with uploading data"
+                logger.error err
+                logger.error res
                 cbfn = -> 
                   up = uploadTree.get(originalPath)
                   up.uploading = false
