@@ -330,8 +330,8 @@ class GFolder
           #file was delete
           uploadTree.remove originalPath
         cb(err)
-
         return
+
       size = stats.size
 
       #sometimes, the operating system will create a file of size 0. Simply delete it.
@@ -352,13 +352,14 @@ class GFolder
               #file was delete
               uploadTree.remove originalPath
             cb(err)
-
             return
+
           if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
             fn2 = ->
               folder.upload(fileName, originalPath, cb)
               return
             setTimeout fn2, 10000
+            return
 
           #if the file is already being uploaded, don't try again.
           if upFile.uploading
@@ -378,13 +379,18 @@ class GFolder
               if err
                 logger.error "There was an error with uploading data"
                 logger.error err
-                logger.error res
-                cbfn = -> 
+                logger.error res                
+                cbfn = (err, end) -> 
+                  logger.debug "after failed upload"
+                  logger.debug "error"
+                  logger.debug err
+                  logger.debug "end", end
                   up = uploadTree.get(originalPath)
                   up.uploading = false
                   delete up.location               
                   folder.upload(fileName, originalPath, cb)
                   return
+                getNewRangeEnd(upFile.location, size,cbfn)
                 setTimeout cbfn, 60000
                 return
               else
