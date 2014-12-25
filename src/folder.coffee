@@ -256,9 +256,16 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
     request(requestOptions, requestCallback)
   )
   .on 'error', (err)->
-    logger.log "error", err
-    logger.error err
-    cb(err, {rangeEnd: start-1})
+    logger.error "error after piping", err
+    logger.error err   
+    callback = (err,end) ->
+      cb err, {
+        statusCode: resp.statusCode
+        rangeEnd: end
+      }
+      return
+
+    getNewRangeEnd(location, fileSize, callback)
 
 
 
@@ -436,7 +443,7 @@ class GFolder
               return
 
 
-            logger.log 'debug', "starting to upload file #{fileName}"      
+            logger.log 'info', "starting to upload file #{fileName}"      
             if upFile.location
               location = upFile.location
 

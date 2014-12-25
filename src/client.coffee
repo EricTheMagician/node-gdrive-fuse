@@ -189,7 +189,7 @@ parseFolderTree = ->
       idToPath.set(o.id,key)
       idToPath.set(o.parentid, pth.dirname(key))
 
-      if 'size' in o
+      if 'size' of o
         folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
       else
         # keep track of the conversion of bitcasa path to real path
@@ -288,7 +288,6 @@ loadChanges = (cb) ->
 parseChanges = (items) ->
   logger.debug "There was #{items.length} to parse"
   notFound = []
-  inodeCount = Math.max.apply(null, inodeToPath.keys()) + 1
   for i in items
     if i.deleted #check if it is deleted
       path = idToPath.get(i.fileId)      
@@ -340,6 +339,7 @@ parseChanges = (items) ->
         parent = folderTree.get parentPath
         path = pth.join parentPath, cfile.title
         idToPath.set cfile.id, path
+        inodeCount = Math.max.apply(null, inodeToPath.keys()) + 1
         if cfile.mimeType == 'application/vnd.google-apps.folder'
           logger.debug "#{path} is a new folder"          
           folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inodeCount, cfile.editable )
@@ -348,7 +348,6 @@ parseChanges = (items) ->
           logger.debug "#{path} is a new file"
           folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inodeCount, cfile.editable)
         inodeToPath.set inodeCount, path
-        inodeCount++
   
   if notFound.length > 0 and notFound.length < items.length
     parseChanges(notFound)
