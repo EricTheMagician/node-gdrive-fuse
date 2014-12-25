@@ -171,7 +171,7 @@ class GDriveFS extends fuse.FileSystem
         file = folderTree.get(path)
         if (file instanceof GFile)
          if file.size == 0
-          logger.debug "#{path} size was 0"
+          # logger.debug "#{path} size was 0"
           fs.open pth.join(uploadLocation, cache), 'w+', (err,fd) ->
             if err
               logger.debug "could not open file for writing"
@@ -657,43 +657,43 @@ uploadCallback = (path, cb) ->
       q.push fn
       q.start()
       return
+  
+    uploadedFile = uploadTree.get(path)
+    uploadedFileLocation = pth.join uploadLocation, uploadedFile.cache
+
+    logger.log 'info', "successfully uploaded #{path}"
+        
+    uploadTree.remove path
+    saveUploadTree()
+    if folderTree.has path
+      logger.debug "#{path} folderTree already existed"
+      file = folderTree.get path
+      file.downloadUrl = result.downloadUrl
+      file.id = result.id
+      file.size = parseInt(result.fileSize)
+      file.ctime = (new Date(result.createdDate)).getTime()
+      file.mtime =  (new Date(result.modifiedDate)).getTime()
     else
-      uploadedFile = uploadTree.get(path)
-      uploadedFileLocation = pth.join uploadLocation, uploadedFile.cache
+      logger.debug "#{path} folderTree did not exist"     
+      inode = Math.max.apply(null, inodeToPath.keys()) + 1
+      file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)        
+      inodeToPath.set inode, path
+    client.idToPath.set( result.id, path)
+    #update folder Tree
+    if  file.name not in parent.children
+      parent.children.push file.name
+    folderTree.set path, file
+    client.saveFolderTree()
 
-      logger.log 'info', "successfully uploaded #{path}"
-          
-      uploadTree.remove path
-      saveUploadTree()
-      if folderTree.has path
-        logger.debug "#{path} folderTree already existed"
-        file = folderTree.get path
-        file.downloadUrl = result.downloadUrl
-        file.id = result.id
-        file.size = parseInt(result.fileSize)
-        file.ctime = (new Date(result.createdDate)).getTime()
-        file.mtime =  (new Date(result.modifiedDate)).getTime()
-      else
-        logger.debug "#{path} folderTree did not exist"     
-        inode = Math.max.apply(null, inodeToPath.keys()) + 1
-        file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)        
-        inodeToPath.set inode, path
-      client.idToPath.set( result.id, path)
-      #update folder Tree
-      if parent.children.indexOf( file.name ) < 0
-        parent.children.push file.name
-      folderTree.set path, file
-      client.saveFolderTree()
-
-      #move the file to download folder after finished uploading
-      fs.open uploadedFileLocation, 'r', (err,fd) ->
-        if err
-          logger.debug "could not open #{uploadedFileLocation} for copying file from upload to uploader"
-          logger.debug err
-          return
-        else          
-          moveToDownload(file, fd, uploadedFileLocation, 0, cb)
+    #move the file to download folder after finished uploading
+    fs.open uploadedFileLocation, 'r', (err,fd) ->
+      if err
+        logger.debug "could not open #{uploadedFileLocation} for copying file from upload to uploader"
+        logger.debug err
         return
+      else          
+        moveToDownload(file, fd, uploadedFileLocation, 0, cb)
+      return
 
     return
 
@@ -703,13 +703,17 @@ resumeUpload = ->
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
     for path in uploadTree.keys()
-      if folderTree.has pth.dirname(path)
-        parent = folderTree.get pth.dirname(path)          
-        _fn = (cb) ->
-          parent.upload pth.basename(path), path, uploadCallback(path,cb)
-          return
-        q.push(_fn)
-        q.start()
+      parentPath = pth.dirname(path)
+      if folderTree.has parentPath
+        parent = folderTree.get parentPath
+        if parent instanceof GFolder
+          _fn = (cb) ->
+            parent.upload pth.basename(path), path, uploadCallback(path,cb)
+            return
+          q.push(_fn)
+          q.start()
+        else
+          logger.debug "While resuming uploads, #{parentPath} was not a folder"
   return
 
 start = ->
