@@ -82,6 +82,7 @@ class GDriveFS extends fuse.FileSystem
 
   getattr: (context, inode, reply) ->
     path = inodeToPath.get inode
+    logger.silly "getting attr for #{path}"
     if folderTree.has(path)
       callback = (status, attr)->
         reply.attr(attr, 5)
@@ -108,6 +109,7 @@ class GDriveFS extends fuse.FileSystem
   #  */
   readdir: (context, inode, requestedSize, offset, fileInfo, reply) ->
     path = inodeToPath.get inode
+    logger.silly "readding dir #{path}"
     # console.log path
     if folderTree.has(path)
       object = folderTree.get(path)
@@ -139,6 +141,7 @@ class GDriveFS extends fuse.FileSystem
 
   setattr: (context, inode, attrs, reply) ->
     path = inodeToPath.get inode
+    logger.silly "setting attr for #{path}"
     file = folderTree.get path
     if 'size' in attrs
       file.size = attrs.size
@@ -148,6 +151,7 @@ class GDriveFS extends fuse.FileSystem
 
   open: (context, inode, fileInfo, reply) ->
     path = inodeToPath.get inode
+    logger.silly "opening file #{path}"
     parent = folderTree.get pth.dirname(path)
     flags = fileInfo.flags
     if flags.rdonly #read only
@@ -255,9 +259,9 @@ class GDriveFS extends fuse.FileSystem
     return
 
   write: (context, inode, buffer, position, fileInfo, reply) ->
-    # logger.log "debug", "writing to file #{path} - position: #{position}, length: #{len}"
 
     path = inodeToPath.get inode
+    logger.log "silly", "writing to file #{path} - position: #{position}, length: #{buffer.length}"
 
     file = folderTree.get path  
     size = file.size
@@ -509,8 +513,8 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
   release: (context, inode, fileInfo, reply) ->
-    logger.silly "closing file #{path}"
     path = inodeToPath.get inode
+    logger.silly "closing file #{path}"
     if uploadTree.has path
       logger.log "debug", "#{path} was in the upload tree"
       client.saveFolderTree()
