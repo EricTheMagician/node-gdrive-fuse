@@ -644,6 +644,9 @@ uploadCallback = (path, cb) ->
         logger.debug "the mimetype of #{path} was invalid"
         cb()
         return
+      if err == "uploading"
+        cb()
+        return
       if err.code == "ENOENT"
         uploadTree.remove(path)
         cb()

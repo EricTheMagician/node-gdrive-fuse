@@ -326,6 +326,7 @@ class GFolder
     #if the file is already being uploaded, don't try again.   
     if upFile and upFile.uploading
       logger.debug "#{fileName} is already being uploaded"
+      cb("uploading")
       return
 
 
