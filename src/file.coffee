@@ -118,20 +118,21 @@ class GFile extends EventEmitter
     path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
     if start >= @size
       return
-    unless file.open(start)
-      unless downloadTree.has("#{file.id}-#{start}")
-        downloadTree.set("#{file.id}-#{start}", 1)
-        callback =  ->
-          downloadTree.remove("#{file.id}-#{start}")
-          file.emit 'downloaded', start
-          return
+    file.open start, (err, fd) ->
+      unless fd
+        unless downloadTree.has("#{file.id}-#{start}")
+          downloadTree.set("#{file.id}-#{start}", 1)
+          callback =  ->
+            downloadTree.remove("#{file.id}-#{start}")
+            file.emit 'downloaded', start
+            return
 
-        GFile.download(file.downloadUrl, start,end, file.size, path, callback)
-        return
+          GFile.download(file.downloadUrl, start,end, file.size, path, callback)
+          return
 
     return
 
-  open: (start) =>
+  open: (start,cb) =>
     file = @
     fn = ->
       if openedFiles.has("#{file.id}-#{start}")
@@ -144,7 +145,7 @@ class GFile extends EventEmitter
       f = openedFiles.get "#{file.id}-#{start}"
       clearTimeout(f.to)
       f.to = setTimeout(fn, cacheTimeout)
-      return f.fd
+      cb null, f.fd
 
     else
       end = Math.min(start + GFile.chunkSize, file.size ) - 1
@@ -152,13 +153,25 @@ class GFile extends EventEmitter
       try
         stats = fs.statSync path
         if stats.size == (end - start + 1)
-          fd = fs.openSync( path, 'r' )
-          openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
-          return fd
+          fd = fs.open path, 'r', (err,fd) ->
+            if err 
+              if err.code == "EMFILE"
+                for o in openedFiles.values()
+                  clearTimeout o.to
+                  fs.close o.fd, ->
+                    return
+                file.open(start, cb)
+              else
+                logger.error "there was an handled error while opening files for reading"
+              return
+
+
+            openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
+            cb null, fd
         else
-          return false
+          cb null, false
       catch
-        return false
+        cb null, false
   read: (start,end, readAhead, cb) =>
     file = @
     end = Math.min(end, @size-1)
@@ -186,24 +199,24 @@ class GFile extends EventEmitter
 
     downloadTree.set("#{file.id}-#{chunkStart}", 1)
     #try to open the file or get the file descriptor
-    fd = @open(chunkStart)
+    file.open chunkStart, (err,fd) ->
 
-    #fd can returns false if the file does not exist yet
-    unless fd
-      file.download start, end, readAhead, cb
+      #fd can returns false if the file does not exist yet
+      unless fd
+        file.download start, end, readAhead, cb
+        _readAheadFn()
+        return
+
+      downloadTree.remove("#{file.id}-#{chunkStart}")
+
+      #if the file is opened, read from it
+      readSize = end-start;
+      buffer = new Buffer(readSize+1)
+      fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
+        cb(buffer.slice(0,bytesRead))
+        return
+
       _readAheadFn()
-      return
-
-    downloadTree.remove("#{file.id}-#{chunkStart}")
-
-    #if the file is opened, read from it
-    readSize = end-start;
-    buffer = new Buffer(readSize+1)
-    fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
-      cb(buffer.slice(0,bytesRead))
-      return
-
-    _readAheadFn()
 
     return
 
