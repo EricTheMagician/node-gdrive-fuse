@@ -161,6 +161,7 @@ class GFile extends EventEmitter
         return false
   read: (start,end, readAhead, cb) =>
     file = @
+    end = Math.min(end, @size-1)
     chunkStart = Math.floor((start)/GFile.chunkSize)* GFile.chunkSize
     chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1
 
