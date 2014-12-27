@@ -39,6 +39,7 @@ oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m
 drive = google.drive({ version: 'v2' })
 
 config.cacheLocation ||=  "/tmp/cache" 
+config.refreshDelay ||= 60000
 dataLocation = pth.join( config.cacheLocation, 'data' )
 fs.ensureDirSync( dataLocation )
 
@@ -358,7 +359,7 @@ parseChanges = (items) ->
     saveFolderTree()
 
   logger.debug "Finished parsing changes from google"
-  setTimeout loadChanges, 60000 + Math.random() * (15000)
+  setTimeout loadChanges, config.refreshDelay + Math.random() * (config.refreshDelay) * 0.25
   return
 ####################################
 ###### Setting up the Client #######
