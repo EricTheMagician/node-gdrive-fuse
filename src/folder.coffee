@@ -333,8 +333,6 @@ class GFolder
 
     fs.stat filePath, (err, stats) ->
       if err or stats == undefined        
-        logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
-        logger.debug err
         if err.code == "ENOENT"
           #file was delete
           uploadTree.remove originalPath

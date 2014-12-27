@@ -644,6 +644,8 @@ uploadCallback = (path, cb) ->
   return (err, result) ->
     parent = folderTree.get pth.dirname(path)
     if err
+      logger.debug "there was an errror while trying to upload file #{pth.basename path} with path #{path}"
+      logger.debug err
       if err == "invalid mime"
         logger.debug "the mimetype of #{path} was invalid"
         cb()
@@ -656,7 +658,7 @@ uploadCallback = (path, cb) ->
         cb()
         return
 
-      logger.debug "failed to upload \"#{path}\". Retrying"
+      logger.debug "Retrying upload: \"#{path}\"."
       fn = (cb) ->
         parent.upload pth.basename(path), path , callback(path,cb)
         return
