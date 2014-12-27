@@ -116,7 +116,7 @@ class GDriveFS extends fuse.FileSystem
       if object instanceof GFile
         reply.err errnoMap.ENOTDIR
       else if object instanceof GFolder
-        size = Math.max( requestedSize , object.children.length * 64)
+        size = Math.max( requestedSize , object.children.length * 256)
         # size = requestedSize
         parent = folderTree.get pth.dirname(path)
         totalSize = 0
