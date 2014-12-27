@@ -27,7 +27,7 @@
     "queue": "^3.0.10",
     "request": "^2.51.0",
     "restler": "git://github.com/mthx/restler#4cc136af9a089ef21013cdad6fdd68adebf92caa",
-    "winston": "~0.7.3"
+    "winston": "~0.8.3"
   },
   "engine": "node >= 0.10.0"
 }

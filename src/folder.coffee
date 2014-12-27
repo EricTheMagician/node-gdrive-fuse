@@ -210,8 +210,6 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       return
 
     if 200 <= resp.statusCode <= 201
-      logger.info "Finished uploading?"
-      logger.info JSON.parse(body)
       cb null, {
         statusCode: 201
         rangeEnd: fileSize
