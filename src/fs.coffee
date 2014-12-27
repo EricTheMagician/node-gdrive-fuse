@@ -147,7 +147,7 @@ class GDriveFS extends fuse.FileSystem
       file.size = attrs.size
 
     reply.attr(file.getAttrSync(), 5);
-
+    return
 
   open: (context, inode, fileInfo, reply) ->
     path = inodeToPath.get inode
@@ -415,6 +415,7 @@ class GDriveFS extends fuse.FileSystem
         # entry_timeout: 60
     
     reply.entry(entry)
+    return
 
 
   create: (context, parentInode, name, mode, fileInfo, reply) ->
@@ -573,6 +574,7 @@ class GDriveFS extends fuse.FileSystem
           fsid: 1000000,
           flag: 0,
       }
+    return
 
   getxattr: (context, inode, name, size, position, reply) ->
       console.log('GetXAttr was called!')
@@ -623,18 +625,18 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
 
     if start < file.size
       moveToDownload(file, fd, uploadedFileLocation, start, cb)
-    else
-      fs.close fd, (err) ->
+      return
+    fs.close fd, (err) ->
+      if err
+        logger.debug "unable to close file after transffering #{uploadedFile}"
+        cb()
+        return        
+      fs.unlink uploadedFileLocation, (err)->
         if err
-          logger.debug "unable to close file after transffering #{uploadedFile}"
-          cb()
-        else
-          fs.unlink uploadedFileLocation, (err)->
-            if err
-              logger.log "error", "unable to remove file #{uploadedFile}"      
-            cb()
-            return
+          logger.log "error", "unable to remove file #{uploadedFile}"      
+        cb()
         return
+      return
     return
 
   return
@@ -658,11 +660,11 @@ uploadCallback = (path, cb) ->
         cb()
         return
 
+      cb()
       logger.debug "Retrying upload: \"#{path}\"."
       fn = (cb) ->
         parent.upload pth.basename(path), path , callback(path,cb)
         return
-      cb()
       q.push fn
       q.start()
       return
@@ -700,8 +702,8 @@ uploadCallback = (path, cb) ->
         logger.debug "could not open #{uploadedFileLocation} for copying file from upload to uploader"
         logger.debug err
         return
-      else          
-        moveToDownload(file, fd, uploadedFileLocation, 0, cb)
+
+      moveToDownload(file, fd, uploadedFileLocation, 0, cb)
       return
 
     return
