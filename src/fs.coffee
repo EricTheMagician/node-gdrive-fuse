@@ -476,7 +476,8 @@ class GDriveFS extends fuse.FileSystem
     if folderTree.has path #make sure that the path exists
       file = folderTree.get path
       if file instanceof GFile #make sure that the file is in fact a file
-
+        
+        folderTree.remove path
         drive.files.trash {fileId: file.id}, (err, res) ->
           if err
             logger.log "debug", "unable to remove file #{path}"
@@ -485,7 +486,6 @@ class GDriveFS extends fuse.FileSystem
           idx = parent.children.indexOf name
           if idx >= 0
             parent.children.splice idx, 1
-          folderTree.remove path
           client.saveFolderTree()
           client.idToPath.remove(file.id)
 
