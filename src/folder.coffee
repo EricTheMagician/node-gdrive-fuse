@@ -331,8 +331,10 @@ class GFolder
 
     fs.stat filePath, (err, stats) ->
       if err or stats == undefined        
+        logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
+        logger.debug err
         if err.code == "ENOENT"
-          #file was delete
+          #file was deleted
           uploadTree.remove originalPath
         cb(err)
         return
@@ -346,6 +348,7 @@ class GFolder
           if err
             logger.debug "there was an error removing a file of size 0, #{filePath}"
             logger.debug err
+          logger.debug "size of #{originalPath} was 0 for uploading"
           cb {code: "ENOENT"}
           return
         return
@@ -362,14 +365,12 @@ class GFolder
 
           if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
             fn2 = ->
+              upFile.uploading = false
               folder.upload(fileName, originalPath, cb)
               return
             setTimeout fn2, 10000
             return
 
-          #if the file is already being uploaded, don't try again.
-          if upFile.uploading
-            return
 
           upFile.uploading = true   
           magic.detectFile filePath, (err, mime) ->

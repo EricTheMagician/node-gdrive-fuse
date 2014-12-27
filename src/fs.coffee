@@ -646,8 +646,6 @@ uploadCallback = (path, cb) ->
   return (err, result) ->
     parent = folderTree.get pth.dirname(path)
     if err
-      logger.debug "there was an errror while trying to upload file #{pth.basename path} with path #{path}"
-      logger.debug err
       if err == "invalid mime"
         logger.debug "the mimetype of #{path} was invalid"
         cb()
@@ -710,7 +708,6 @@ uploadCallback = (path, cb) ->
 
 #resume file uploading
 resumeUpload = ->  
-  q.start()
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
     for path in uploadTree.keys()
@@ -718,10 +715,10 @@ resumeUpload = ->
       if folderTree.has parentPath
         parent = folderTree.get parentPath
         if parent instanceof GFolder
-          _fn = (cb) ->
+          uploadWork = (cb) ->
             parent.upload pth.basename(path), path, uploadCallback(path,cb)
             return
-          q.push(_fn)
+          q.push(uploadWork)
           q.start()
         else
           logger.debug "While resuming uploads, #{parentPath} was not a folder"
