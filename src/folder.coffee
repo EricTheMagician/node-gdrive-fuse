@@ -321,6 +321,7 @@ class GFolder
     folder = @
     upFile = uploadTree.get originalPath
     unless upFile
+      cb {code: "ENOENT"}
       return
     filePath = pth.join uploadLocation, upFile.cache
     #if the file is already being uploaded, don't try again.   
@@ -349,6 +350,7 @@ class GFolder
           if err
             logger.debug "there was an error removing a file of size 0, #{filePath}"
             logger.debug err
+          cb {code: "ENOENT"}
           return
         return
 

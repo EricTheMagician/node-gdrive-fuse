@@ -502,7 +502,7 @@ class GDriveFS extends fuse.FileSystem
       else
         reply.err errnoMap.EISDIR    
     else
-      reply.err errnoMap.EEXIST
+      reply.err errnoMap.ENOENT
     return
 
 
