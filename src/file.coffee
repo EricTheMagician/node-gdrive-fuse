@@ -177,46 +177,75 @@ class GFile extends EventEmitter
     end = Math.min(end, @size-1)
     chunkStart = Math.floor((start)/GFile.chunkSize)* GFile.chunkSize
     chunkEnd = Math.min( Math.ceil(end/GFile.chunkSize) * GFile.chunkSize, file.size)-1
+    nChunks = (chunkEnd - chunkStart)/GFile.chunkSize
 
-    _readAheadFn = ->
-      if readAhead
-        if chunkStart <= start < (chunkStart + 131072)
-          file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
-          file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
+    if nChunks < 1
+      _readAheadFn = ->
+        if readAhead
+          if chunkStart <= start < (chunkStart + 131072)
+            file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
+            file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
 
 
-    path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
-    listenCallback = (cStart)  ->      
-      if ( cStart <= start < (cStart + GFile.chunkSize-1)  )
-        file.read(start,end, readAhead, cb)
-        file.removeListener 'downloaded', listenCallback
-      return
+      path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
+      listenCallback = (cStart)  ->      
+        if ( cStart <= start < (cStart + GFile.chunkSize-1)  )
+          file.read(start,end, readAhead, cb)
+          file.removeListener 'downloaded', listenCallback
+        return
 
-    if downloadTree.has("#{file.id}-#{chunkStart}")
-      file.on 'downloaded', listenCallback
-      _readAheadFn()
-      return
-
-    downloadTree.set("#{file.id}-#{chunkStart}", 1)
-    #try to open the file or get the file descriptor
-    file.open chunkStart, (err,fd) ->
-
-      #fd can returns false if the file does not exist yet
-      unless fd
-        file.download start, end, readAhead, cb
+      if downloadTree.has("#{file.id}-#{chunkStart}")
+        file.on 'downloaded', listenCallback
         _readAheadFn()
         return
 
-      downloadTree.remove("#{file.id}-#{chunkStart}")
+      downloadTree.set("#{file.id}-#{chunkStart}", 1)
+      #try to open the file or get the file descriptor
+      file.open chunkStart, (err,fd) ->
 
-      #if the file is opened, read from it
-      readSize = end-start;
-      buffer = new Buffer(readSize+1)
-      fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
-        cb(buffer.slice(0,bytesRead))
+        #fd can returns false if the file does not exist yet
+        unless fd
+          file.download start, end, readAhead, cb
+          _readAheadFn()
+          return
+
+        downloadTree.remove("#{file.id}-#{chunkStart}")
+
+        #if the file is opened, read from it
+        readSize = end-start;
+        buffer = new Buffer(readSize+1)
+        fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
+          cb(buffer.slice(0,bytesRead))
+          return
+
+        _readAheadFn()
+
+    else if nChunks < 2
+      end1 = chunkStart + GFile.chunkSize - 1
+      start2 = chunkStart + GFile.chunkSize
+
+      callback1 = (buffer1) ->
+        if buffer1.length == 0
+          cb(buffer1)
+          return
+        callback2 = (buffer2) ->
+          if buffer2.length == 0
+            cb(buffer1)
+            return
+          cb( Buffer.concat([buffer1, buffer2]) )
+          return
+
+        file.read( start2, end, true, callback2)
         return
 
-      _readAheadFn()
+      file.read( start, end1,true, callback1)
+
+    else
+      logger.debug "too many chunks requested, #{nChunks}"
+      cb(buf0)
+
+    return
+
 
     return
 
