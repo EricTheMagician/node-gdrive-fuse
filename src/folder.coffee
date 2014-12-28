@@ -258,12 +258,12 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
     logger.error err   
     callback = (err,end) ->
       cb err, {
-        statusCode: resp.statusCode
         rangeEnd: end
       }
       return
 
     getNewRangeEnd(location, fileSize, callback)
+    return
 
 
 
@@ -327,6 +327,7 @@ class GFolder
       logger.debug "#{fileName} is already being uploaded"
       cb("uploading")
       return
+    upFile.uploading = true
 
 
     fs.stat filePath, (err, stats) ->
@@ -336,6 +337,7 @@ class GFolder
         if err.code == "ENOENT"
           #file was deleted
           uploadTree.remove originalPath
+        upFile.uploading = false
         cb(err)
         return
 
@@ -350,6 +352,7 @@ class GFolder
             logger.debug err
           logger.debug "size of #{originalPath} was 0 for uploading"
           cb {code: "ENOENT"}
+          upFile.uploading = false
           return
         return
 
@@ -361,6 +364,8 @@ class GFolder
               #file was delete
               uploadTree.remove originalPath
             cb(err)
+            upFile.uploading = false
+
             return
 
           if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
