@@ -290,8 +290,8 @@ parseChanges = (items) ->
   logger.debug "There was #{items.length} to parse"
   notFound = []
   for i in items
+    path = idToPath.get(i.fileId)      
     if i.deleted #check if it is deleted
-      path = idToPath.get(i.fileId)      
       if folderTree.has path #check to see if the file was not already removed from folderTree
         logger.debug "#{path} was deleted"
         folderTree.remove path
@@ -302,8 +302,7 @@ parseChanges = (items) ->
         idToPath.remove i.fileId
       continue
     else
-      cfile = i.file      
-
+      cfile = i.file     
       # if it is not deleted, check to see if it's been marked as trash
       if cfile.labels.trashed
         if folderTree.has path
