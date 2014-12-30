@@ -22,7 +22,6 @@
     "fusejs": "git://github.com/thejinx0r/fusejs#dev",
     "googleapis": "^1.0.20",
     "hashmap": "^1.1.0",
-    "limiter": "~1.0.5",
     "mmmagic": "git://github.com/thejinx0r/mmmagic#merge",
     "queue": "^3.0.10",
     "request": "^2.51.0",
