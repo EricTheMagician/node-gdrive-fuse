@@ -315,7 +315,8 @@ class GDriveFS extends fuse.FileSystem
             return
           else
             parent.children.push name
-            inode = Math.max.apply(null, inodeToPath.keys()) + 1
+            inodes = value.inode for value in folderTree.values()
+            inode = Math.max(inodes) + 1
             folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), inode, res.editable, [])
             folderTree.set path, folder
             inodeToPath.set inode, path 
@@ -388,7 +389,9 @@ class GDriveFS extends fuse.FileSystem
     logger.log "debug", "adding #{name} to #{parentPath}, #{parentInode}"
     path = pth.join parentPath, name
     now = (new Date).getTime()
-    inode = Math.max.apply(null, inodeToPath.keys()) + 1
+
+    inodes = value.inode for value in folderTree.values()
+    inode = Math.max(inodes) + 1
     inodeToPath.set inode, path
 
     file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
@@ -434,7 +437,8 @@ class GDriveFS extends fuse.FileSystem
         parent.children.push name
       now = (new Date).getTime()
       logger.log "debug", "adding #{path} to folderTree"
-      inode = Math.max.apply(null, inodeToPath.keys()) + 1
+      inodes = value.inode for value in folderTree.values()
+      inode = Math.max(inodes) + 1
       file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
       folderTree.set path, file
       inodeToPath.set inode, path
@@ -538,13 +542,11 @@ class GDriveFS extends fuse.FileSystem
           ###
 
           if 0 < file.size <=  10485760 #10MB 
-            logger.info "Starting to upload #{path}"
             cb = ->
               return
             parent.upload pth.basename(path), path, uploadCallback(path, cb)           
           else if file.size >  10485760           
             fn = (cb)->
-              logger.info "Starting to upload #{path}"
               parent.upload pth.basename(path), path, uploadCallback(path,cb)            
               return
             q.push fn
@@ -684,7 +686,8 @@ uploadCallback = (path, cb) ->
       file.mtime =  (new Date(result.modifiedDate)).getTime()
     else
       logger.debug "#{path} folderTree did not exist"     
-      inode = Math.max.apply(null, inodeToPath.keys()) + 1
+      inodes = value.inode for value in folderTree.values()
+      inode = Math.max(inodes) + 1
       file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)        
       inodeToPath.set inode, path
     client.idToPath.set( result.id, path)

@@ -448,7 +448,7 @@ class GFolder
               return
 
 
-            logger.log 'info', "starting to upload file #{fileName}"      
+            logger.log 'info', "Starting to upload file #{fileName}"      
             if upFile.location
               location = upFile.location
 

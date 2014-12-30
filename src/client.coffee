@@ -339,7 +339,8 @@ parseChanges = (items) ->
         parent = folderTree.get parentPath
         path = pth.join parentPath, cfile.title
         idToPath.set cfile.id, path
-        inodeCount = Math.max.apply(null, inodeToPath.keys()) + 1
+        inodes = value.inode for value in folderTree.values()
+        inode = Math.max(inodes) + 1
         if cfile.mimeType == 'application/vnd.google-apps.folder'
           logger.debug "#{path} is a new folder"          
           folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inodeCount, cfile.editable )

@@ -1,3 +1,6 @@
+##v0.6.1
+fixes bug #31 - maximum inode value was not being calculated properly.
+
 ##v0.6.0
 * Fixed memory leak issues. Switched from the restler package to the request package.
 * With the request package, piping files is now possible and is used for both file uploads and downloads. As a result, the upload chunk size is now obsolote and not used.
