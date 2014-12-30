@@ -8,3 +8,6 @@ This is a simple filesystem written in NodeJS to mount Google Drive as a local d
 
 ##Configuration
 [Configuration](https://github.com/thejinx0r/node-gdrive-fuse/wiki/Configuration)
+
+##Changelog
+[Changelog](https://github.com/thejinx0r/node-gdrive-fuse/blob/master/changelog.md)
