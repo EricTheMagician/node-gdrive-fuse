@@ -663,14 +663,18 @@ uploadCallback = (path, cb) ->
       cb()
       logger.debug "Retrying upload: \"#{path}\"."
       fn = (cb) ->
-        parent.upload pth.basename(path), path , callback(path,cb)
+        parent.upload pth.basename(path), path , uploadCallback(path,cb)
         return
       q.push fn
       q.start()
       return
   
-    uploadedFile = uploadTree.get(path)
-    uploadedFileLocation = pth.join uploadLocation, uploadedFile.cache
+    upFile = uploadTree.get path
+
+    unless upFile #make uploaded file is still in the uploadTree
+      cb()
+      return
+    uploadedFileLocation = pth.join uploadLocation, upFile.cache
 
     logger.log 'info', "successfully uploaded #{path}"
         
