@@ -724,6 +724,7 @@ uploadCallback = (path, cb) ->
 
 #resume file uploading
 resumeUpload = ->  
+  # uploadWork = null
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
     for path in uploadTree.keys()
@@ -732,11 +733,10 @@ resumeUpload = ->
         parent = folderTree.get parentPath
         if parent instanceof GFolder
           fileName = pth.basename path
-          p = path
-          uploadWork = (cb) ->
-            parent.upload pth.basename(path), path, uploadCallback(path,cb)
+          p = path          
+          q.push (cb) ->
+            parent.upload fileName, p, uploadCallback(p,cb)
             return
-          q.push(uploadWork)
         else
           logger.debug "While resuming uploads, #{parentPath} was not a folder"
     q.start()
