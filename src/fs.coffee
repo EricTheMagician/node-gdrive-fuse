@@ -388,6 +388,11 @@ class GDriveFS extends fuse.FileSystem
     parent = folderTree.get parentPath
     logger.log "debug", "adding #{name} to #{parentPath}, #{parentInode}"
     path = pth.join parentPath, name
+
+    if folderTree.has(path)
+      reply.err PosixError.EEXIST
+      return
+      
     now = (new Date).getTime()
 
     inodes = value.inode for value in folderTree.values()
