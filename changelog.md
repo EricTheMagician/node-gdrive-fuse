@@ -1,3 +1,6 @@
+##v0.6.2
+fix bug #25 - file uploads were not being resumed properly on load.
+
 ##v0.6.1
 fixes bug #31 - maximum inode value was not being calculated properly.
 

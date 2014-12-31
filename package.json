@@ -1,6 +1,6 @@
 {
   "name": "GDriveF4JS",
-  "version": "0.6.1",
+  "version": "0.6.2",
   "description": "Google Drive Fuse filesystem written in node",
   "author": {
     "name": "Eric Yen",
