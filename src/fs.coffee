@@ -731,13 +731,15 @@ resumeUpload = ->
       if folderTree.has parentPath
         parent = folderTree.get parentPath
         if parent instanceof GFolder
+          fileName = pth.basename path
+          p = path
           uploadWork = (cb) ->
             parent.upload pth.basename(path), path, uploadCallback(path,cb)
             return
           q.push(uploadWork)
-          q.start()
         else
           logger.debug "While resuming uploads, #{parentPath} was not a folder"
+    q.start()
   return
 
 start = ->
