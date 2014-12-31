@@ -547,6 +547,10 @@ class GDriveFS extends fuse.FileSystem
             parent.upload pth.basename(path), path, uploadCallback(path, cb)           
           else if file.size >  10485760           
             fn = (cb)->
+              if parent instanceof GFile
+                console.log "While uploading, #{pth.dirname(path)} was a file - #{parent}"
+                cb()
+                return
               parent.upload pth.basename(path), path, uploadCallback(path,cb)            
               return
             q.push fn
