@@ -398,12 +398,14 @@ class GFolder
                   logger.debug err
                   logger.debug "end", end
                   up = uploadTree.get(originalPath)
+                  unless up
+                    cb("ENOENT")
+                    return
                   up.uploading = false
                   delete up.location               
                   folder.upload(fileName, originalPath, cb)
                   return
                 getNewRangeEnd(upFile.location, size,cbfn)
-                setTimeout cbfn, 60000
                 return
               else
                 start = res.rangeEnd + 1
