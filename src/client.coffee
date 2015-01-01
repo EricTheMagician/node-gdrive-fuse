@@ -337,6 +337,10 @@ parseChanges = (items) ->
       continue
 
     else
+      unless cfile.parents
+        logger.debug "changed file had empty parents"
+        logger.debug cfile
+        continue
 
       parentId = cfile.parents[0].id
       parentPath = idToPath.get(parentId)
