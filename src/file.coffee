@@ -76,18 +76,22 @@ class GFile extends EventEmitter
         unless once
           once = true
           fn = ->
-            cb("expiredUrl");
+            cb("expiredUrl")
+            return
           setTimeout fn, 2000
+      return
     .on 'error', (err)->
       console.log "error"
       console.log err
       cb(err)
+      return
     .pipe(
       fs.createWriteStream(saveLocation)
     ).on 'close', ->
       unless once
         once = true
         cb(null)
+      return
     
 
     return
@@ -146,6 +150,7 @@ class GFile extends EventEmitter
       clearTimeout(f.to)
       f.to = setTimeout(fn, cacheTimeout)
       cb null, f.fd
+      return
 
     else
       end = Math.min(start + GFile.chunkSize, file.size ) - 1
@@ -168,10 +173,12 @@ class GFile extends EventEmitter
 
             openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
             cb null, fd
+            return
         else
           cb null, false
       catch
         cb null, false
+      return
   read: (start,end, readAhead, cb) =>
     file = @
     end = Math.min(end, @size-1)
@@ -185,6 +192,7 @@ class GFile extends EventEmitter
           if chunkStart <= start < (chunkStart + 131072)
             file.recursive( Math.floor(file.size / GFile.chunkSize) * GFile.chunkSize, file.size-1)
             file.recursive(chunkStart + i * GFile.chunkSize, chunkEnd + i * GFile.chunkSize) for i in [1..config.advancedChunks]
+        return
 
 
       path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
@@ -219,6 +227,7 @@ class GFile extends EventEmitter
           return
 
         _readAheadFn()
+        return
 
     else if nChunks < 2
       end1 = chunkStart + GFile.chunkSize - 1
@@ -246,9 +255,6 @@ class GFile extends EventEmitter
 
     return
 
-
-    return
-
   updateUrl: (cb) =>
     logger.debug "updating url for #{@name}"
     file = @
@@ -267,6 +273,7 @@ class GFile extends EventEmitter
           logger.debug "there was an error while updating url"
           logger.debug "err", err
         cb(file.downloadUrl)
+        return
       return
     return
 

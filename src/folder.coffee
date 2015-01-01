@@ -239,6 +239,7 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
       return
 
     getNewRangeEnd(location, fileSize, callback)
+    return
 
 
 
