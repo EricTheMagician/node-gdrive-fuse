@@ -294,7 +294,9 @@ parseChanges = (items) ->
     if i.deleted #check if it is deleted
       if folderTree.has path #check to see if the file was not already removed from folderTree
         logger.debug "#{path} was deleted"
+        o = folderTree.get path
         folderTree.remove path
+        inodeToPath.remove o.inode
         parent = folderTree.get pth.dirname(path)
         idx = parent.children.indexOf pth.basename(path)
         if idx >= 0
@@ -310,8 +312,12 @@ parseChanges = (items) ->
     if cfile.labels.trashed
       if folderTree.has path
         logger.debug "#{path} was trashed"
+        o = folderTree.get path        
+        
         folderTree.remove path
-        idToPath.remove i.fileId
+        idToPath.remove o.id
+        inodeToPath.remove o.inode
+
         parent = folderTree.get pth.dirname(path)
         if parent
           idx = parent.children.indexOf pth.basename(path)
@@ -331,6 +337,7 @@ parseChanges = (items) ->
       continue
 
     else
+
       parentId = cfile.parents[0].id
       parentPath = idToPath.get(parentId)
       unless parentPath
