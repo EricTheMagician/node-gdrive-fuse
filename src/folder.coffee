@@ -15,17 +15,12 @@ else
 
 
 config.cacheLocation ||= '/tmp/cache'
-google = require 'googleapis'
-oauth2Client = new google.auth.OAuth2(config.clientId, config.clientSecret, config.redirectUrl)
-oauth2Client.setCredentials config.accessToken
-google.options({ auth: oauth2Client, user: config.email })
-drive = google.drive({ version: 'v2' })
-lockRefresh = false
 
+lockRefresh = false
 refreshToken =  (cb) ->
   unless lockRefresh
     lock = true
-    oauth2Client.refreshAccessToken (err,tokens) ->
+    GFolder.oauth.refreshAccessToken (err,tokens) ->
       if err
         logger.debug "There was an error with refreshing access token"
         logger.debug err
@@ -220,7 +215,7 @@ uploadData = (location, fileLocation, start, fileSize, mime, cb) ->
 
     if resp.statusCode >= 500
       callback = (err,end) ->
-        cb null, fd, {
+        cb null, {
           statusCode: resp.statusCode
           rangeEnd: end
         }

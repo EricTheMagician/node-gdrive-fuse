@@ -1,3 +1,6 @@
+##v0.6.3
+fix bug #28, #34. When refreshing access token, use the auth client from client.coffee
+
 ##v0.6.2
 fix bug #25 - file uploads were not being resumed properly on load.
 
