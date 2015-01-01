@@ -767,7 +767,7 @@ start = ->
           logger.error "unmount error:", err
         if data
           logger.info "unmounting output:", data
-        opts =  ["GDrive", "-s", "-f", "-o", "allow_other", config.mountPoint]
+        opts =  ["GDrive", "-o", "allow_other", config.mountPoint]
         # opts.push "-s"
         # opts.push "-f"
 
