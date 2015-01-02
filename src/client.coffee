@@ -193,8 +193,6 @@ parseFolderTree = ->
       if 'size' of o
         folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
       else
-        # keep track of the conversion of bitcasa path to real path
-        idToPath.set o.path, key
         folderTree.set key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
 
     changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
@@ -291,7 +289,7 @@ parseChanges = (items) ->
   notFound = []
   for i in items
     path = idToPath.get(i.fileId)      
-    if i.deleted #check if it is deleted
+    if i.deleted or i.file.labels.trashed #check if it is deleted
       if folderTree.has path #check to see if the file was not already removed from folderTree
         logger.debug "#{path} was deleted"
         o = folderTree.get path
@@ -304,27 +302,10 @@ parseChanges = (items) ->
         idToPath.remove i.fileId
       continue
   
-    cfile = i.file     
+    cfile = i.file #changed file     
     unless cfile
       continue
-    
-    # if it is not deleted, check to see if it's been marked as trash
-    if cfile.labels.trashed
-      if folderTree.has path
-        logger.debug "#{path} was trashed"
-        o = folderTree.get path        
-        
-        folderTree.remove path
-        idToPath.remove o.id
-        inodeToPath.remove o.inode
-
-        parent = folderTree.get pth.dirname(path)
-        if parent
-          idx = parent.children.indexOf pth.basename(path)
-          if idx >= 0
-            parent.children.splice(idx, 1)
-      continue
-
+     
     #if it is not deleted or trashed, check to see if it's new or not
     if path
       logger.debug "#{path} was updated"          
@@ -336,30 +317,30 @@ parseChanges = (items) ->
           f.downloadUrl = cfile.downloadUrl
       continue
 
-    else
-      unless cfile.parents
-        logger.debug "changed file had empty parents"
-        logger.debug cfile
-        continue
+  
+    unless cfile.parents
+      logger.debug "changed file had empty parents"
+      logger.debug cfile
+      continue
 
-      parentId = cfile.parents[0].id
-      parentPath = idToPath.get(parentId)
-      unless parentPath
-        notFound.push i
-        continue
-      parent = folderTree.get parentPath
-      path = pth.join parentPath, cfile.title
-      idToPath.set cfile.id, path
-      inodes = value.inode for value in folderTree.values()
-      inode = Math.max(inodes) + 1
-      if cfile.mimeType == 'application/vnd.google-apps.folder'
-        logger.debug "#{path} is a new folder"          
-        folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
-        inodeToPath.set cfile.id, path
-      else
-        logger.debug "#{path} is a new file"
-        folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
-      inodeToPath.set inode, path
+    parentId = cfile.parents[0].id
+    parentPath = idToPath.get(parentId)
+    unless parentPath
+      notFound.push i
+      continue
+    parent = folderTree.get parentPath
+    path = pth.join parentPath, cfile.title
+    idToPath.set cfile.id, path
+    inodes = value.inode for value in folderTree.values()
+    inode = Math.max(inodes) + 1
+    if cfile.mimeType == 'application/vnd.google-apps.folder'
+      logger.debug "#{path} is a new folder"          
+      folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
+      inodeToPath.set cfile.id, path
+    else
+      logger.debug "#{path} is a new file"
+      folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
+    inodeToPath.set inode, path
 
   if notFound.length > 0 and notFound.length < items.length
     parseChanges(notFound)
