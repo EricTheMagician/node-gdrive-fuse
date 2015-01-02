@@ -160,7 +160,12 @@ class GDriveFS extends fuse.FileSystem
         if file instanceof GFile
           if file.downloadUrl #make sure that the file has been fully uploaded
             reply.open(fileInfo)
-          else
+          else if uploadTree.has(path) #after writing a file, sometimes the filesystem tries to open the file again.
+            fs.open pth.join(uploadLocation, uploadTree.get(path).cache), 'r', (err,fd) ->
+              fileInfo.fh = fd
+              reply.open fileInfo
+
+
             reply.err errnoMap.EACCESS
         else
           reply.errerrnoMap.EISDIR
@@ -281,7 +286,6 @@ class GDriveFS extends fuse.FileSystem
     return
 
   flush: (context, inode, fileInfo, reply) ->
-      console.log('Flush was called!');
       reply.err(0)
       return
 
@@ -467,7 +471,7 @@ class GDriveFS extends fuse.FileSystem
           inode: inode #parent.inode
           generation: 1
           attr:file
-
+        console.log attr
         reply.create attr, fileInfo
         return
     else
@@ -772,7 +776,7 @@ start = ->
         # opts.push "-f"
 
         # opts.push "-mt"
-        # opts.push "-d"
+        opts.push "-d"
         fuse.fuse.mount
           filesystem: GDriveFS
           options: opts.concat(add_opts)
