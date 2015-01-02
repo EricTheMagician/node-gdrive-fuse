@@ -571,7 +571,12 @@ class GDriveFS extends fuse.FileSystem
           return
         return
 
-    else
+    else if fileInfo.fh
+      fs.close fileInfo.fh, (err) ->
+        if err
+          reply.err err.errno
+        reply.err 0
+    else    
       reply.err(0)
     return
 
