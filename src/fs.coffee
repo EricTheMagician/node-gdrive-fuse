@@ -327,7 +327,6 @@ class GDriveFS extends fuse.FileSystem
             # idToPath.set res.id, path
             client.idToPath.set(res.id, path)
             attr = folder.getAttrSync()
-            console.log attr
             entry = {
                 inode: attr.inode,
                 generation: 2,
