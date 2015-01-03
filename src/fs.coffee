@@ -160,12 +160,15 @@ class GDriveFS extends fuse.FileSystem
         if file instanceof GFile
           if file.downloadUrl #make sure that the file has been fully uploaded
             reply.open(fileInfo)
-          else if uploadTree.has(path) #after writing a file, sometimes the filesystem tries to open the file again.
-            fs.open pth.join(uploadLocation, uploadTree.get(path).cache), 'r', (err,fd) ->
-              fileInfo.fh = fd
-              reply.open fileInfo
-
-
+          # else if uploadTree.has(path) #after writing a file, sometimes the filesystem tries to open the file again.
+          #   fs.open pth.join(uploadLocation, uploadTree.get(path).cache), 'r', (err,fd) ->
+          #     if err
+          #       reply.err errnoMap.EACCESS
+          #       return
+          #     fileInfo.fh = fd
+          #     reply.open fileInfo
+          #     return
+          # else
             reply.err errnoMap.EACCESS
         else
           reply.errerrnoMap.EISDIR
@@ -454,7 +457,7 @@ class GDriveFS extends fuse.FileSystem
       client.saveFolderTree()
 
 
-      fs.open systemPath, 'w+', (err, fd) ->
+      fs.open systemPath, 'w', (err, fd) ->
         if (err)
           logger.log "error", "unable to createfile #{path}, #{err}"
           reply.err(errnoMap[err.code])
