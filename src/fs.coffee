@@ -470,7 +470,6 @@ class GDriveFS extends fuse.FileSystem
           inode: inode #parent.inode
           generation: 1
           attr:file
-        console.log attr
         reply.create attr, fileInfo
         return
     else

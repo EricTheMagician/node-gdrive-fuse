@@ -275,8 +275,9 @@ saveUploadTree = ->
       value = uploadTree.get key
       toSave[key] = value
     logger.debug "saving upload tree"
-    fs.outputJsonSync pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave
-    lockUploadTree = false
+    fs.outputJson pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave, ->
+      lockUploadTree = false
+      return
   return
 
 
