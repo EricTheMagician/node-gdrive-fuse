@@ -168,7 +168,7 @@ class GDriveFS extends fuse.FileSystem
           #     fileInfo.fh = fd
           #     reply.open fileInfo
           #     return
-          # else
+          else
             reply.err errnoMap.EACCESS
         else
           reply.errerrnoMap.EISDIR
