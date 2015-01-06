@@ -125,9 +125,10 @@ class GDriveFS extends fuse.FileSystem
         for child in object.children
           cpath = pth.join(path,child)
           cnode = folderTree.get cpath
-          attr = cnode.getAttrSync()
-          len = reply.addDirEntry(child, size, {inode: cnode.inode}, offset);          
-          totalSize += len
+          if cnode
+            attr = cnode.getAttrSync()
+            len = reply.addDirEntry(child, size, {inode: cnode.inode}, offset);          
+            totalSize += len
 
         if object.children.length == 0
           reply.buffer(new Buffer(0), 0)
@@ -490,20 +491,20 @@ class GDriveFS extends fuse.FileSystem
     logger.log "debug", "removing file #{path}, name is #{name}-#{folderTree.has path}"
     if folderTree.has path #make sure that the path exists
       file = folderTree.get path
+      parent = folderTree.get pth.dirname(path)
+      name = pth.basename path
+      idx = parent.children.indexOf name
+      if idx >= 0
+        parent.children.splice idx, 1
+      client.saveFolderTree()
+      client.idToPath.remove(file.id)
+
       if file instanceof GFile #make sure that the file is in fact a file
         
         folderTree.remove path
         drive.files.trash {fileId: file.id}, (err, res) ->
           if err
             logger.log "debug", "unable to remove file #{path}"
-          parent = folderTree.get pth.dirname(path)
-          name = pth.basename path
-          idx = parent.children.indexOf name
-          if idx >= 0
-            parent.children.splice idx, 1
-          client.saveFolderTree()
-          client.idToPath.remove(file.id)
-
           reply.err 0 #always return success
           return          
       
