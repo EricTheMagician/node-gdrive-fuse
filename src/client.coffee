@@ -318,7 +318,7 @@ parseChanges = (items) ->
       continue
 
   
-    unless cfile.parents
+    if cfile == undefined or cfile.parents == undefined or cfile.parents[0] == undefined 
       logger.debug "changed file had empty parents"
       logger.debug cfile
       continue
