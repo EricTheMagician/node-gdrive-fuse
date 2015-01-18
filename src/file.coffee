@@ -79,11 +79,17 @@ class GFile extends EventEmitter
             cb("expiredUrl")
             return
           setTimeout fn, 2000
+      if resp.statusCode >= 500
+        unless once
+          fn = ->
+            cb(500)
       return
     .on 'error', (err)->
-      console.log "error"
-      console.log err
-      cb(err)
+      unless once
+        once = true
+        console.log "error"
+        console.log err
+        cb(err)
       return
     .pipe(
       fs.createWriteStream(saveLocation)
@@ -126,7 +132,10 @@ class GFile extends EventEmitter
       unless fd
         unless downloadTree.has("#{file.id}-#{start}")
           downloadTree.set("#{file.id}-#{start}", 1)
-          callback =  ->
+          callback =  (err) ->
+            if err
+              logger.debug "There was an error during recursive download:"
+              logger.debug err            
             downloadTree.remove("#{file.id}-#{start}")
             file.emit 'downloaded', start
             return
@@ -156,26 +165,31 @@ class GFile extends EventEmitter
       end = Math.min(start + GFile.chunkSize, file.size ) - 1
       path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
       try
-        stats = fs.statSync path
-        if stats.size == (end - start + 1)
-          fd = fs.open path, 'r', (err,fd) ->
-            if err 
-              if err.code == "EMFILE"
-                for o in openedFiles.values()
-                  clearTimeout o.to
-                  fs.close o.fd, ->
-                    return
-                file.open(start, cb)
-              else
-                logger.error "there was an handled error while opening files for reading"
+        fs.stat path, (err, stats) ->
+          if err
+            logger.error "there was an error stat-ing a file in file.open"
+            logger.err err
+            cb err,false
+          if stats.size == (end - start + 1)
+            fd = fs.open path, 'r', (err,fd) ->
+              if err 
+                if err.code == "EMFILE"
+                  for o in openedFiles.values()
+                    clearTimeout o.to
+                    fs.close o.fd, ->
+                      return
+                  file.open(start, cb)
+                else
+                  logger.error "there was an handled error while opening files for reading"
+                return
+
+
+              openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
+              cb null, fd
               return
-
-
-            openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
-            cb null, fd
-            return
-        else
-          cb null, false
+          else
+            cb null, false
+          return
       catch
         cb null, false
       return

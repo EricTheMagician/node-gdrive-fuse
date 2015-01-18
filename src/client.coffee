@@ -310,6 +310,10 @@ parseChanges = (items) ->
     if path
       logger.debug "#{path} was updated"          
       f = folderTree.get(path)
+      unless f
+        idToPath.remove path
+        notFound.push i
+        continue
       f.ctime = (new Date(cfile.createdDate)).getTime()
       f.mtime = (new Date(cfile.modifiedDate)).getTime()
       if f instanceof GFile
