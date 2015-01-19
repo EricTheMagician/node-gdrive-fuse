@@ -786,7 +786,8 @@ start = ->
         # opts.push "-d"
 
         # Try to create the mount point if it doesn't exist
-        if not fs.mkdirsSync config.mountPoint
+        fs.mkdirsSync config.mountPoint
+        if not fs.existsSync config.mountPoint
           logger.log('error', 'Could not create mount point')
           return
 
