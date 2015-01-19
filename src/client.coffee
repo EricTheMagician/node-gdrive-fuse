@@ -295,11 +295,13 @@ parseChanges = (items) ->
         o = folderTree.get path
         folderTree.remove path
         inodeToPath.remove o.inode
+        idToPath.remove i.fileId
         parent = folderTree.get pth.dirname(path)
+        unless parent
+          continue
         idx = parent.children.indexOf pth.basename(path)
         if idx >= 0
           parent.children.splice(idx, 1)
-        idToPath.remove i.fileId
       continue
   
     cfile = i.file #changed file     
