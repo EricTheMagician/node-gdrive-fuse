@@ -167,8 +167,8 @@ class GFile extends EventEmitter
       try
         fs.stat path, (err, stats) ->
           if err
-            logger.error "there was an error stat-ing a file in file.open"
-            logger.error err
+            logger.debug "there was an debug stat-ing a file in file.open"
+            logger.debug err
             cb err,false
             return
           if stats.size == (end - start + 1)
