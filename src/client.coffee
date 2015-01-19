@@ -342,7 +342,7 @@ parseChanges = (items) ->
     if cfile.mimeType == 'application/vnd.google-apps.folder'
       logger.debug "#{path} is a new folder"          
       folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
-      inodeToPath.set cfile.id, path
+      inodeToPath.set inode, path
     else
       logger.debug "#{path} is a new file"
       folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
