@@ -168,8 +168,9 @@ class GFile extends EventEmitter
         fs.stat path, (err, stats) ->
           if err
             logger.error "there was an error stat-ing a file in file.open"
-            logger.err err
+            logger.error err
             cb err,false
+            return
           if stats.size == (end - start + 1)
             fd = fs.open path, 'r', (err,fd) ->
               if err 
