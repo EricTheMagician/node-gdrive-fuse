@@ -177,7 +177,6 @@ parseFolderTree = ->
   now = Date.now()
   inode = 1
   fs.readJson jsonFile, (err, data) ->
-    for key in Object.keys(data)
       o = data[key]
       inodeToPath.set inode, key
       o.inode = inode

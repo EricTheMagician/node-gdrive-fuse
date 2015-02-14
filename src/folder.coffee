@@ -468,11 +468,14 @@ class GFolder
 if fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json'))
   logger.info "loading upload tree"
   fs.readJson pth.join(config.cacheLocation, 'data','uploadTree.json'), (err, data) ->
-    for key in Object.keys(data)
-      value = data[key]
-      value.uploading = false
-      uploadTree.set key, value
-    return
+    try
+      for key in Object.keys(data)
+        value = data[key]
+        value.uploading = false
+        uploadTree.set key, value
+      return
+    catch error
+      return
 
 
 module.exports.GFolder = GFolder
