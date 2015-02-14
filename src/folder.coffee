@@ -328,7 +328,7 @@ class GFolder
 
 
     fs.stat filePath, (err, stats) ->
-      if err or stats == undefined        
+      if err or stats == undefined
         logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
         logger.debug err
         if err.code == "ENOENT"
@@ -374,7 +374,7 @@ class GFolder
             return
 
 
-          upFile.uploading = true   
+          upFile.uploading = true
           magic.detectFile filePath, (err, mime) ->
             if err
               logger.debug "There was an error with detecting mime type"
@@ -388,8 +388,8 @@ class GFolder
               if err
                 logger.error "There was an error with uploading data"
                 logger.error err
-                logger.error res                
-                cbfn = (err, end) -> 
+                logger.error res
+                cbfn = (err, end) ->
                   logger.debug "after failed upload"
                   logger.debug "error"
                   logger.debug err
@@ -399,19 +399,19 @@ class GFolder
                     cb("ENOENT")
                     return
                   up.uploading = false
-                  delete up.location               
+                  delete up.location
                   folder.upload(fileName, originalPath, cb)
                   return
                 getNewRangeEnd(upFile.location, size,cbfn)
                 return
               else
                 start = res.rangeEnd + 1
-                if start < size              
+                if start < size
                   uploadData upFile.location, filePath, start, size, mime, cbUploadData
                 else
                   logger.debug "successfully uploaded file #{originalPath}"
-                  cb(null, res.result)                      
-                return                    
+                  cb(null, res.result)
+                return
               return
             cbNewLink = (err, location) ->
               if err
@@ -419,7 +419,7 @@ class GFolder
                 return
 
               upFile.location = location
-              uploadTree.set originalPath, upFile 
+              uploadTree.set originalPath, upFile
               saveUploadTree()
 
               #once new link is obtained, start uploading
@@ -427,7 +427,7 @@ class GFolder
               return
 
             cbNewEnd = (err, end) ->
-              if err 
+              if err
                 delete upFile.location
                 logger.debug "there was an error with getting a new range end for #{originalPath}"
                 logger.debug "err", err
@@ -437,7 +437,7 @@ class GFolder
 
               if end <= 0
                 logger.debug "tried to get new range for #{originalPath}, but it was #{end}"
-                delete upFile.location           
+                delete upFile.location
                 getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
               else
                 start = end + 1
@@ -447,7 +447,7 @@ class GFolder
               return
 
 
-            logger.log 'info', "Starting to upload file #{fileName}"      
+            logger.log 'info', "Starting to upload file #{fileName}"
             if upFile.location
               location = upFile.location
 
@@ -455,7 +455,7 @@ class GFolder
               return
             else
               getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
-            
+
             return
 
           return

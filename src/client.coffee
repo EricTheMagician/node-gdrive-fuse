@@ -38,7 +38,7 @@ OAuth2Client = google.auth.OAuth2
 oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
 drive = google.drive({ version: 'v2' })
 
-config.cacheLocation ||=  "/tmp/cache" 
+config.cacheLocation ||=  "/tmp/cache"
 config.refreshDelay ||= 60000
 dataLocation = pth.join( config.cacheLocation, 'data' )
 fs.ensureDirSync( dataLocation )
@@ -83,7 +83,7 @@ getAllFiles = ()->
 parseFilesFolders = (items) ->
   files = []
   folders = []
-  rootFound = false  
+  rootFound = false
   now = (new Date).getTime()
   inodeCount = 2
   logger.info "Parinsg data, looking for root foolder"
@@ -93,9 +93,9 @@ parseFilesFolders = (items) ->
   # and then parse files
 
   for i in items
-    if (! (i.parents) ) or i.parents.length == 0 
+    if (! (i.parents) ) or i.parents.length == 0
       continue
-    unless i.labels.trashed      
+    unless i.labels.trashed
       if i.mimeType == "application/vnd.google-apps.folder"
         unless rootFound
           if i.parents[0].isRoot
@@ -114,7 +114,7 @@ parseFilesFolders = (items) ->
     notFound = []
 
     for f in folders
-      # if (!f.parents ) or f.parents.length == 0 
+      # if (!f.parents ) or f.parents.length == 0
       #   logger.log "debug", "folder.parents is undefined or empty"
       #   logger.log "debug", f
       #   continue
@@ -139,13 +139,13 @@ parseFilesFolders = (items) ->
       else
         notFound.push f
 
-      #make sure that the folder list is gettting smaller over time. 
-    if left.length == notFound.length 
+      #make sure that the folder list is gettting smaller over time.
+    if left.length == notFound.length
       logger.info "There was #{left.length} folders that were not possible to process"
       logger.debug notFound
       break
     left = notFound
-  
+
   logger.info "Parsing files"
   for f in files
     pid = f.parents[0].id
@@ -177,44 +177,48 @@ parseFolderTree = ->
   now = Date.now()
   inode = 1
   fs.readJson jsonFile, (err, data) ->
-      o = data[key]
-      inodeToPath.set inode, key
-      o.inode = inode
-      inode++
-      #make sure parent directory exists
-      unless folderTree.has(pth.dirname(key))
-        continue
+    try
+      for key in Object.keys(data)
+        o = data[key]
+        inodeToPath.set inode, key
+        o.inode = inode
+        inode++
+        #make sure parent directory exists
+        unless folderTree.has(pth.dirname(key))
+          continue
 
-      #add to idToPath
-      idToPath.set(o.id,key)
-      idToPath.set(o.parentid, pth.dirname(key))
+        #add to idToPath
+        idToPath.set(o.id,key)
+        idToPath.set(o.parentid, pth.dirname(key))
 
-      if 'size' of o
-        folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
-      else
-        folderTree.set key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
+        if 'size' of o
+          folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
+        else
+          folderTree.set key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
 
-    changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
-    fs.exists changeFile, (exists) ->
-      if exists
-        fs.readJson changeFile, (err, data) ->
-          largestChangeId = data.largestChangeId
-          if require.main != module
-            loadChanges()
-      return
-    
+      changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
+      fs.exists changeFile, (exists) ->
+        if exists
+          fs.readJson changeFile, (err, data) ->
+            largestChangeId = data.largestChangeId
+            if require.main != module
+              loadChanges()
+        return
+    catch error
+      #if there was an error with reading the file, just download the whole structure again
+      getAllFiles()
     return
   return
 
 loadFolderTree = ->
   #create (or read) the folderTree
   fs.exists pth.join(dataLocation, 'folderTree.json'), (exists) ->
-    if exists 
+    if exists
       logger.log 'info', "Loading folder structure"
       parseFolderTree()
     else
       logger.log 'info', "Downloading full folder structure from google"
-      getAllFiles()    
+      getAllFiles()
     return
   return
 
@@ -241,7 +245,7 @@ getLargestChangeId = (cb)->
     unless err
       res.largestChangeId = parseInt(res.largestChangeId) + 1
       largestChangeId = res.largestChangeId
-      fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", res      
+      fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", res
     if typeof(cb) == 'function'
       cb()
     return
@@ -252,7 +256,7 @@ loadPageChange = (start, items, cb) ->
 
   opts =
     maxResults: 500
-    startChangeId: start  
+    startChangeId: start
 
   drive.changes.list opts, (err, res) ->
     unless err
@@ -272,7 +276,7 @@ loadChanges = (cb) ->
   callback = (err, newId, items, pageToken) ->
     largestChangeId = newId
     if pageToken
-      drive.changes.list 
+      drive.changes.list
       loadPageChange(pageToken, items, callback)
     else
       parseChanges(items)
@@ -280,14 +284,14 @@ loadChanges = (cb) ->
 
   loadPageChange(id, [], callback)
 
- 
+
   return
 
 parseChanges = (items) ->
   logger.debug "There was #{items.length} to parse"
   notFound = []
   for i in items
-    path = idToPath.get(i.fileId)      
+    path = idToPath.get(i.fileId)
     if i.deleted or i.file.labels.trashed #check if it is deleted
       if folderTree.has path #check to see if the file was not already removed from folderTree
         logger.debug "#{path} was deleted"
@@ -302,14 +306,14 @@ parseChanges = (items) ->
         if idx >= 0
           parent.children.splice(idx, 1)
       continue
-  
-    cfile = i.file #changed file     
+
+    cfile = i.file #changed file
     unless cfile
       continue
-     
+
     #if it is not deleted or trashed, check to see if it's new or not
     if path
-      logger.debug "#{path} was updated"          
+      logger.debug "#{path} was updated"
       f = folderTree.get(path)
       unless f
         idToPath.remove path
@@ -322,8 +326,8 @@ parseChanges = (items) ->
           f.downloadUrl = cfile.downloadUrl
       continue
 
-  
-    if cfile == undefined or cfile.parents == undefined or cfile.parents[0] == undefined 
+
+    if cfile == undefined or cfile.parents == undefined or cfile.parents[0] == undefined
       logger.debug "changed file had empty parents"
       logger.debug cfile
       continue
@@ -339,7 +343,7 @@ parseChanges = (items) ->
     inodes = value.inode for value in folderTree.values()
     inode = Math.max(inodes) + 1
     if cfile.mimeType == 'application/vnd.google-apps.folder'
-      logger.debug "#{path} is a new folder"          
+      logger.debug "#{path} is a new folder"
       folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
       inodeToPath.set inode, path
     else
@@ -352,7 +356,7 @@ parseChanges = (items) ->
     return
 
   if items.length > 0
-    fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}      
+    fs.outputJsonSync "#{config.cacheLocation}/data/largestChangeId.json", {largestChangeId: largestChangeId}
     saveFolderTree()
 
   logger.debug "Finished parsing changes from google"
