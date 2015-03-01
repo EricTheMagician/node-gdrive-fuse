@@ -22,6 +22,24 @@ logger = new (winston.Logger)({
     ]
 })
 
+regexPattern = ///^[a-zA-Z0-9]*-([0-9]*)-([0-9]*)$///
+
+getStats = (location, cb) ->
+  fs.stat location, (err,stat) ->
+    if err
+      cb(err)
+      return
+    expectedSize = pth.basename(location).match(regexPattern)
+    if(expectedSize == null)
+      cb("size was null")
+      return
+    # console.log "Expected size for #{pth.basename(location)} is #{expectedSize[2]-expectedSize[1]}"
+    stat.size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+    cb(err, stat)
+    return
+  return
+
+memoizeStat = async.memoize( getStats )
 zip = () ->
   lengthArray = (arr.length for arr in arguments)
   length = Math.min(lengthArray...)
@@ -65,7 +83,7 @@ watcher = fs.watch downloadLocation, (event, filename) ->
 
           downloadFiles = (pth.join(downloadLocation,file) for file in downloadFiles)
 
-          async.map downloadFiles, fs.stat, (err, stats) ->            
+          async.map downloadFiles, memoizeStat, (err, stats) ->            
             totalDownloadSize = 0
             unless stats.length == 0
               for stat in stats
@@ -93,6 +111,7 @@ watcher = fs.watch downloadLocation, (event, filename) ->
                 return
               totalSize -= info[1].size
               path = pth.join(info[0])
+              delete memoizeStat.memo[info[0]]
               logger.silly "deleting #{path}"
               fs.unlinkSync(path)
             locked = false
