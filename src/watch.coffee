@@ -35,6 +35,7 @@ getStats = (location, cb) ->
       return
     # console.log "Expected size for #{pth.basename(location)} is #{expectedSize[2]-expectedSize[1]}"
     stat.size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+    # console.log(stat)
     cb(err, stat)
     return
   return
@@ -87,7 +88,8 @@ watcher = fs.watch downloadLocation, (event, filename) ->
             totalDownloadSize = 0
             unless stats.length == 0
               for stat in stats
-                totalDownloadSize += stat.size
+                if stat is not undefined
+                  totalDownloadSize += stat.size
 
             logger.silly "total download size is #{totalDownloadSize}"
 
