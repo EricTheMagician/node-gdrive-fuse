@@ -30,11 +30,9 @@ getStats = (location, cb) ->
       cb(err)
       return
     expectedSize = pth.basename(location).match(regexPattern)
-    if(expectedSize == null)
-      cb("size was null")
-      return
-    # console.log "Expected size for #{pth.basename(location)} is #{expectedSize[2]-expectedSize[1]}"
-    stat.size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+    if(expectedSize != null)
+    	stat.size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+    #console.log "Expected size for #{pth.basename(location)} is #{expectedSize[2]-expectedSize[1]}"
     # console.log(stat)
     cb(err, stat)
     return
@@ -83,13 +81,14 @@ watcher = fs.watch downloadLocation, (event, filename) ->
         fs.readdir downloadLocation, (err, downloadFiles) ->
 
           downloadFiles = (pth.join(downloadLocation,file) for file in downloadFiles)
-
+          logger.silly "finished parsing uploading files"
           async.map downloadFiles, memoizeStat, (err, stats) ->            
             totalDownloadSize = 0
             unless stats.length == 0
               for stat in stats
-                if stat is not undefined
+                if stat
                   totalDownloadSize += stat.size
+                  logger.silly totalDownloadSize
 
             logger.silly "total download size is #{totalDownloadSize}"
 
