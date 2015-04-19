@@ -11,13 +11,13 @@ PosixError = fuse.PosixError;
 
 
 client = require('./client')
-folderTree = client.folderTree
+inodeTree = client.inodeTree
+idToInode = client.idToInode
 drive = client.drive
 folder = require("./folder")
 uploadTree = folder.uploadTree
 GFolder = folder.GFolder
 saveUploadTree = folder.saveUploadTree
-inodeToPath = client.inodeToPath
 f = require("./file");
 logger = f.logger
 GFile = f.GFile
@@ -81,13 +81,12 @@ errnoMap =
 class GDriveFS extends fuse.FileSystem
 
   getattr: (context, inode, reply) ->
-    path = inodeToPath.get inode
-    logger.silly "getting attr for #{path}"
-    if folderTree.has(path)
+    # logger.silly "getting attr for #{path}"
+    if inodeTree.has(inode)
       callback = (status, attr)->
         reply.attr(attr, 5)
         return
-      folderTree.get(path).getAttr(callback)
+      inodeTree.get(inode).getAttr(callback)
         
     else
       reply.err(errnoMap.ENOENT)
@@ -108,26 +107,23 @@ class GDriveFS extends fuse.FileSystem
   #  *     and names is the result in the form of an array of file names (when err === 0).
   #  */
   readdir: (context, inode, requestedSize, offset, fileInfo, reply) ->
-    path = inodeToPath.get inode
-    logger.silly "readding dir #{path}"
     # console.log path
-    if folderTree.has(path)
-      object = folderTree.get(path)
+    if inodeTree.has(inode)
+      object = inodeTree.get(inode)
       if object instanceof GFile
         reply.err errnoMap.ENOTDIR
       else if object instanceof GFolder
         size = Math.max( requestedSize , object.children.length * 256)
         # size = requestedSize
-        parent = folderTree.get pth.dirname(path)
+        parent = inodeTree.get object.parentid
         totalSize = 0
         #totalSize += reply.addDirEntry('.', requestedSize, {inode: object.inode}, offset);
         # totalSize += reply.addDirEntry('..', requestedSize, {inode: parent.inode}, offset);
         for child in object.children
-          cpath = pth.join(path,child)
-          cnode = folderTree.get cpath
+          cnode = inodeTree.get child
           if cnode
             attr = cnode.getAttrSync()
-            len = reply.addDirEntry(child, size, {inode: cnode.inode}, offset);          
+            len = reply.addDirEntry(cnode.name, size, {inode: cnode.inode}, offset);          
             totalSize += len
 
         if object.children.length == 0
@@ -141,23 +137,20 @@ class GDriveFS extends fuse.FileSystem
     return
 
   setattr: (context, inode, attrs, reply) ->
-    path = inodeToPath.get inode
     logger.silly "setting attr for #{path}"
-    file = folderTree.get path
+    file = inodeTree.get inode
     if 'size' in attrs
       file.size = attrs.size
 
-    reply.attr(file.getAttrSync(), 5);
+    # reply.attr(file.getAttrSync(), 5);
+    reply.err(0)
     return
 
   open: (context, inode, fileInfo, reply) ->
-    path = inodeToPath.get inode
-    logger.silly "opening file #{path}"
-    parent = folderTree.get pth.dirname(path)
     flags = fileInfo.flags
     if flags.rdonly #read only
-      if folderTree.has(path)
-        file = folderTree.get(path)
+      if inodeTree.has(inode)
+        file = inodeTree.get(inode)
         if file instanceof GFile
           if file.downloadUrl #make sure that the file has been fully uploaded
             reply.open(fileInfo)
@@ -610,25 +603,30 @@ class GDriveFS extends fuse.FileSystem
       console.log('Access was called!');
       reply.err(0);
 
-  lookup: (context, parent, name, reply) ->
-      parentPath = inodeToPath.get parent
-      # parent = folderTree.get parentPath
-      childPath =  pth.join(parentPath, name)
-      parent = folderTree.get(parentPath)
-      child = folderTree.get childPath
-      if folderTree.has childPath
-        child = folderTree.get childPath
-        attr = child.getAttrSync()
-        attr.size ||= 4096
-        entry = 
-            inode: attr.inode
-            generation: 2
-            attr: attr
-            # attr_timeout: 5,
-            # entry_timeout: 5
-        reply.entry(entry)
-      else
+  lookup: (context, parentInode, name, reply) ->
+
+      #make sure the parent inode exists
+      unless inodeTree.has parentInode
         reply.err PosixError.ENOENT
+
+      parent = inodeTree.get parentInode
+      for childInode in parent.children      
+        child = inodeTree.get(childInode)
+        if child and child.name == name
+          attr = child.getAttrSync()
+          attr.size ||= 4096
+          entry = 
+              inode: childInode
+              generation: 2
+              attr: attr
+              # attr_timeout: 5,
+              # entry_timeout: 5
+          reply.entry(entry)
+          return
+
+      #if the child is not found
+      reply.err PosixError.ENOENT
+
       return
 
 
@@ -754,7 +752,7 @@ resumeUpload = ->
   return
 
 start = ->
-  if folderTree.count() > 1
+  if inodeTree.count() > 1
     try
       logger.log "info", 'attempting to start f4js'
       switch os.type()
