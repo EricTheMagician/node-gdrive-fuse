@@ -137,13 +137,25 @@ class GDriveFS extends fuse.FileSystem
     return
 
   setattr: (context, inode, attrs, reply) ->
-    logger.silly "setting attr for #{path}"
+    logger.debug "setting attr for #{inode}"
     file = inodeTree.get inode
+    unless file
+      reply.err errnoMap.ENOENT
+      return
+    # console.log file
+    # console.log attrs
+    a = new Date(attrs.atime)
+    m = new Date(attrs.mtime)
+    # console.log a.getTime(),m.getTime()
+    # attrs.atime = a.getTime()
+    # attrs.mtime = m.getTime()
+    file.mtime = m.getTime()
     if 'size' in attrs
       file.size = attrs.size
 
-    # reply.attr(file.getAttrSync(), 5);
-    reply.err(0)
+
+    reply.attr(file.getAttrSync(), 5);
+    # reply.err(0)
     return
 
   open: (context, inode, fileInfo, reply) ->
@@ -154,14 +166,6 @@ class GDriveFS extends fuse.FileSystem
         if file instanceof GFile
           if file.downloadUrl #make sure that the file has been fully uploaded
             reply.open(fileInfo)
-          # else if uploadTree.has(path) #after writing a file, sometimes the filesystem tries to open the file again.
-          #   fs.open pth.join(uploadLocation, uploadTree.get(path).cache), 'r', (err,fd) ->
-          #     if err
-          #       reply.err errnoMap.EACCESS
-          #       return
-          #     fileInfo.fh = fd
-          #     reply.open fileInfo
-          #     return
           else
             reply.err errnoMap.EACCESS
         else
@@ -171,23 +175,26 @@ class GDriveFS extends fuse.FileSystem
       return
 
     if flags.wronly #write only
-      cache = MD5(path)
-      logger.log 'debug', "tried to open file \"#{path}\" for writing"
-      if folderTree.has(path) #if folderTree has path, make sure it's a file with size zero
-        file = folderTree.get(path)
+      logger.silly "tried to open file \"#{inode}\" for writing"
+      if inodeTree.has(inode) #if folderTree has path, make sure it's a file with size zero
+        file = inodeTree.get(inode)
         if (file instanceof GFile)
          if file.size == 0
           # logger.debug "#{path} size was 0"
-          fs.open pth.join(uploadLocation, cache), 'w+', (err,fd) ->
-            if err
-              logger.debug "could not open file for writing"
-              logger.debug err
-              reply.err errnoMap[err.code]
-              return
+          if uploadTree.has(inode)
+            cache = uploadTree.get(inode).cache
+            fs.open pth.join(uploadLocation, cache), 'w+', (err,fd) ->
+              if err
+                logger.debug "could not open file for writing"
+                logger.debug err
+                reply.err errnoMap[err.code]
+                return
 
-            fileInfo.fh = fd
-            reply.open(fileInfo)
-            return
+              fileInfo.fh = fd
+              reply.open(fileInfo)
+              return
+          else
+            reply.err errnoMap.EACCESS
 
          else
            reply.err errnoMap.EACCESS
@@ -233,16 +240,15 @@ class GDriveFS extends fuse.FileSystem
     return
 
   read: (context, inode, len, offset, fileInfo, reply) ->
-    path = inodeToPath.get inode
-    logger.log "silly", "reading file #{path} - #{offset}:#{len}"
+    # logger.log "silly", "reading file #{path} - #{offset}:#{len}"
 
-    if folderTree.has(path)
+    if inodeTree.has(inode)
       callback = (dataBuf) ->
         reply.buffer(dataBuf, dataBuf.length)
         return
 
       #make sure that we are only reading a file
-      file = folderTree.get(path)
+      file = inodeTree.get(inode)
       if file instanceof GFile
 
         #make sure the offset request is not bigger than the file itself
@@ -262,10 +268,10 @@ class GDriveFS extends fuse.FileSystem
 
   write: (context, inode, buffer, position, fileInfo, reply) ->
 
-    path = inodeToPath.get inode
-    logger.log "silly", "writing to file #{path} - position: #{position}, length: #{buffer.length}"
+    # path = inodeToPath.get inode
+    # logger.log "silly", "writing to file #{path} - position: #{position}, length: #{buffer.length}"
 
-    file = folderTree.get path  
+    file = inodeTree.get inode  
     size = file.size
     fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
       if (err)
@@ -293,16 +299,19 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
   mkdir: (context, parentInode, name, mode, reply) ->
-    parentPath = inodeToPath.get parentInode
-    path = pth.join parentPath, name
-    logger.debug "creating folder #{path}"
-
-    parent = folderTree.get parentPath
+    # parentPath = inodeToPath.get parentInode
+    # path = pth.join parentPath, name
+    # logger.debug "creating folder #{path}"
+    logger.debug "creating folder #{name}"
+    parent = inodeTree.get parentInode
     if parent #make sure that the parent exists
       if parent instanceof GFolder #make sure that the parent is a folder
-        unless parent.children.indexOf name < 0 #make sure that the child doesn't already exist
-          reply.err errnoMap.EEXIST
-          return
+
+        for childInode in parent.children #make sure that the child doesn't already exist
+          child = inodeTree.get childInode
+          if child.name == name
+            reply.err errnoMap.EEXIST
+            return
         folder =
           resource:
             title: name
@@ -315,14 +324,12 @@ class GDriveFS extends fuse.FileSystem
             reply.err(errnoMap.EIO)
             return
           else
-            parent.children.push name
-            inodes = value.inode for value in folderTree.values()
+            inodes = value.inode for value in inodeTree.values()
             inode = Math.max(inodes) + 1
-            folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), inode, res.editable, [])
-            folderTree.set path, folder
-            inodeToPath.set inode, path 
-            # idToPath.set res.id, path
-            client.idToPath.set(res.id, path)
+            parent.children.push inode
+            folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), inode, res.editable, [])            
+            inodeTree.set inode, folder
+            idToInode.set folder.id, inode
             attr = folder.getAttrSync()
             entry = {
                 inode: attr.inode,
@@ -346,72 +353,69 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
   rmdir: (context, parentInode, name, reply) ->
-    parentPath = inodeToPath.get parentInode
-    path = pth.join parentPath, name 
-    logger.log "debug", "removing folder #{path}"
-    if folderTree.has path #make sure that the path exists
-      folder = folderTree.get path
-      if folder instanceof GFolder #make sure that the folder is in fact a folder
-        if folder.children.length == 0
-          drive.files.trash {fileId: folder.id}, (err, res) ->
-            if err
-              logger.log "error", "unable to remove folder #{path}"
-              reply.err errnoMap.EIO
-              return
-            else
-              parent = folderTree.get pth.dirname(path)
-              name = pth.basename path
-              idx = parent.children.indexOf name
-              if idx >= 0
-                parent.children.splice idx, 1
-              folderTree.remove path
-              client.idToPath.remove(folder.id)
+    parent = inodeTree.get parentInode
+    logger.log "debug", "removing folder #{name}"
 
-              reply.err 0
-              client.saveFolderTree()
-              return
-            return  
+    #make sure the actual directory exists
+    for childInode in parent.children
+      folder = inodeTree.get childInode
+      if child.name == name  
+        # make sure that it is a folder
+        if folder instanceof GFolder  
+          #make sure it is empty
+          if folder.children.length == 0
+            drive.files.trash {fileId: folder.id}, (err, res) ->
+              if err
+                logger.log "error", "unable to remove folder #{path}"
+                reply.err errnoMap.EIO
+                return
+              else
+                parent = folderTree.get pth.dirname(path)
+                name = pth.basename path
+                idx = parent.children.indexOf name
+                if idx >= 0
+                  parent.children.splice idx, 1
+                folderTree.remove path
+                client.idToPath.remove(folder.id)
+
+                reply.err 0
+                client.saveFolderTree()
+                return
+              return  
+          else
+            reply.err errnoMap.ENOTEMPTY
+            return
         else
-          reply.err errnoMap.ENOTEMPTY
+          reply.err errnoMap.ENOTDIR
           return
-      else
-        reply.err errnoMap.ENOTDIR
-        return
 
-    else
-      reply.err errnoMap.ENOENT
-      return
+    reply.err errnoMap.ENOENT
     return
 
   mknod: (context, parentInode, name, mode, rdev, reply) ->
-    parentPath = inodeToPath.get parentInode
-    parent = folderTree.get parentPath
-    logger.log "debug", "adding #{name} to #{parentPath}, #{parentInode}"
-    path = pth.join parentPath, name
-
-    if folderTree.has(path)
-      reply.err PosixError.EEXIST
-      return
       
     now = (new Date).getTime()
-
-    inodes = value.inode for value in folderTree.values()
+    inodes = value.inode for value in inodeTree.values()
     inode = Math.max(inodes) + 1
-    inodeToPath.set inode, path
+
+    parent = inodeTree.get parentInode
+
+    for childInode in parent.children #TODO: if file exists, delete it first
+      if inodeTree.get(childInode).name == name
+        reply.err PosixError.EEXIST
+        return
+
 
     file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
-    folderTree.set path, file
+    inodeTree.set inode, file
 
-    if parent.children.indexOf(name) < 0 #TODO: if file exists, delete it first
-
-      parent.children.push name
 
     attr = file.getAttrSync()
 
     upFile = 
-      cache: MD5(path)
+      cache: MD5(parent.id + name)
       uploading: false
-    uploadTree.set path, upFile
+    uploadTree.set inode, upFile
     saveUploadTree()
 
 
@@ -427,19 +431,14 @@ class GDriveFS extends fuse.FileSystem
 
 
   create: (context, parentInode, name, mode, fileInfo, reply) ->
-    parentPath = inodeToPath.get parentInode
-    path = pth.join parentPath, name
-    cache = MD5(path)
-    systemPath = pth.join(uploadLocation, cache);
-    logger.log "debug", "creating file"
-
-    parentPath = pth.dirname path
-    parent = folderTree.get parentPath
+    parent = inodeTree.get parentInode
+    
     if parent #make sure parent exists
-      name = pth.basename path
+      logger.log "debug", "creating file #{name}"
+      systemPath = pth.join(uploadLocation, cache);
 
-      if parent.children.indexOf(name) < 0 #TODO: if file exists, delete it first
-        parent.children.push name
+      # for childInode in parent.children #TODO: if file exists, delete it first
+      #   parent.children.push name
       now = (new Date).getTime()
       logger.log "debug", "adding #{path} to folderTree"
       inodes = value.inode for value in folderTree.values()
@@ -478,42 +477,42 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
   unlink: (context, parentInode, name, reply) ->
-    parentPath = inodeToPath.get parentInode
-    path = pth.join parentPath, name
+    logger.log "debug", "removing file #{name}"
+    parent = inodeTree.get parentInode
 
-    logger.log "debug", "removing file #{path}, name is #{name}-#{folderTree.has path}"
-    if folderTree.has path #make sure that the path exists
-      file = folderTree.get path
-      parent = folderTree.get pth.dirname(path)
-      name = pth.basename path
-      idx = parent.children.indexOf name
-      if idx >= 0
-        parent.children.splice idx, 1
-      client.saveFolderTree()
-      client.idToPath.remove(file.id)
+    for childInode in parent.children
+      child = inodeTree.get childInode
+      if child.name != name
+        continue
 
-      if file instanceof GFile #make sure that the file is in fact a file
-        
-        folderTree.remove path
-        drive.files.trash {fileId: file.id}, (err, res) ->
-          if err
-            logger.log "debug", "unable to remove file #{path}"
-          reply.err 0 #always return success
-          return          
-      
-        #check if file was being uploaded
-        if uploadTree.has path
-          cache = uploadTree.get(path).cache
-          uploadTree.remove path
-          fs.unlink pth.join(uploadLocation,cache), (err)->
-          
-
-      else
+      if child instanceof GFolder
         reply.err errnoMap.EISDIR    
-    else
-      reply.err errnoMap.ENOENT
-    return
+        return
 
+
+      parent.children.splice( parent.children.indexOf(childInode), 1)
+      inodeTree.remove childInode
+      idToInode.remove child.id
+      client.saveFolderTree()
+
+      drive.files.trash {fileId: file.id}, (err, res) ->
+        if err
+          logger.log "debug", "unable to remove file #{path}"
+        reply.err 0 #always return success
+        return          
+
+      if uploadTree.has childInode
+        cache = uploadTree.get(inode).cache
+        uploadTree.remove childInode
+        fs.unlink pth.join(uploadLocation,cache), (err) ->
+          return
+
+      return
+
+
+    reply.err PosixError.ENOENT
+    return
+    
 
   # /*
   #  * Handler for the release() system call.
@@ -522,22 +521,21 @@ class GDriveFS extends fuse.FileSystem
   #  * cb: a callback of the form cb(err), where err is the Posix return code.
   #  */
   release: (context, inode, fileInfo, reply) ->
-    path = inodeToPath.get inode
-    logger.silly "closing file #{path}"
-    if uploadTree.has path
-      logger.log "debug", "#{path} was in the upload tree"
-      client.saveFolderTree()
+    logger.silly "closing file #{inode}"
+    if uploadTree.has inode
+      logger.log "debug", "#{inode} was in the upload tree"
       #close the file
       fs.close fileInfo.fh, (err) ->
         if (err)
           reply.err err.errno
           return
         reply.err(0)
-        #upload file once file is closed
-        parent = folderTree.get pth.dirname(path)
 
-        if folderTree.has path
-          file = folderTree.get(path)
+        #upload file once file is closed
+        if inodeTree.has inode
+          file = inodeTree.get(inode)
+          parentInode = idToInode.get file.parentid
+          parent = inodeTree.get parentInode
           ###
           three cases: 
           if file size is 0: delete it and don't upload
@@ -545,22 +543,23 @@ class GDriveFS extends fuse.FileSystem
           if file size is >10 MB, add to upload queue
           ###
 
+
           if 0 < file.size <=  10485760 #10MB 
             cb = ->
               return
-            parent.upload pth.basename(path), path, uploadCallback(path, cb)           
+            parent.upload file.name, inode, uploadCallback(inode, cb)           
           else if file.size >  10485760           
             fn = (cb)->
               if parent instanceof GFile
-                console.log "While uploading, #{pth.dirname(path)} was a file - #{parent}"
+                logger.debug "While uploading, #{name} was a file - #{parent}"
                 cb()
                 return
-              parent.upload pth.basename(path), path, uploadCallback(path,cb)            
+              parent.upload file.name, inode, uploadCallback(inode,cb)            
               return
             q.push fn
             q.start()
           else          
-            uploadTree.remove path
+            uploadTree.remove inode
             saveUploadTree()      
 
           return
@@ -591,17 +590,19 @@ class GDriveFS extends fuse.FileSystem
       }
     return
 
-  getxattr: (context, inode, name, size, position, reply) ->
-      console.log('GetXAttr was called!')
-      parentPath = inodeToPath.get inode
-      childPath = pth.join(parentPath, name)
-      if folderTree.has childPath
+  getxattr: (context, parentInode, name, size, position, reply) ->
+    console.log('GetXAttr was called!')
+    parent = inodeToPath.get parentInode
+    for childInode in parent.children
+      if inodeTree.get(childInode).name == name
         reply.err 0
-      else
-        reply.err PosixError.ENOENT
+        return
+    reply.err PosixError.ENOENT
+    return
   access: (context, inode, mask, reply) ->
-      console.log('Access was called!');
-      reply.err(0);
+    console.log('Access was called!');
+    reply.err(0);
+    return
 
   lookup: (context, parentInode, name, reply) ->
 
@@ -662,9 +663,12 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
   return
 
 #function to create a callback for file uploading
-uploadCallback = (path, cb) ->
+uploadCallback = (inode, cb) ->
+  file = inodeTree.get inode
+  parentInode = idToInode.get file.parentid
+  parent = inodeTree.get parentInode
+
   return (err, result) ->
-    parent = folderTree.get pth.dirname(path)
     if err
       if err == "invalid mime"
         logger.debug "the mimetype of #{path} was invalid"
@@ -680,43 +684,43 @@ uploadCallback = (path, cb) ->
 
       cb()
       logger.debug "Retrying upload: \"#{path}\"."
-      fn = (cb) ->
-        parent.upload pth.basename(path), path , uploadCallback(path,cb)
+      fn = (_cb) ->
+        parent.upload file.name, inode , uploadCallback(inode,_cb)
         return
       q.push fn
       q.start()
       return
   
-    upFile = uploadTree.get path
+    upFile = uploadTree.get inode
 
-    unless upFile #make uploaded file is still in the uploadTree
+    unless upFile #make sure uploaded file is still in the uploadTree
       cb()
       return
     uploadedFileLocation = pth.join uploadLocation, upFile.cache
 
-    logger.log 'info', "successfully uploaded #{path}"
+    logger.log 'info', "successfully uploaded #{file.name}"
         
-    uploadTree.remove path
+    uploadTree.remove inode
     saveUploadTree()
-    if folderTree.has path
-      logger.debug "#{path} folderTree already existed"
-      file = folderTree.get path
+    if inodeTree.has inode
+      logger.debug "#{file.name} already existed in inodeTree"
+      file = inodeTree.get inode
       file.downloadUrl = result.downloadUrl
       file.id = result.id
       file.size = parseInt(result.fileSize)
       file.ctime = (new Date(result.createdDate)).getTime()
       file.mtime =  (new Date(result.modifiedDate)).getTime()
     else
-      logger.debug "#{path} folderTree did not exist"     
+      logger.debug "#{file.name} folderTree did not exist"     
       inodes = value.inode for value in folderTree.values()
       inode = Math.max(inodes) + 1
       file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)        
-      inodeToPath.set inode, path
-    client.idToPath.set( result.id, path)
-    #update folder Tree
-    if  file.name not in parent.children
-      parent.children.push file.name
-    folderTree.set path, file
+
+    #update parent
+    if  file.inode not in parent.children
+      parent.children.push file.inode
+    inodeTree.set inode, file
+    idToInode.set file.id, inode
     client.saveFolderTree()
 
     #move the file to download folder after finished uploading
@@ -736,18 +740,22 @@ resumeUpload = ->
   # uploadWork = null
   if uploadTree.count() > 0
     logger.info "resuming file uploading"
-    paths = uploadTree.keys()
-    uploadTree.forEach (value,path) ->
-      parentPath = pth.dirname(path)
-      if folderTree.has parentPath
-        parent = folderTree.get parentPath
+    inodes = uploadTree.keys()
+    uploadTree.forEach (value,inode) ->
+      if inodeTree.has(inode)
+        file = inodeTree.get(inode)
+      else
+        return
+      parentInode = idToInode.get( file.parentid )
+      if inodeTree.has parentInode
+        parent = inodeTree.get parentInode
         if parent instanceof GFolder
           q.push (cb) ->
-            parent.upload pth.basename(path), path, uploadCallback(path,cb)
+            parent.upload file.name, inode, uploadCallback(inode,cb)
             return
           q.start()
         else
-          logger.debug "While resuming uploads, #{parentPath} was not a folder"
+          logger.debug "While resuming uploads, #{parent} was not a folder"
       return
   return
 
