@@ -359,7 +359,8 @@ class GDriveFS extends fuse.FileSystem
     #make sure the actual directory exists
     for childInode in parent.children
       folder = inodeTree.get childInode
-      if child.name == name  
+      if folder.name == name  
+
         # make sure that it is a folder
         if folder instanceof GFolder  
           #make sure it is empty
@@ -370,18 +371,18 @@ class GDriveFS extends fuse.FileSystem
                 reply.err errnoMap.EIO
                 return
               else
-                parent = folderTree.get pth.dirname(path)
-                name = pth.basename path
-                idx = parent.children.indexOf name
+                idx = parent.children.indexOf childInode
                 if idx >= 0
                   parent.children.splice idx, 1
-                folderTree.remove path
-                client.idToPath.remove(folder.id)
+                inodeTree.remove childInode
+                idToInode.remove(folder.id)
 
                 reply.err 0
                 client.saveFolderTree()
                 return
               return  
+            
+            return
           else
             reply.err errnoMap.ENOTEMPTY
             return
@@ -481,18 +482,18 @@ class GDriveFS extends fuse.FileSystem
     parent = inodeTree.get parentInode
 
     for childInode in parent.children
-      child = inodeTree.get childInode
-      if child.name != name
+      file = inodeTree.get childInode
+      if file.name != name
         continue
 
-      if child instanceof GFolder
+      if file instanceof GFolder
         reply.err errnoMap.EISDIR    
         return
 
 
       parent.children.splice( parent.children.indexOf(childInode), 1)
       inodeTree.remove childInode
-      idToInode.remove child.id
+      idToInode.remove file.id
       client.saveFolderTree()
 
       drive.files.trash {fileId: file.id}, (err, res) ->
@@ -502,7 +503,7 @@ class GDriveFS extends fuse.FileSystem
         return          
 
       if uploadTree.has childInode
-        cache = uploadTree.get(inode).cache
+        cache = uploadTree.get(childInode).cache
         uploadTree.remove childInode
         fs.unlink pth.join(uploadLocation,cache), (err) ->
           return
@@ -745,6 +746,7 @@ resumeUpload = ->
       if inodeTree.has(inode)
         file = inodeTree.get(inode)
       else
+        uploadTree.remove inode
         return
       parentInode = idToInode.get( file.parentid )
       if inodeTree.has parentInode
