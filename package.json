@@ -13,7 +13,7 @@
   "files": [
     "src"
   ],
-  "homepage": "https://github.com/thejinx0r/BitcasaF4JS",
+  "homepage": "https://github.com/thejinx0r/node-gdrive-fuse",
   "dependencies": {
     "MD5": "^1.2.1",
     "async": "^0.9.0",
