@@ -784,6 +784,10 @@ start = ->
 
         # opts.push "-mt"
         # opts.push "-d"
+
+        # Try to create the mount point if it doesn't exist
+        fs.ensureDirSync config.mountPoint
+
         fuse.fuse.mount
           filesystem: GDriveFS
           options: opts.concat(add_opts)

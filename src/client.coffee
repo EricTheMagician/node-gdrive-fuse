@@ -172,6 +172,17 @@ parseFilesFolders = (items) ->
     setTimeout loadChanges, 90000
   return
 
+updateParents = (item) ->
+  logger.debug "  Item contains #{item.parents.length} parents"
+  for parent in item.parents
+    path = idToPath.get(parent.id)
+    parentEl = folderTree.get path
+    if parentEl
+      idx = parentEl.children.indexOf item.title
+      if idx < 0
+        logger.debug "  Adding item to parent: #{path}"
+        parentEl.children.push item.title
+
 parseFolderTree = ->
   jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
   now = Date.now()
@@ -321,6 +332,10 @@ parseChanges = (items) ->
         continue
       f.ctime = (new Date(cfile.createdDate)).getTime()
       f.mtime = (new Date(cfile.modifiedDate)).getTime()
+
+      # XXX: I'm not sure we need this here
+      updateParents cfile
+
       if f instanceof GFile
         if cfile.downloadUrl
           f.downloadUrl = cfile.downloadUrl
@@ -349,6 +364,9 @@ parseChanges = (items) ->
     else
       logger.debug "#{path} is a new file"
       folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
+
+    updateParents cfile
+
     inodeToPath.set inode, path
 
   if notFound.length > 0 and notFound.length < items.length
