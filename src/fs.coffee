@@ -533,7 +533,12 @@ class GDriveFS extends fuse.FileSystem
         reply.err(0)
 
         #upload file once file is closed
-        if inodeTree.has inode
+        if uploadTree.has inode
+          upCache = uploadTree.get inode
+          upCache.released = true
+          uploadTree.set inode, upCache
+          saveUploadTree()
+
           file = inodeTree.get(inode)
           parentInode = idToInode.get file.parentid
           parent = inodeTree.get parentInode
@@ -748,17 +753,28 @@ resumeUpload = ->
       else
         uploadTree.remove inode
         return
-      parentInode = idToInode.get( file.parentid )
-      if inodeTree.has parentInode
-        parent = inodeTree.get parentInode
-        if parent instanceof GFolder
-          q.push (cb) ->
-            parent.upload file.name, inode, uploadCallback(inode,cb)
-            return
-          q.start()
-        else
-          logger.debug "While resuming uploads, #{parent} was not a folder"
-      return
+
+      #check to see if the file was released by the filesystem
+      #if it wasn't released by the filesystem, it means that the file was not finished transfering
+      if value.released
+        parentInode = idToInode.get( file.parentid )
+        if inodeTree.has parentInode
+          parent = inodeTree.get parentInode
+          if parent instanceof GFolder
+            q.push (cb) ->
+              parent.upload file.name, inode, uploadCallback(inode,cb)
+              return
+            q.start()
+          else
+            logger.debug "While resuming uploads, #{parent} was not a folder"
+        return
+      else
+        inodeTree.remove inode
+        uploadTree.remove inode
+        path = pth.join uploadLocation, value.cache
+        fs.unlink path, ->
+          return
+
   return
 
 start = ->
