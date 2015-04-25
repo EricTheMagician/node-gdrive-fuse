@@ -166,6 +166,9 @@ parseFilesFolders = (items) ->
       unless parent.children
         continue
 
+      #add file to parent list
+      parent.children.push inodeCount
+
       idToInode.set( f.id, inodeCount)
       inodeTree.set inodeCount, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable)
       inodeCount++
@@ -460,3 +463,5 @@ module.exports.inodeTree = inodeTree
 module.exports.saveFolderTree = saveFolderTree
 module.exports.drive = drive
 module.exports.loadChanges = loadChanges
+module.exports.parseFilesFolders = parseFilesFolders
+
