@@ -34,9 +34,9 @@ transports = [new (winston.transports.File)({
   maxFiles: 3
   })]
 if config.debug
-  transports.push new (winston.transports.Console)({ level: 'silly', timestamp: printDate,colorize: true })
+  transports.push new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true })
 else
-  transports.push new (winston.transports.Console)({ level: 'silly', timestamp: printDate,colorize: true })
+  transports.push new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true })
 
 logger = new (winston.Logger)({
     transports: transports
