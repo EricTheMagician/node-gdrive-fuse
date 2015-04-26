@@ -684,7 +684,7 @@ uploadCallback = (inode, cb) ->
         cb()
         return
       if err.code == "ENOENT"
-        uploadTree.remove(path)
+        uploadTree.remove(inode)
         cb()
         return
 
