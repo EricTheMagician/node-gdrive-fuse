@@ -227,7 +227,7 @@ class GFile extends EventEmitter
       file.open chunkStart, (err,fd) ->
 
         #fd can returns false if the file does not exist yet
-        unless fd
+        if err or fd == false
           file.download start, end, readAhead, cb
           _readAheadFn()
           return

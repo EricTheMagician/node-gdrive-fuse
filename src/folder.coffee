@@ -312,9 +312,9 @@ class GFolder
     cb(0,attr)
     return
 
-  upload: (fileName, originalPath, cb) =>
+  upload: (fileName, inode, cb) =>
     folder = @
-    upFile = uploadTree.get originalPath
+    upFile = uploadTree.get inode
     unless upFile
       cb {code: "ENOENT"}
       return
