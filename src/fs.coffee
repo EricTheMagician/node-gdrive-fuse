@@ -138,6 +138,7 @@ class GDriveFS extends fuse.FileSystem
 
   setattr: (context, inode, attrs, reply) ->
     logger.debug "setting attr for #{inode}"
+    console.log attrs
     file = inodeTree.get inode
     unless file
       reply.err errnoMap.ENOENT
@@ -152,6 +153,10 @@ class GDriveFS extends fuse.FileSystem
     file.mtime = m.getTime()
     if 'size' in attrs
       file.size = attrs.size
+    if 'mode' in attrs
+      file.mode = attrs.mode
+
+    inodeTree.set inode, file
 
 
     reply.attr(file.getAttrSync(), 5);
@@ -272,6 +277,10 @@ class GDriveFS extends fuse.FileSystem
     # logger.log "silly", "writing to file #{path} - position: #{position}, length: #{buffer.length}"
 
     file = inodeTree.get inode  
+    unless file
+      logger.debug inode
+      reply.err errnoMap.ENOENT
+      return
     size = file.size
     fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
       if (err)
@@ -402,7 +411,8 @@ class GDriveFS extends fuse.FileSystem
     parent = inodeTree.get parentInode
 
     for childInode in parent.children #TODO: if file exists, delete it first
-      if inodeTree.get(childInode).name == name
+      child = inodeTree.get(childInode)
+      if child and child.name == name
         reply.err PosixError.EEXIST
         return
 
@@ -436,24 +446,25 @@ class GDriveFS extends fuse.FileSystem
     
     if parent #make sure parent exists
       logger.log "debug", "creating file #{name}"
+
+      cache = MD5(parent.id + name)
       systemPath = pth.join(uploadLocation, cache);
 
       # for childInode in parent.children #TODO: if file exists, delete it first
       #   parent.children.push name
       now = (new Date).getTime()
-      logger.log "debug", "adding #{path} to folderTree"
-      inodes = value.inode for value in folderTree.values()
+      logger.log "debug", "adding file \"#{name}\" to folder \"#{parent.name}\""
+      inodes = value.inode for value in inodeTree.values()
       inode = Math.max(inodes) + 1
       file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
-      folderTree.set path, file
-      inodeToPath.set inode, path
+      inodeTree.set inode, file
 
       client.saveFolderTree()
 
 
       fs.open systemPath, 'w', (err, fd) ->
         if (err)
-          logger.log "error", "unable to createfile #{path}, #{err}"
+          logger.log "error", "unable to create file #{inode} -- #{name}, #{err}"
           reply.err(errnoMap[err.code])
           return
         fileInfo.fh = fd
@@ -461,7 +472,7 @@ class GDriveFS extends fuse.FileSystem
         upFile = 
           cache: cache
           uploading: false
-        uploadTree.set path, upFile
+        uploadTree.set inode, upFile
         saveUploadTree()
         attr = 
           inode: inode #parent.inode
@@ -483,6 +494,13 @@ class GDriveFS extends fuse.FileSystem
 
     for childInode in parent.children
       file = inodeTree.get childInode
+
+      #make sure the file still exists in the inodeTree
+      #if not, remove it
+      unless file
+        idx = parent.children.indexOf childInode
+        parent.children.splice(idx,1)
+        continue
       if file.name != name
         continue
 
@@ -605,6 +623,13 @@ class GDriveFS extends fuse.FileSystem
         return
     reply.err PosixError.ENOENT
     return
+  listxattr: (context, inode, size, reply) ->
+    console.log "listxattr called"
+    obj = inodeTree.get inode
+    if obj
+      console.log obj
+
+    reply.xattr 1024*1024
   access: (context, inode, mask, reply) ->
     console.log('Access was called!');
     reply.err(0);
@@ -635,6 +660,7 @@ class GDriveFS extends fuse.FileSystem
       reply.err PosixError.ENOENT
 
       return
+
 
 
 
@@ -777,6 +803,7 @@ resumeUpload = ->
 
   return
 
+
 start = ->
   if inodeTree.count() > 1
     try
@@ -794,10 +821,10 @@ start = ->
       if process.version < '0.11.0'
         opts.push( "-o", "allow_other")
 
-      fs.ensureDirSync(config.mountPoint)
       debug = false
 
       exec command, (err, data) ->
+        fs.ensureDirSync(config.mountPoint)
         if err
           logger.error "unmount error:", err
         if data
@@ -807,7 +834,7 @@ start = ->
         # opts.push "-f"
 
         # opts.push "-mt"
-        # opts.push "-d"
+        opts.push "-d"
         fuse.fuse.mount
           filesystem: GDriveFS
           options: opts.concat(add_opts)
