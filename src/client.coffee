@@ -242,7 +242,10 @@ parseFolderTree = ->
       fs.exists changeFile, (exists) ->
         if exists
           fs.readJson changeFile, (err, data) ->
-            largestChangeId = data.largestChangeId
+            if err
+              largestChangeId = 0
+            else
+              largestChangeId = data.largestChangeId
             if require.main != module
               loadChanges()
         return
