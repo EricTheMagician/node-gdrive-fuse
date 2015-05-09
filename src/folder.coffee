@@ -329,11 +329,11 @@ class GFolder
 
     fs.stat filePath, (err, stats) ->
       if err or stats == undefined
-        logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
+        logger.debug "there was an errror while trying to upload file #{fileName}"
         logger.debug err
         if err.code == "ENOENT"
           #file was deleted
-          uploadTree.remove originalPath
+          uploadTree.remove inode
         upFile.uploading = false
         cb(err)
         return
@@ -347,7 +347,6 @@ class GFolder
           if err
             logger.debug "there was an error removing a file of size 0, #{filePath}"
             logger.debug err
-          logger.debug "size of #{originalPath} was 0 for uploading"
           cb {code: "ENOENT"}
           upFile.uploading = false
           return
@@ -356,10 +355,10 @@ class GFolder
       fn = ->
         fs.stat filePath, (err, stats2) ->
           if err or stats2 == undefined
-            logger.debug "there was an errror while trying to upload file #{fileName} with path #{originalPath}"
+            logger.debug "there was an errror while trying to upload file #{fileName} with path #{inode}"
             if err.code == "ENOENT"
               #file was delete
-              uploadTree.remove originalPath
+              uploadTree.remove inode
             cb(err)
             upFile.uploading = false
 
@@ -368,7 +367,7 @@ class GFolder
           if size != stats2.size #make sure that the cache file is not being written to. mv will create, close and reopen
             fn2 = ->
               upFile.uploading = false
-              folder.upload(fileName, originalPath, cb)
+              folder.upload(fileName, inode, cb)
               return
             setTimeout fn2, 10000
             return
@@ -394,13 +393,13 @@ class GFolder
                   logger.debug "error"
                   logger.debug err
                   logger.debug "end", end
-                  up = uploadTree.get(originalPath)
+                  up = uploadTree.get(inode)
                   unless up
                     cb("ENOENT")
                     return
                   up.uploading = false
                   delete up.location
-                  folder.upload(fileName, originalPath, cb)
+                  folder.upload(fileName, inode, cb)
                   return
                 getNewRangeEnd(upFile.location, size,cbfn)
                 return
@@ -409,7 +408,7 @@ class GFolder
                 if start < size
                   uploadData upFile.location, filePath, start, size, mime, cbUploadData
                 else
-                  logger.debug "successfully uploaded file #{originalPath}"
+                  logger.debug "successfully uploaded file #{inode}"
                   cb(null, res.result)
                 return
               return
@@ -419,7 +418,7 @@ class GFolder
                 return
 
               upFile.location = location
-              uploadTree.set originalPath, upFile
+              uploadTree.set inode, upFile
               saveUploadTree()
 
               #once new link is obtained, start uploading
@@ -429,19 +428,19 @@ class GFolder
             cbNewEnd = (err, end) ->
               if err
                 delete upFile.location
-                logger.debug "there was an error with getting a new range end for #{originalPath}"
+                logger.debug "there was an error with getting a new range end for #{inode}"
                 logger.debug "err", err
                 getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
 
                 return
 
               if end <= 0
-                logger.debug "tried to get new range for #{originalPath}, but it was #{end}"
+                logger.debug "tried to get new range for #{inode}, but it was #{end}"
                 delete upFile.location
                 getUploadResumableLink folder.id, fileName, size, mime, cbNewLink
               else
                 start = end + 1
-                logger.debug "got new range end for #{originalPath}: #{end}"
+                logger.debug "got new range end for #{inode}: #{end}"
                 #once new range end is obtained, start uploading in chunks
                 uploadData location, filePath, start, size, mime, cbUploadData
               return
