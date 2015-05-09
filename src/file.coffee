@@ -72,7 +72,7 @@ class GFile extends EventEmitter
     once = false
     request(options)
     .on 'response', (resp) ->
-      if resp.statusCode == 401 or resp.statusCode == 403        
+      if resp.statusCode == 401 or resp.statusCode == 403
         unless once
           once = true
           fn = ->
@@ -123,24 +123,30 @@ class GFile extends EventEmitter
     cb(0,attr)
     return
 
-  recursive: (start,end) =>    
+  recursive: (start,end) =>
     file = @
     path = pth.join(downloadLocation, "#{file.id}-#{start}-#{end}")
     if start >= @size
       return
     file.open start, (err, fd) ->
-      unless fd
+      if err or fd == false
         unless downloadTree.has("#{file.id}-#{start}")
+          logger.silly "starting to recurse #{file.name}-#{start}"
           downloadTree.set("#{file.id}-#{start}", 1)
           callback =  (err) ->
-            if err
-              logger.debug "There was an error during recursive download:"
-              logger.debug err            
+            # if err
+              #logger.debug "There was an error during recursive download #{start}-#{end}:"
+              #logger.debug err
             downloadTree.remove("#{file.id}-#{start}")
             file.emit 'downloaded', start
+            fn = ->
+              file.emit 'downloaded', start
+            setTimeout fn, 1000
+            logger.silly "finishing recurse #{file.id}-#{start}"
             return
 
-          GFile.download(file.downloadUrl, start,end, file.size, path, callback)
+          #GFile.download(file.downloadUrl, start,end, file.size, path, callback)
+          file.download(start, end,false, callback)
           return
 
     return
@@ -173,7 +179,7 @@ class GFile extends EventEmitter
             return
           if stats.size == (end - start + 1)
             fd = fs.open path, 'r', (err,fd) ->
-              if err 
+              if err
                 if err.code == "EMFILE"
                   for o in openedFiles.values()
                     clearTimeout o.to
@@ -211,13 +217,22 @@ class GFile extends EventEmitter
 
 
       path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
-      listenCallback = (cStart)  ->      
-        if ( cStart <= start < (cStart + GFile.chunkSize-1)  )
-          file.read(start,end, readAhead, cb)
-          file.removeListener 'downloaded', listenCallback
-        return
-
       if downloadTree.has("#{file.id}-#{chunkStart}")
+        logger.silly "download tree has #{file.id}-#{chunkStart}"
+        __once__ = false
+        listenCallback = (cStart)  ->
+          unless __once__
+           #logger.silly "listen callback #{file.id}-#{chunkStart},#{cStart}"
+           if ( cStart <= start < (cStart + GFile.chunkSize-1)  )
+              #logger.debug "once #{ __once__ } -- #{cStart} -- #{start}"
+              __once__ = true
+              file.removeListener 'downloaded', listenCallback
+              #logger.silly "listen callback #{file.id}-#{chunkStart}"
+              file.emit 'downloaded', cStart
+              file.read(start,end, readAhead, cb)
+
+          return
+
         file.on 'downloaded', listenCallback
         _readAheadFn()
         return
@@ -316,6 +331,9 @@ class GFile extends EventEmitter
             cb(buf0)
             downloadTree.remove("#{file.id}-#{chunkStart}")
             file.emit 'downloaded', chunkStart
+            fn = ->
+              file.emit 'downloaded', chunkStart
+            setTimeout fn, 1000
           return
 
         downloadTree.remove("#{file.id}-#{chunkStart}")
