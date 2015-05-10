@@ -151,15 +151,16 @@ class GDriveFS extends fuse.FileSystem
     # attrs.atime = a.getTime()
     # attrs.mtime = m.getTime()
     file.mtime = m.getTime()
-    if 'size' in attrs
+    if attrs.hasOwnProperty("size")
       file.size = attrs.size
-    if 'mode' in attrs
+
+    if attrs.hasOwnProperty("mode")
+      logger.debug "mode before and after: #{file.mode}-#{attrs.mode}"
       file.mode = attrs.mode
 
     inodeTree.set inode, file
 
 
-    reply.attr(file.getAttrSync(), 5);
     # reply.err(0)
     return
 
@@ -284,7 +285,7 @@ class GDriveFS extends fuse.FileSystem
     size = file.size
     fs.write fileInfo.fh, buffer, 0, buffer.length, position, (err, bytesWritten, buffer) ->
       if (err)
-        logger.debug "there was an error writing to #{path}"
+        logger.debug "there was an error writing for file #{file.name}"
         logger.debug err
         logger.debug "position", position, "fh", fileInfo.fh
         reply.err(err.errno)
@@ -404,9 +405,6 @@ class GDriveFS extends fuse.FileSystem
 
   mknod: (context, parentInode, name, mode, rdev, reply) ->
       
-    now = (new Date).getTime()
-    inodes = value.inode for value in inodeTree.values()
-    inode = Math.max(inodes) + 1
 
     parent = inodeTree.get parentInode
 
@@ -416,9 +414,13 @@ class GDriveFS extends fuse.FileSystem
         reply.err PosixError.EEXIST
         return
 
+    now = (new Date).getTime()
+    inodes = value.inode for value in inodeTree.values()
+    inode = Math.max(inodes) + 1
 
     file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
     inodeTree.set inode, file
+    parent.children.push inode
 
 
     attr = file.getAttrSync()
@@ -458,6 +460,7 @@ class GDriveFS extends fuse.FileSystem
       inode = Math.max(inodes) + 1
       file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
       inodeTree.set inode, file
+      parent.children.push inode
 
       client.saveFolderTree()
 
@@ -516,7 +519,7 @@ class GDriveFS extends fuse.FileSystem
 
       drive.files.trash {fileId: file.id}, (err, res) ->
         if err
-          logger.log "debug", "unable to remove file #{path}"
+          logger.log "debug", "unable to remove file #{file.name}"
         reply.err 0 #always return success
         return          
 
@@ -797,6 +800,12 @@ resumeUpload = ->
       else
         inodeTree.remove inode
         uploadTree.remove inode
+        parentInode = idToInode.get value.parentid
+        parent = inodeTree.get parentInode
+        if parent
+          idx = parent.children.indexOf inode
+          if idx > 0
+            parent.children.splice idx, 1
         path = pth.join uploadLocation, value.cache
         fs.unlink path, ->
           return
