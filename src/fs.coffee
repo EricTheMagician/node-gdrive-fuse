@@ -161,6 +161,7 @@ class GDriveFS extends fuse.FileSystem
     inodeTree.set inode, file
 
 
+    reply.attr(file.getAttrSync(), 5);
     # reply.err(0)
     return
 
@@ -422,6 +423,7 @@ class GDriveFS extends fuse.FileSystem
     inodeTree.set inode, file
     parent.children.push inode
 
+    logger.debug "mknod: parentid: #{parent.id} -- inode #{inode}"
 
     attr = file.getAttrSync()
 
@@ -461,6 +463,9 @@ class GDriveFS extends fuse.FileSystem
       file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
       inodeTree.set inode, file
       parent.children.push inode
+
+      logger.debug "create: parentid: #{parent.id} -- inode #{inode}"
+
 
       client.saveFolderTree()
 
