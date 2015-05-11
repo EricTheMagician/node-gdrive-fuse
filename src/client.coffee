@@ -25,14 +25,15 @@ logger =  f.logger
 ####### Client Variables ###########
 ####################################
 
-#Create maps of name and files
-folderTree = new hashmap()
-now = (new Date).getTime()
-folderTree.set('/', new GFolder(null, null, 'root',now, now, 1, true, ['loading data']))
+now = Date.now()
 
-idToPath = new hashmap()
-inodeToPath = new hashmap()
-inodeToPath.set 1, '/'
+#Create maps of name and files
+inodeTree = new hashmap()
+inodeTree.set(1,new GFolder(null, null, 'root',now, now, 1, true, []))
+idToInode = new hashmap()
+#idToPath = new hashmap()
+#inodeToPath = new hashmap()
+#inodeToPath.set 1, '/'
 
 OAuth2Client = google.auth.OAuth2
 oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
@@ -54,6 +55,8 @@ getPageFiles = (pageToken, items, cb) ->
     fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission, version),nextPageToken"
     maxResults: 500
     pageToken: pageToken
+  logger.silly "current length of items during downloading of all files is #{items.length}"
+
   drive.files.list opts, (err, resp) ->
     if err
       logger.log 'error', "There was an error while downloading files from google, retrying"
@@ -70,6 +73,7 @@ getPageFiles = (pageToken, items, cb) ->
 
 getAllFiles = ()->
   callback = (err, nextPageToken, items) ->
+    logger.debug "current length of items during downloading of all files is #{items.length}"
     if nextPageToken
       getPageFiles(nextPageToken, items, callback)
     else
@@ -92,15 +96,22 @@ parseFilesFolders = (items) ->
   # then parse the folders
   # and then parse files
 
+  fs.outputJsonSync "#{config.cacheLocation}/data/unparsed.json", items
+
+
   for i in items
     if (! (i.parents) ) or i.parents.length == 0
       continue
     unless i.labels.trashed
+      if i.deleted or i.labels.trashed
+        continue
+      if i.id  == "0B8TRGM3mVvQnYUpyTE8yYTNYN0E"
+        console.log i
       if i.mimeType == "application/vnd.google-apps.folder"
         unless rootFound
           if i.parents[0].isRoot
-            folderTree.set('/', new GFolder(i.parents[0].id, null, 'root',now, now,1, true))
-            idToPath.set(i.parents[0].id, '/')
+            inodeTree.set(1, new GFolder(i.parents[0].id, null, 'root',now, now,1, true))
+            idToInode.set(i.parents[0].id, 1)
             logger.log "info", "root node found"
             rootFound = true
 
@@ -119,27 +130,27 @@ parseFilesFolders = (items) ->
       #   logger.log "debug", f
       #   continue
       pid = f.parents[0].id #parent id
-      parentPath = idToPath.get(pid)
-      if parentPath
+      parentInode = idToInode.get(pid)
+      if parentInode
 
         #if the parent exists, get it
-        parent = folderTree.get(parentPath)
-        path = pth.join(parentPath, f.title)
-        idToPath.set( f.id, path)
+        parent = inodeTree.get(parentInode)
+
+        #check to see if id has already been set
+        if idToInode.has(f.id)
+          continue
+        idToInode.set( f.id, inodeCount)
 
         #push this current folder to the parent's children list
-        if parent.children.indexOf(f.title) < 0
-          parent.children.push f.title
-        else
-          continue
-        #set up the new folder
-        inodeToPath.set inodeCount, path
-        folderTree.set(path, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable , []))
-        inodeCount++
+        if parent.children.indexOf(inodeCount) < 0
+          parent.children.push inodeCount
+          inodeTree.set(inodeCount, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable , []))
+        inodeCount++          
       else
         notFound.push f
 
       #make sure that the folder list is gettting smaller over time.
+
     if left.length == notFound.length
       logger.info "There was #{left.length} folders that were not possible to process"
       logger.debug notFound
@@ -149,19 +160,17 @@ parseFilesFolders = (items) ->
   logger.info "Parsing files"
   for f in files
     pid = f.parents[0].id
-    parentPath = idToPath.get(pid)
-    if parentPath
-      parent = folderTree.get parentPath
+    parentInode = idToInode.get(pid)
+    if parentInode
+      parent = inodeTree.get parentInode
       unless parent.children
         continue
-      if parent.children.indexOf(f.title) < 0
-        parent.children.push f.title
 
-      path = pth.join parentPath, f.title
-      idToPath.set( f.id, path)
-      inodeToPath.set inodeCount, path
+      #add file to parent list
+      parent.children.push inodeCount
 
-      folderTree.set path, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable)
+      idToInode.set( f.id, inodeCount)
+      inodeTree.set inodeCount, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable)
       inodeCount++
 
   logger.info "Finished parsing files"
@@ -172,29 +181,23 @@ parseFilesFolders = (items) ->
     setTimeout loadChanges, 90000
   return
 
-parseFolderTree = ->
-  jsonFile =  "#{config.cacheLocation}/data/folderTree.json"
+parseFolderTreeInode = ->
+  jsonFile =  "#{config.cacheLocation}/data/inodeTree.json"  
   now = Date.now()
-  inode = 1
   fs.readJson jsonFile, (err, data) ->
     try
       for key in Object.keys(data)
         o = data[key]
-        inodeToPath.set inode, key
-        o.inode = inode
-        inode++
-        #make sure parent directory exists
-        unless folderTree.has(pth.dirname(key))
-          continue
+        inode = o.inode
 
         #add to idToPath
         idToPath.set(o.id,key)
         idToPath.set(o.parentid, pth.dirname(key))
 
         if 'size' of o
-          folderTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
+          inodeTree.set key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
         else
-          folderTree.set key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
+          inodeTree.set key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
 
       changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
       fs.exists changeFile, (exists) ->
@@ -210,9 +213,53 @@ parseFolderTree = ->
     return
   return
 
+parseFolderTree = ->
+  jsonFile =  "#{config.cacheLocation}/data/inodeTree.json"
+  now = Date.now()
+  fs.readJson jsonFile, (err, data) ->
+    try
+      for key in Object.keys(data)
+        o = data[key]
+        if key == "1"
+          inodeTree.set 1, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mitime, o.inode, o.permission, o.children)
+          idToInode.set o.id, 1
+          continue
+
+        #make sure parent directory exists
+        unless idToInode.has( o.parentid )
+          console.log o
+          break
+          continue
+
+        idToInode.set o.id, o.inode
+
+        if 'size' of o
+          inodeTree.set o.inode, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission )
+        else
+          inodeTree.set o.inode, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children)
+
+      changeFile = "#{config.cacheLocation}/data/largestChangeId.json"
+      fs.exists changeFile, (exists) ->
+        if exists
+          fs.readJson changeFile, (err, data) ->
+            if err
+              largestChangeId = 0
+            else
+              largestChangeId = data.largestChangeId
+            if require.main != module
+              loadChanges()
+        return
+    catch error
+      #if there was an error with reading the file, just download the whole structure again
+      logger.debug error
+      getAllFiles()
+    return
+  return
+
 loadFolderTree = ->
   #create (or read) the folderTree
-  fs.exists pth.join(dataLocation, 'folderTree.json'), (exists) ->
+  fs.exists pth.join(dataLocation, 'inodeTree.json'), (exists) ->
+    logger.debug "Folder tree exist status: #{exists}"
     if exists
       logger.log 'info', "Loading folder structure"
       parseFolderTree()
@@ -229,11 +276,12 @@ saveFolderTree = () ->
     lockFolderTree = true
     logger.debug "saving folder tree"
     toSave = {}
-    for key in folderTree.keys()
-      value = folderTree.get key
+    for key in inodeTree.keys()
+      value = inodeTree.get key
       toSave[key] = value
 
-    fs.outputJson "#{config.cacheLocation}/data/folderTree.json", toSave,  ->
+    fs.outputJson "#{config.cacheLocation}/data/inodeTree.json", toSave,  ->
+      return
     lockFolderTree = false
   return
 
@@ -290,31 +338,39 @@ loadChanges = (cb) ->
 parseChanges = (items) ->
   logger.debug "There was #{items.length} to parse"
   notFound = []
+  logger.log items
   for i in items
-    path = idToPath.get(i.fileId)
+
     if i.deleted or i.file.labels.trashed #check if it is deleted
-      if folderTree.has path #check to see if the file was not already removed from folderTree
-        logger.debug "#{path} was deleted"
-        o = folderTree.get path
-        folderTree.remove path
-        inodeToPath.remove o.inode
-        idToPath.remove i.fileId
-        parent = folderTree.get pth.dirname(path)
+      if idToInode.has i.fileId #check to see if the file was not already removed from folderTree
+        logger.debug "#{i.file.title} was deleted"
+        id = i.fileId
+        inode = idToInode.get id
+        obj = inodeTree.get inode
+        inodeTree.remove inode
+        idToInode.remove id
+
+        parent = inodeTree.get obj.parentid
         unless parent
           continue
-        idx = parent.children.indexOf pth.basename(path)
+        idx = parent.children.indexOf inode
         if idx >= 0
           parent.children.splice(idx, 1)
+      else
+        logger.debug "processing a file that was marked as deleted, but not preset in the inodeTree: #{i.file.title} with id #{i.file.id}"
       continue
 
     cfile = i.file #changed file
     unless cfile
       continue
 
+
     #if it is not deleted or trashed, check to see if it's new or not
-    if path
-      logger.debug "#{path} was updated"
-      f = folderTree.get(path)
+    inode = idToInode.get(cfile.id)
+    if inode
+      f = inodeTree.get(inode)
+      logger.debug "#{f.name} was updated"
+
       unless f
         idToPath.remove path
         notFound.push i
@@ -322,8 +378,7 @@ parseChanges = (items) ->
       f.ctime = (new Date(cfile.createdDate)).getTime()
       f.mtime = (new Date(cfile.modifiedDate)).getTime()
       if f instanceof GFile
-        if cfile.downloadUrl
-          f.downloadUrl = cfile.downloadUrl
+        f.downloadUrl = cfile.downloadUrl
       continue
 
 
@@ -333,24 +388,22 @@ parseChanges = (items) ->
       continue
 
     parentId = cfile.parents[0].id
-    parentPath = idToPath.get(parentId)
-    unless parentPath
+    parentInode = idToInode.get(parentId)
+    unless parentInode
       notFound.push i
       continue
-    parent = folderTree.get parentPath
-    path = pth.join parentPath, cfile.title
-    idToPath.set cfile.id, path
-    inodes = value.inode for value in folderTree.values()
+    parent = inodeTree.get parentInode
+    inodes = value.inode for value in inodeTree.values()
     inode = Math.max(inodes) + 1
+    idToInode.set cfile.id, inode
+    parent.children.push inode
     if cfile.mimeType == 'application/vnd.google-apps.folder'
-      logger.debug "#{path} is a new folder"
-      folderTree.set path, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
-      inodeToPath.set inode, path
+      logger.debug "#{cfile.title} is a new folder"
+      inodeTree.set inode, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
     else
-      logger.debug "#{path} is a new file"
-      folderTree.set path, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
-    inodeToPath.set inode, path
-
+      logger.debug "#{cfile.title} is a new file"
+      inodeTree.set inode, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
+    
   if notFound.length > 0 and notFound.length < items.length
     parseChanges(notFound)
     return
@@ -408,9 +461,10 @@ google.options({ auth: oauth2Client })
 GFile.oauth = oauth2Client;
 GFolder.oauth = oauth2Client;
 
-module.exports.folderTree = folderTree
-module.exports.idToPath = idToPath
+module.exports.idToInode = idToInode
+module.exports.inodeTree = inodeTree
 module.exports.saveFolderTree = saveFolderTree
 module.exports.drive = drive
 module.exports.loadChanges = loadChanges
-module.exports.inodeToPath = inodeToPath
+module.exports.parseFilesFolders = parseFilesFolders
+
