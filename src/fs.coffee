@@ -424,7 +424,7 @@ class GDriveFS extends fuse.FileSystem
     parent.children.push inode
 
     logger.debug "mknod: parentid: #{parent.id} -- inode #{inode}"
-
+    logger.info "adding a new file #{name} to folder #{parent.name}"
     attr = file.getAttrSync()
 
     upFile = 
@@ -465,6 +465,7 @@ class GDriveFS extends fuse.FileSystem
       parent.children.push inode
 
       logger.debug "create: parentid: #{parent.id} -- inode #{inode}"
+      logger.info "adding a new file #{name} to folder #{parent.name}"
 
 
       client.saveFolderTree()
@@ -509,6 +510,8 @@ class GDriveFS extends fuse.FileSystem
         idx = parent.children.indexOf childInode
         parent.children.splice(idx,1)
         continue
+
+      #make sure it's the right file
       if file.name != name
         continue
 
