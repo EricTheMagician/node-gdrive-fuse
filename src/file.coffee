@@ -173,8 +173,8 @@ class GFile extends EventEmitter
       try
         fs.stat path, (err, stats) ->
           if err
-            logger.debug "there was an debug stat-ing a file in file.open"
-            logger.debug err
+            logger.silly "there was an debug stat-ing a file in file.open"
+            logger.silly err
             cb err,false
             return
           if stats.size == (end - start + 1)
@@ -237,12 +237,12 @@ class GFile extends EventEmitter
         _readAheadFn()
         return
 
-      downloadTree.set("#{file.id}-#{chunkStart}", 1)
       #try to open the file or get the file descriptor
       file.open chunkStart, (err,fd) ->
 
         #fd can returns false if the file does not exist yet
         if err or fd == false
+          downloadTree.set("#{file.id}-#{chunkStart}", 1)
           file.download start, end, readAhead, cb
           _readAheadFn()
           return

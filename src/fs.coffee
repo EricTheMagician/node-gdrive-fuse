@@ -847,7 +847,7 @@ start = ->
         if data
           logger.info "unmounting output:", data
         opts =  ["GDrive", "-o", "allow_other", config.mountPoint]
-        opts.push "-s"
+        # opts.push "-s"
         # opts.push "-f"
 
         # opts.push "-mt"
