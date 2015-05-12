@@ -145,8 +145,8 @@ class GFile extends EventEmitter
             logger.silly "finishing recurse #{file.id}-#{start}"
             return
 
-          #GFile.download(file.downloadUrl, start,end, file.size, path, callback)
-          file.download(start, end,false, callback)
+          GFile.download(file.downloadUrl, start,end, file.size, path, callback)
+          # file.download(start, end,false, callback)
           return
 
     return
@@ -298,10 +298,9 @@ class GFile extends EventEmitter
       GFile.oauth.refreshAccessToken (err, tokens) ->
 
         config.accessToken = tokens
-        unless err
-        else
-          logger.debug "there was an error while updating url"
-          logger.debug "err", err
+        if err
+          logger.silly "there was an error while updating url"
+          logger.silly "err", err
         cb(file.downloadUrl)
         return
       return
