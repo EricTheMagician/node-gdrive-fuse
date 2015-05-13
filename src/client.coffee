@@ -49,42 +49,58 @@ largestChangeId = 1;
 ####### Client Functions ###########
 ####################################
 
+__items_to_parse_from_google__ = []
 
-getPageFiles = (pageToken, items, cb) ->
+getPageFiles = (pageToken, total, cb) ->
   opts =
     fields: "etag,items(copyable,createdDate,downloadUrl,editable,fileExtension,fileSize,id,kind,labels(hidden,restricted,trashed),md5Checksum,mimeType,modifiedDate,parents(id,isRoot),shared,title,userPermission, version),nextPageToken"
     maxResults: 500
     pageToken: pageToken
-  logger.silly "current length of items during downloading of all files is #{items.length}"
+  # logger.silly "current length of items during downloading of all files and folders is #{total} - left to parse: #{__items_to_parse_from_google__.length}"
 
   drive.files.list opts, (err, resp) ->
     if err
       logger.log 'error', "There was an error while downloading files from google, retrying"
       logger.error err
       fn = ->
-        getPageFiles(pageToken, items, cb)
+        getPageFiles(pageToken, total, cb)
         return
       setTimeout(fn, 4000)
       return
-
-    cb(null, resp.nextPageToken, items.concat(resp.items))
+    __items_to_parse_from_google__ = __items_to_parse_from_google__.concat(resp.items)
+    newTotal = total + resp.items.length
+    if newTotal > 10000
+      newTotal -= 10000
+      logger.info "Taking a break from downloading files to try and parse files and folders. Current items to parse: #{__items_to_parse_from_google__.length}"
+      parseFilesFolders()
+    cb(null, newTotal, resp.nextPageToken)
     return
   return
 
 getAllFiles = ()->
-  callback = (err, nextPageToken, items) ->
-    logger.debug "current length of items during downloading of all files is #{items.length}"
+  callback = (err, total, nextPageToken) ->
+    logger.debug "current length of items during downloading of all files is #{__items_to_parse_from_google__.length}"
     if nextPageToken
-      getPageFiles(nextPageToken, items, callback)
+      getPageFiles(nextPageToken, total, callback)
     else
       logger.log 'info', "Finished downloading folder structure from google"
       getLargestChangeId()
-      parseFilesFolders(items)
+      parseFilesFolders()
+      logger.debug __items_to_parse_from_google__
+      fsaveFolderTree()
+      getLargestChangeId()
+      if require.main != module
+        setTimeout loadChanges, 90000
+
     return
-  getPageFiles(null, [], callback)
+  getPageFiles(null, 0, callback)
   return
 
-parseFilesFolders = (items) ->
+parseFilesFolders = () ->
+  items = __items_to_parse_from_google__
+  __items_to_parse_from_google__ = []
+  logger.debug "Starting to parse items from google."
+  logger.debug "There are #{items.length}  items to parse and the current inodeTree size is #{inodeTree.count()}."
   files = []
   folders = []
   rootFound = false
@@ -105,8 +121,7 @@ parseFilesFolders = (items) ->
     unless i.labels.trashed
       if i.deleted or i.labels.trashed
         continue
-      if i.id  == "0B8TRGM3mVvQnYUpyTE8yYTNYN0E"
-        console.log i
+
       if i.mimeType == "application/vnd.google-apps.folder"
         unless rootFound
           if i.parents[0].isRoot
@@ -153,7 +168,7 @@ parseFilesFolders = (items) ->
 
     if left.length == notFound.length
       logger.info "There was #{left.length} folders that were not possible to process"
-      logger.debug notFound
+      # logger.debug notFound
       break
     left = notFound
 
@@ -172,13 +187,15 @@ parseFilesFolders = (items) ->
       idToInode.set( f.id, inodeCount)
       inodeTree.set inodeCount, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable)
       inodeCount++
+    else
+      left.push(f)
 
-  logger.info "Finished parsing files"
-  logger.info "Everything should be ready to use"
-  saveFolderTree()
-  getLargestChangeId()
-  if require.main != module
-    setTimeout loadChanges, 90000
+  __items_to_parse_from_google__ = __items_to_parse_from_google__.concat(left)
+
+  # logger.info "Finished parsing files"
+  # logger.info "Everything should be ready to use"
+  # saveFolderTree()
+  logger.debug "After attempting to parse, there is #{inodeTree.count()} items in the inodeTree and #{__items_to_parse_from_google__.length} items that were not yet parseable"
   return
 
 parseFolderTreeInode = ->
