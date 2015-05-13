@@ -87,7 +87,7 @@ getAllFiles = ()->
       getLargestChangeId()
       parseFilesFolders()
       logger.debug __items_to_parse_from_google__
-      fsaveFolderTree()
+      saveFolderTree()
       getLargestChangeId()
       if require.main != module
         setTimeout loadChanges, 90000
