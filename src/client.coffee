@@ -152,7 +152,10 @@ parseFilesFolders = () ->
         parent = inodeTree.get(parentInode)
 
         #check to see if parent is a folder
-        unless parent instanceof GFolder
+        if parent instanceof GFolder
+          unless hasOwnProperty(parent, "children")
+            parent.children = []
+        else
           notFound.push f
           continue
 
