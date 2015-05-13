@@ -151,9 +151,15 @@ parseFilesFolders = () ->
         #if the parent exists, get it
         parent = inodeTree.get(parentInode)
 
+        #check to see if parent is a folder
+        unless parent instanceof GFolder
+          notFound.push f
+          continue
+
         #check to see if id has already been set
         if idToInode.has(f.id)
           continue
+
         idToInode.set( f.id, inodeCount)
 
         #push this current folder to the parent's children list
