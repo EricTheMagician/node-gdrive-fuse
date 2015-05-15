@@ -109,7 +109,10 @@ parseFilesFolders = () ->
   else
     rootFound = false
   now = (new Date).getTime()
-  inodeCount = 2
+
+  inodes = value.inode for value in inodeTree.values()
+  inodeCount = Math.max(inodes) + 1
+
   logger.info "Parinsg data, looking for root foolder"
   # google does not return the list of files and folders in a particular order.
   # so find the root folder first,
