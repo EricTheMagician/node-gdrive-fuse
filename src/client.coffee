@@ -103,7 +103,11 @@ parseFilesFolders = () ->
   logger.debug "There are #{items.length}  items to parse and the current inodeTree size is #{inodeTree.count()}."
   files = []
   folders = []
-  rootFound = false
+  root = inodeTree.get(1)
+  if root.id
+    rootFound = true
+  else
+    rootFound = false
   now = (new Date).getTime()
   inodeCount = 2
   logger.info "Parinsg data, looking for root foolder"
@@ -152,9 +156,9 @@ parseFilesFolders = () ->
         parent = inodeTree.get(parentInode)
 
         #check to see if parent is a folder
-        if parent instanceof GFolder
-          unless hasOwnProperty(parent, "children")
-            parent.children = []
+        if parent and parent instanceof GFolder
+          unless parent.hasOwnProperty( "children")
+            parent.children = []    
         else
           notFound.push f
           continue
