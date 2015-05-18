@@ -726,7 +726,7 @@ uploadCallback = (inode, cb) ->
         return
 
       cb()
-      logger.debug "Retrying upload: \"#{path}\"."
+      logger.debug "Retrying upload: \"#{file.name}\"."
       fn = (_cb) ->
         parent.upload file.name, inode , uploadCallback(inode,_cb)
         return
