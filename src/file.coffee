@@ -90,12 +90,12 @@ class GFile extends EventEmitter
         console.log "error"
         console.log err
         console.log err.code
-        if err.code == "EMFILE"
-          openedFiles.forEach (value, key) ->
-            clearTimeout(value.to)
-            fs.close f.fd, ->
-              return
-            return
+        # if err.code == "EMFILE"
+        #   openedFiles.forEach (value, key) ->
+        #     clearTimeout(value.to)
+        #     fs.close f.fd, ->
+        #       return
+        #     return
 
 
         cb(err)
@@ -267,8 +267,9 @@ class GFile extends EventEmitter
             return
           _readAheadFn()
         catch error
-        finally
           file.read(start,end, readAhead, cb)
+
+        return
 
 
     else if nChunks < 2
