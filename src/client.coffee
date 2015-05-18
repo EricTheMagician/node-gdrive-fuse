@@ -410,6 +410,9 @@ parseChanges = (items) ->
         continue
       f.ctime = (new Date(cfile.createdDate)).getTime()
       f.mtime = (new Date(cfile.modifiedDate)).getTime()
+      if  f.name != cfile.title
+        logger.info "#{f.name} was renamed to cfile.title"
+        f.name = file.title
       if f instanceof GFile
         f.downloadUrl = cfile.downloadUrl
       continue
