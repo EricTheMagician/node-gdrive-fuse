@@ -89,6 +89,15 @@ class GFile extends EventEmitter
         once = true
         console.log "error"
         console.log err
+        console.log err.code
+        if err.code == "EMFILE"
+          openedFiles.forEach (value, key) ->
+            clearTimeout(value.to)
+            fs.close f.fd, ->
+              return
+            return
+
+
         cb(err)
       return
     .pipe(
@@ -252,12 +261,15 @@ class GFile extends EventEmitter
         #if the file is opened, read from it
         readSize = end-start;
         buffer = new Buffer(readSize+1)
-        fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
-          cb(buffer.slice(0,bytesRead))
-          return
+        try
+          fs.read fd,buffer, 0, readSize+1, start-chunkStart, (err, bytesRead, buffer) ->
+            cb(buffer.slice(0,bytesRead))
+            return
+          _readAheadFn()
+        catch error
+        finally
+          file.read(start,end, readAhead, cb)
 
-        _readAheadFn()
-        return
 
     else if nChunks < 2
       end1 = chunkStart + GFile.chunkSize - 1
@@ -293,6 +305,11 @@ class GFile extends EventEmitter
       acknowledgeAbuse  : true
       fields: "downloadUrl"    
     GFile.GDrive.files.get data, (err, res) ->
+      if err
+        logger.error "There was an error while getting an updated url for #{file.name}"
+        logger.error err
+        file.updateUrl(cb)
+        return
       file.downloadUrl = res.downloadUrl
       
       GFile.oauth.refreshAccessToken (err, tokens) ->
