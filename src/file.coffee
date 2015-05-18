@@ -60,7 +60,12 @@ class GFile extends EventEmitter
 
   constructor: (@downloadUrl, @id, @parentid, @name, @size, @ctime, @mtime, @inode, @permission, @mode = 0o100777) ->
 
-  @download: (url, start,end, size, saveLocation, cb ) ->   
+  @download: (url, start,end, size, saveLocation, cb ) -> 
+    if config.accessToken == null
+      logger.debug "access token was null when downloading files"
+      cb("expiredUrl")
+      return
+
     options =
       url: url
       encoding: null
