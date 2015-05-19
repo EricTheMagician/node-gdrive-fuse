@@ -411,7 +411,7 @@ parseChanges = (items) ->
       f.ctime = (new Date(cfile.createdDate)).getTime()
       f.mtime = (new Date(cfile.modifiedDate)).getTime()
       if  f.name != cfile.title
-        logger.info "#{f.name} was renamed to cfile.title"
+        logger.info "#{f.name} was renamed to #{cfile.title}"
         f.name = cfile.title
       if f.parentid != cfile.parents[0].id
         logger.info "#{f.name} has moved"
