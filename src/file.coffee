@@ -95,12 +95,12 @@ class GFile extends EventEmitter
         console.log "error"
         console.log err
         console.log err.code
-        # if err.code == "EMFILE"
-        #   openedFiles.forEach (value, key) ->
-        #     clearTimeout(value.to)
-        #     fs.close f.fd, ->
-        #       return
-        #     return
+        if err.code == "EMFILE"
+          openedFiles.forEach (value, key) ->
+            clearTimeout(value.to)
+            fs.close f.fd, ->
+              return
+            return
 
 
         cb(err)
