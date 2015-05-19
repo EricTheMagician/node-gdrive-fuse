@@ -96,6 +96,8 @@ class GFile extends EventEmitter
         console.log err
         console.log err.code
         if err.code == "EMFILE"
+          logger.debug "There was an error with downloading files: EMFILE"
+          logger.debug err
           openedFiles.forEach (value, key) ->
             clearTimeout(value.to)
             fs.close f.fd, ->
