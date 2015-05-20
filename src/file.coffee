@@ -113,13 +113,13 @@ class GFile extends EventEmitter
         .on 'error', (err) ->        
           logger.error "There was an error with writing during the download"
           logger.error err
-          GFile.download(url, start,end, size, saveLocation, cb )
+          cb(err)
           return        
       )
       .on 'error', (err) ->        
         logger.error "There was an error with piping during the download"
         logger.error err
-        GFile.download(url, start,end, size, saveLocation, cb )
+        cb(err)
         return        
       .on 'close', ->
         unless once
