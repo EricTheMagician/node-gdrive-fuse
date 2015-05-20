@@ -109,7 +109,7 @@ class GFile extends EventEmitter
           cb(err)
         return
       .pipe( fs.createWriteStream(saveLocation) )
-      .on 'error', (err)->
+      .on 'error', (err) ->        
         logger.error "There was an error with piping during the download"
         logger.error err
         GFile.download(url, start,end, size, saveLocation, cb )
@@ -119,7 +119,7 @@ class GFile extends EventEmitter
           once = true
           cb(null)
         return
-    catch e:
+    catch e
       logger.error "There was an uncaught error while downloading"
       logger.error e
     
