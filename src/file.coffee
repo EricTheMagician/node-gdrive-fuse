@@ -107,6 +107,7 @@ class GFile extends EventEmitter
 
 
           cb(err)
+        this.emit('end')          
         return
       .pipe( 
         fs.createWriteStream(saveLocation) 
@@ -114,12 +115,14 @@ class GFile extends EventEmitter
           logger.error "There was an error with writing during the download"
           logger.error err
           cb(err)
+          this.emit('end')
           return        
       )
       .on 'error', (err) ->        
         logger.error "There was an error with piping during the download"
         logger.error err
         cb(err)
+        this.emit('end')
         return        
       .on 'close', ->
         unless once
