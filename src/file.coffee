@@ -100,7 +100,7 @@ class GFile extends EventEmitter
           logger.debug err
           openedFiles.forEach (value, key) ->
             clearTimeout(value.to)
-            fs.close f.fd, ->
+            fs.close value.fd, ->
               return
             return
 
