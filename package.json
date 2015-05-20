@@ -22,7 +22,7 @@
     "fusejs": "git://github.com/thejinx0r/fusejs#1cac30a67efd2c9e62a614d9ed2dc35296ffafc5",
     "googleapis": "^1.0.20",
     "hashmap": "^1.1.0",
-    "mmmagic": "git://github.com/thejinx0r/mmmagic#merge",
+    "mmmagic": "~0.3.14",
     "queue": "^3.0.10",
     "request": "^2.51.0",
     "restler": "git://github.com/mthx/restler#4cc136af9a089ef21013cdad6fdd68adebf92caa",
