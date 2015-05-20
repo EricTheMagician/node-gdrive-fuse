@@ -340,7 +340,6 @@ class GFile extends EventEmitter
     nChunks = (chunkEnd - chunkStart)/GFile.chunkSize
 
     if nChunks < 1
-      logger.debug "starting to download #{file.name}, chunkStart: #{chunkStart}"
       path = pth.join(downloadLocation, "#{file.id}-#{chunkStart}-#{chunkEnd}")
       callback = (err)->   
         if err
@@ -364,7 +363,12 @@ class GFile extends EventEmitter
         file.read(start,end, readAhead, cb)
         file.emit 'downloaded', chunkStart
         return
-      GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, path, callback)
+      if downloadTree.has "#{file.id}-#{chunkStart}" 
+        file.read(start,end,readAhead,cb)
+      else
+        logger.debug "starting to download #{file.name}, chunkStart: #{chunkStart}"      
+        downloadTree.set("#{file.id}-#{chunkStart}", 1)
+        GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, path, callback)
 
     else if nChunks < 2      
       end1 = chunkStart + GFile.chunkSize - 1
