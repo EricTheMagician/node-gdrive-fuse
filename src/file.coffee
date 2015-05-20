@@ -258,7 +258,6 @@ class GFile extends EventEmitter
 
         #fd can returns false if the file does not exist yet
         if err or fd == false
-          downloadTree.set("#{file.id}-#{chunkStart}", 1)
           file.download start, end, readAhead, cb
           _readAheadFn()
           return
