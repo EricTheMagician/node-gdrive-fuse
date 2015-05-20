@@ -75,45 +75,53 @@ class GFile extends EventEmitter
 
     ws = null
     once = false
-    request(options)
-    .on 'response', (resp) ->
-      if resp.statusCode == 401 or resp.statusCode == 403
+    try    
+      request(options)
+      .on 'response', (resp) ->
+        if resp.statusCode == 401 or resp.statusCode == 403
+          unless once
+            once = true
+            fn = ->
+              cb("expiredUrl")
+              return
+            setTimeout fn, 2000
+        if resp.statusCode >= 500
+          unless once
+            fn = ->
+              cb(500)
+        return
+      .on 'error', (err)->
         unless once
           once = true
-          fn = ->
-            cb("expiredUrl")
-            return
-          setTimeout fn, 2000
-      if resp.statusCode >= 500
-        unless once
-          fn = ->
-            cb(500)
-      return
-    .on 'error', (err)->
-      unless once
-        once = true
-        console.log "error"
-        console.log err
-        console.log err.code
-        if err.code == "EMFILE"
-          logger.debug "There was an error with downloading files: EMFILE"
-          logger.debug err
-          openedFiles.forEach (value, key) ->
-            clearTimeout(value.to)
-            fs.close value.fd, ->
+          console.log "error"
+          console.log err
+          console.log err.code
+          if err.code == "EMFILE"
+            logger.debug "There was an error with downloading files: EMFILE"
+            logger.debug err
+            openedFiles.forEach (value, key) ->
+              clearTimeout(value.to)
+              fs.close value.fd, ->
+                return
               return
-            return
 
 
-        cb(err)
-      return
-    .pipe(
-      fs.createWriteStream(saveLocation)
-    ).on 'close', ->
-      unless once
-        once = true
-        cb(null)
-      return
+          cb(err)
+        return
+      .pipe( fs.createWriteStream(saveLocation) )
+      .on 'error', (err)->
+        logger.error "There was an error with piping during the download"
+        logger.error err
+        GFile.download(url, start,end, size, saveLocation, cb )
+        return        
+      .on 'close', ->
+        unless once
+          once = true
+          cb(null)
+        return
+    catch e:
+      logger.error "There was an uncaught error while downloading"
+      logger.error e
     
 
     return
