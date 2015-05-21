@@ -390,7 +390,11 @@ parseChanges = (items) ->
         if idx >= 0
           parent.children.splice(idx, 1)
       else
-        logger.debug "processing a file that was marked as deleted, but not preset in the inodeTree: #{i.file.title} with id #{i.file.id}"
+        try
+          logger.debug "processing a file that was marked as deleted, but not preset in the inodeTree: #{i.file.title} with id #{i.file.id}"
+        catch e
+          logger.debug "processfile a file that was marked as deleted but not present in the inodeTree"
+          logger.debug i
       continue
 
     cfile = i.file #changed file
