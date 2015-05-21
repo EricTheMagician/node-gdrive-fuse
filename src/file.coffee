@@ -50,9 +50,24 @@ openedFiles = new hashmap()
 downloadTree = new hashmap()
 buf0 = new Buffer(0)
 
+closeAllOpenedFiles = ->
+  openedFiles.forEach (value, key) ->
+    clearTimeout(value.to)
+    fs.close value.fd, (err) ->
+      if err
+        logger.debug "There was an error closing file #{key}"
+        logger.debug value
+      else
+        openedFiles.remove key
+      return
+    return
+  return
+
+
 ######################################
 ######### Create File Class ##########
 ######################################
+
 
 class GFile extends EventEmitter
 
@@ -99,12 +114,7 @@ class GFile extends EventEmitter
           if err.code == "EMFILE"
             logger.debug "There was an error with downloading files: EMFILE"
             logger.debug err
-            openedFiles.forEach (value, key) ->
-              clearTimeout(value.to)
-              fs.close value.fd, ->
-                return
-              return
-
+            closeAllOpenedFiles()
 
           cb(err)
         this.end()          
@@ -114,6 +124,10 @@ class GFile extends EventEmitter
         .on 'error', (err) ->        
           logger.error "There was an error with writing during the download"
           logger.error err
+          if err.code == "EMFILE"
+            logger.debug "There was an error with downloading files: EMFILE"
+            logger.debug err
+            closeAllOpenedFiles()
           cb(err)
           this.end()
           return        
@@ -121,6 +135,10 @@ class GFile extends EventEmitter
       .on 'error', (err) ->        
         logger.error "There was an error with piping during the download"
         logger.error err
+        if err.code == "EMFILE"
+          logger.debug "There was an error with downloading files: EMFILE"
+          logger.debug err
+          closeAllOpenedFiles()
         cb(err)
         this.end()
         return        
