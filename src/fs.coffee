@@ -795,9 +795,11 @@ resumeUpload = ->
       #if it wasn't released by the filesystem, it means that the file was not finished transfering
       if value.released
         parentInode = idToInode.get( file.parentid )
+        value.uploading = false
         if inodeTree.has parentInode
           parent = inodeTree.get parentInode
           if parent instanceof GFolder
+            inodeTree.set key, value
             q.push (cb) ->
               parent.upload file.name, inode, uploadCallback(inode,cb)
               return
