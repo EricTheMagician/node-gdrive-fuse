@@ -210,6 +210,9 @@ class GFile extends EventEmitter
     fn = ->
       if openedFiles.has("#{file.id}-#{start}")
         fs.close openedFiles.get("#{file.id}-#{start}").fd, (err) ->
+          if err
+            logger.error "There was an error with closing file #{file.name}"
+            logger.error err
           openedFiles.remove "#{file.id}-#{start}"
           return
       return   
