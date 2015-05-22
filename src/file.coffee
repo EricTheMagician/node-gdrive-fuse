@@ -51,7 +51,8 @@ downloadTree = new hashmap()
 buf0 = new Buffer(0)
 
 closeAllOpenedFiles = ->
-  openedFiles.forEach (value, key) ->
+  for key in openedFiles.keys()
+    value = openedFiles.get key
     clearTimeout(value.to)
     fs.close value.fd, (err) ->
       if err
