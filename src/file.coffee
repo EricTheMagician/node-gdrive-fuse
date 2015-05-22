@@ -238,10 +238,12 @@ class GFile extends EventEmitter
             fd = fs.open path, 'r', (err,fd) ->
               if err
                 if err.code == "EMFILE"
-                  for o in openedFiles.values()
+                  for key in openedFiles.keys()
+                    o = openedFiles.get key
                     clearTimeout o.to
                     fs.close o.fd, ->
                       return
+                    openedFiles.remove key
                   file.open(start, cb)
                 else
                   logger.error "there was an handled error while opening files for reading"
