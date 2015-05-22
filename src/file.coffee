@@ -89,7 +89,17 @@ class GFile extends EventEmitter
         "Authorization": "Bearer #{config.accessToken.access_token}"
         "Range": "bytes=#{start}-#{end}"
 
-    ws = null
+    ws = fs.createWriteStream(saveLocation) 
+    ws.on 'error', (err) ->        
+      logger.error "There was an error with writing during the download"
+      logger.error err
+      if err.code == "EMFILE"
+        logger.debug "There was an error with downloading files: EMFILE"
+        logger.debug err
+        closeAllOpenedFiles()
+      cb(err)
+      this.end()
+      return        
     once = false
     try    
       request(options)
@@ -118,20 +128,11 @@ class GFile extends EventEmitter
             closeAllOpenedFiles()
 
           cb(err)
-        this.end()          
+        this.end()     
+        ws.end()     
         return
       .pipe( 
-        fs.createWriteStream(saveLocation) 
-        .on 'error', (err) ->        
-          logger.error "There was an error with writing during the download"
-          logger.error err
-          if err.code == "EMFILE"
-            logger.debug "There was an error with downloading files: EMFILE"
-            logger.debug err
-            closeAllOpenedFiles()
-          cb(err)
-          this.end()
-          return        
+        ws
       )
       .on 'error', (err) ->        
         logger.error "There was an error with piping during the download"
@@ -142,16 +143,19 @@ class GFile extends EventEmitter
           closeAllOpenedFiles()
         cb(err)
         this.end()
+        ws.end()
         return        
       .on 'close', ->
         unless once
           once = true
+          ws.end()
           cb(null)
         return
       return
     catch e
       logger.error "There was an uncaught error while downloading"
       logger.error e
+      ws.end()
     
 
     return
@@ -248,7 +252,6 @@ class GFile extends EventEmitter
                 else
                   logger.error "there was an handled error while opening files for reading"
                 return
-
 
               openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
               cb null, fd
