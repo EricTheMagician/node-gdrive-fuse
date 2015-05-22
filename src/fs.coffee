@@ -250,8 +250,11 @@ class GDriveFS extends fuse.FileSystem
     # logger.log "silly", "reading file #{path} - #{offset}:#{len}"
 
     if inodeTree.has(inode)
+      once = false
       callback = (dataBuf) ->
-        reply.buffer(dataBuf, dataBuf.length)
+        unless once
+          once = true
+          reply.buffer(dataBuf, dataBuf.length)
         return
 
       #make sure that we are only reading a file
