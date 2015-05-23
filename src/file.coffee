@@ -239,7 +239,7 @@ class GFile extends EventEmitter
             cb err,false
             return
           if stats.size == (end - start + 1)
-            fd = fs.open path, 'r', (err,fd) ->
+            fs.open path, 'r', (err,fd) ->
               if err
                 if err.code == "EMFILE"
                   for key in openedFiles.keys()
@@ -252,7 +252,12 @@ class GFile extends EventEmitter
                 else
                   logger.error "there was an handled error while opening files for reading"
                 return
-
+              #make sure that there's only one file opened
+              if openedFiles.has "#{file.id}-#{start}"
+                cb null, openedFiles.get("#{file.id}-#{start}").fd
+                fs.close fd, ->
+                  return
+                return
               openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
               cb null, fd
               return
