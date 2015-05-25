@@ -220,7 +220,7 @@ class GFile extends EventEmitter
           openedFiles.remove "#{file.id}-#{start}"
           return
       return   
-    cacheTimeout = 3000    
+    cacheTimeout = 6000    
     if openedFiles.has( "#{file.id}-#{start}")
       f = openedFiles.get "#{file.id}-#{start}"
       clearTimeout(f.to)
@@ -254,7 +254,12 @@ class GFile extends EventEmitter
                 return
               #make sure that there's only one file opened
               if openedFiles.has "#{file.id}-#{start}"
-                cb null, openedFiles.get("#{file.id}-#{start}").fd
+                file = openedFiles.get("#{file.id}-#{start}")
+
+                clearTimeout file.to
+                file.to = setTimeout(fn, cacheTimeout)
+
+                cb null, file.fd
                 fs.close fd, ->
                   return
                 return
