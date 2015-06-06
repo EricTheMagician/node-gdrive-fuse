@@ -649,6 +649,55 @@ class GDriveFS extends fuse.FileSystem
     reply.err(0);
     return
 
+  rename: (context, oldParentInode, oldName, newParentInode, newName, reply) ->    
+    #find the currrent child
+    parent = inodeTree.get oldParentInode
+    unless parent
+      reply.err PosixError.ENOENT
+      return
+
+    for childInode in parent.children
+      child = inodeTree.get childInode
+      if child.name == oldName
+        #move to new folder if required
+        params = 
+          resource:
+            title: newName
+          fileId: child.id
+          modifiedDate: true
+        if newParentInode != oldParentInode
+          newParent = inodeTree.get newParentInode
+          unless newParent
+            reply.err PosixError.ENOENT
+            return
+          unless newParent instanceof GFolder
+            reply.err PosixError.ENOTDIR
+            return
+          params.addParents = newParentInode.id
+          params.removeParents =  parent.id
+
+        child.name = newName
+        console.log "before google api"
+        drive.files.patch params, (err)->
+          console.log "after google api"
+          if err
+            logger.error "There was an error with renaming file #{child.name}"
+            logger.error err
+            reply.err PosixError.EIO
+            return
+          reply.err 0
+          if newParentInode != oldParentInode
+            newParent.children.push childInode
+            oldParent.children.splice( oldParent.children.indexOf(childInode), 1 )
+          return
+
+
+
+        return
+
+    #if we get here, it means there was no child found
+    reply.err PosixError.ENOENT
+    return
   lookup: (context, parentInode, name, reply) ->
 
       #make sure the parent inode exists
