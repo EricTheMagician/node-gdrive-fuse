@@ -4,7 +4,7 @@ hashmap = require( 'hashmap' ).HashMap
 winston = require 'winston'
 {EventEmitter} = require 'events'
 request = require 'request'
-
+sqlite3 = require 'sqlite3'
 ######################################
 ######### Setup File Config ##########
 ######################################
@@ -16,7 +16,9 @@ else
 config.cacheLocation ||=  '/tmp/cache'
 
 #setup cache size monitoring
+db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
 totalDownloadSize = 0
+regexPattern = ///^[a-zA-Z0-9]*-([0-9]*)-([0-9]*)$///
 if config.maxCacheSize
   maxCache =  config.maxCacheSize * 1024 * 1024
 else

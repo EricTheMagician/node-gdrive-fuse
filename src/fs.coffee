@@ -324,7 +324,7 @@ class GDriveFS extends fuse.FileSystem
 
         for childInode in parent.children #make sure that the child doesn't already exist
           child = inodeTree.get childInode
-          if child.name == name
+          if child and child.name == name
             reply.err errnoMap.EEXIST
             return
         folder =
