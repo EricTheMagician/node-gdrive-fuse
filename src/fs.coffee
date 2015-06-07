@@ -21,6 +21,7 @@ saveUploadTree = folder.saveUploadTree
 f = require("./file");
 logger = f.logger
 GFile = f.GFile
+addNewFile = f.addNewFile
 queue = require 'queue'
 
 {exec} = require('child_process')
@@ -734,11 +735,12 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
   savePath = pth.join(config.cacheLocation, 'download', "#{file.id}-#{start}-#{end}");
   rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
   wstream = fs.createWriteStream(savePath)
-  rstream.pipe(wstream)
 
   rstream.on 'end',  ->        
+    addNewFile("#{file.id}-#{start}-#{end}", 'downloading', end-start + 1)
+  
     start += GFile.chunkSize
-
+    wstream.end()
     if start < file.size
       moveToDownload(file, fd, uploadedFileLocation, start, cb)
       return
@@ -755,6 +757,7 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
       return
     return
 
+  rstream.pipe(wstream)
   return
 
 #function to create a callback for file uploading
@@ -856,6 +859,7 @@ resumeUpload = ->
               parent.upload file.name, inode, uploadCallback(inode,cb)
               return
             q.start()
+            return
           else
             logger.debug "While resuming uploads, #{parent} was not a folder"
         return

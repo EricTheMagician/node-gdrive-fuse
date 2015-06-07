@@ -14,6 +14,17 @@ else
   config = {}
 
 config.cacheLocation ||=  '/tmp/cache'
+
+#setup cache size monitoring
+totalDownloadSize = 0
+if config.maxCacheSize
+  maxCache =  config.maxCacheSize * 1024 * 1024
+else
+  console.log "max cache size was not set. you should exit and manually set it"
+  console.log "defaulting to a 10 GB cache"
+  maxCache  = 10737418240
+
+
 #download location
 downloadLocation = pth.join config.cacheLocation, 'download'
 fs.ensureDirSync downloadLocation
@@ -111,10 +122,12 @@ class GFile extends EventEmitter
               cb("expiredUrl")
               return
             setTimeout fn, 2000
+          ws.end()
         if resp.statusCode >= 500
           unless once
             fn = ->
               cb(500)
+          ws.end()
         return
       .on 'error', (err)->
         unless once
@@ -149,6 +162,12 @@ class GFile extends EventEmitter
         unless once
           once = true
           ws.end()
+          base = pth.basename(saveLocation)
+          chunkSize = end-start + 1
+          totalDownloadSize += chunkSize
+          db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{base}', #{Date.now()}, 'downloading', #{chunkSize})"
+          if totalDownloadSize > 0.95*maxCacheSize
+            delete_files()
           cb(null)
         return
       return
@@ -255,14 +274,15 @@ class GFile extends EventEmitter
               #make sure that there's only one file opened
               if openedFiles.has "#{file.id}-#{start}"
                 file = openedFiles.get("#{file.id}-#{start}")
-
                 clearTimeout file.to
-                file.to = setTimeout(fn, cacheTimeout)
+
 
                 cb null, file.fd
                 fs.close fd, ->
                   return
                 return
+
+                file.to = setTimeout(fn, cacheTimeout)
               openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
               cb null, fd
               return
@@ -451,4 +471,116 @@ class GFile extends EventEmitter
 
     return
 
+#### prevent download folder from getting too big
+initialize_path = (path, type) ->
+  fs.readdir path, (err, files) ->
+    files.forEach (file) ->
+      expectedSize = file.match(regexPattern)
+      if(expectedSize != null)
+        size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+        cmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', 0, '#{type}', #{size})"
+        # db.run cmd, (err) ->
+        db.get "SELECT * FROM files WHERE name='#{file}'", (err,rows) ->
+          if err
+            console.log "init path"
+            console.log err
+            return
+          unless rows
+            db.run cmd, (err) ->
+              if err
+                console.log "init run path"
+                console.log err
+                return
+
+              totalDownloadSize += size
+              # console.log "#{file} totalDownloadSize: #{totalDownloadSize}"
+              return
+          return
+
+
+      return
+      # path2 = pth.join(path,file)
+      # q.push queue_fn(path2,file, type)
+      # q.start()
+      # queue_fn(path2,file, type)
+    return
+  return
+      #   fs.readdir downloadLocation, (err, downloadFiles) ->
+
+      #     downloadFiles = (pth.join(downloadLocation,file) for file in downloadFiles)
+      #     logger.silly "finished parsing uploading files"
+      #     async.map downloadFiles, memoizeStat, (err, stats) ->
+      #       unless stats.length == 0
+      #         for stat in stats
+      #           if stat
+      #             totalDownloadSize += stat.size
+      #             logger.silly totalDownloadSize
+
+      #       logger.silly "total download size is #{totalDownloadSize}"
+
+      #       totalSize = totalUploadSize + totalDownloadSize
+      #       logger.silly "total size is #{totalSize}"
+
+      #       if totalSize > maxCache
+      #         #assume that files and stats are from the download directory
+      #         all = zip(downloadFiles,stats)
+      #         all.sort(sortStats)
+      #         logger.debug "Watcher: event #{event} triggered by #{filename} - totalSize: #{totalSize}) - maxCacheSize #{maxCache}"
+      #       else
+      #         logger.silly "totalSize was less than maxCache"
+      #         locked = false
+      #         return
+
+
+      #       for info in all
+      #         if totalSize < 0.9*maxCache
+      #           locked = false
+      #           return
+      #         totalSize -= info[1].size
+      #         path = pth.join(info[0])
+      #         delete memoizeStat.memo[info[0]]
+      #         logger.silly "deleting #{path}"
+      #         fs.unlinkSync(path)
+      #       locked = false
+      #       return
+      #     return
+      #   return
+      # return
+
+initialize_db = ->
+  db.all "SELECT * from files", (err, rows) ->
+    for row in rows
+      if row.type == "downloading"
+        totalDownloadSize += row.size
+      else if row.type == "uploading"
+        totalUploadSize += row.size
+    console.log(totalDownloadSize)
+
+delete_files = ->
+  db.all "SELECT * from files ORDER BY atime, size ASC", (err, rows) ->
+    for row in rows
+      if row.type == "downloading"
+        if totalDownloadSize >= (0.9*maxCache)
+          totalDownloadSize -= row.size
+          fs.unlink pth.join(downloadLocation, row.name), ()->
+            return
+          db.run("DELETE FROM files WHERE name='#{row.name}'")
+        else
+          return
+
+    return
+  return
+
+addNewFile = (file, type, size)->
+  db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', #{Date.now()}, '#{type}', #{size})"
+
+
+db.run  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT, atime INT)", (err) ->
+  if err
+    console.log err
+  console.log "Created database"
+  initialize_db()
+  initialize_path downloadLocation, "downloading"
+
 module.exports.GFile = GFile
+module.exports.addNewFile = addNewFile
