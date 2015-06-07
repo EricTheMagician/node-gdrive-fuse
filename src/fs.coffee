@@ -167,6 +167,7 @@ class GDriveFS extends fuse.FileSystem
     return
 
   open: (context, inode, fileInfo, reply) ->
+    self = @
     flags = fileInfo.flags
     if flags.rdonly #read only
       if inodeTree.has(inode)
@@ -175,7 +176,12 @@ class GDriveFS extends fuse.FileSystem
           if file.downloadUrl #make sure that the file has been fully uploaded
             reply.open(fileInfo)
           else
-            reply.err errnoMap.EACCESS
+            #wait for filesystem to finish uploading file and retry again
+            fn = ->
+              @open(context,inode,fileInfo,reply)
+              return
+            setTimeout(fn,15457)
+
         else
           reply.errerrnoMap.EISDIR
       else
@@ -885,8 +891,8 @@ start = ->
       logger.log "info", 'attempting to start f4js'
       switch os.type()
         when 'Linux' 
-          add_opts = []
-          command = "fusermount -u #{config.mountPoint}"          
+          add_opts = ["-o", "allow_other", ]
+          command = "umount -f #{config.mountPoint}"          
         when 'Darwin'
           add_opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc"]
           command = "diskutil umount force #{config.mountPoint}"
