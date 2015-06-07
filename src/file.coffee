@@ -4,7 +4,6 @@ hashmap = require( 'hashmap' ).HashMap
 winston = require 'winston'
 {EventEmitter} = require 'events'
 request = require 'request'
-sqlite3 = require 'sqlite3'
 ######################################
 ######### Setup File Config ##########
 ######################################
@@ -16,7 +15,10 @@ else
 config.cacheLocation ||=  '/tmp/cache'
 
 #setup cache size monitoring
+sqlite3 = require 'sqlite3'
+queue = require 'queue'
 db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
+q = queue({concurrency: 1, timeout: 7200000 })
 totalDownloadSize = 0
 regexPattern = ///^[a-zA-Z0-9]*-([0-9]*)-([0-9]*)$///
 if config.maxCacheSize
@@ -168,7 +170,7 @@ class GFile extends EventEmitter
           chunkSize = end-start + 1
           totalDownloadSize += chunkSize
           db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{base}', #{Date.now()}, 'downloading', #{chunkSize})"
-          if totalDownloadSize > 0.95*maxCacheSize
+          if totalDownloadSize > 0.95*maxCache
             delete_files()
           cb(null)
         return
@@ -474,33 +476,47 @@ class GFile extends EventEmitter
     return
 
 #### prevent download folder from getting too big
+queue_fn = (size, cmd) ->
+  fn = (done) ->
+    db.run cmd, (err) ->
+      if err
+        console.log "init run path"
+        console.log err
+        done()
+        return
+
+      totalDownloadSize += size
+      console.log "totalDownloadSize: #{totalDownloadSize}"
+      done()
+      return
+  return fn
 initialize_path = (path, type) ->
   fs.readdir path, (err, files) ->
-    files.forEach (file) ->
+    count = 0
+    totalSize = 0
+    basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
+    cmd = basecmd
+    for file in files
       expectedSize = file.match(regexPattern)
       if(expectedSize != null)
         size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
-        cmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', 0, '#{type}', #{size})"
-        # db.run cmd, (err) ->
-        db.get "SELECT * FROM files WHERE name='#{file}'", (err,rows) ->
-          if err
-            console.log "init path"
-            console.log err
-            return
-          unless rows
-            db.run cmd, (err) ->
-              if err
-                console.log "init run path"
-                console.log err
-                return
+        cmd += "('#{file}', 0, '#{type}', #{size})"        
+        count += 1
+        totalSize += size
 
-              totalDownloadSize += size
-              # console.log "#{file} totalDownloadSize: #{totalDownloadSize}"
-              return
-          return
+        if count > 15
+          q.push queue_fn(size, cmd)
+          q.start()
+          count = 0
+          totalSize = 0
+          cmd = basecmd
+        else
+          cmd += ','
+
+          # return
 
 
-      return
+      
       # path2 = pth.join(path,file)
       # q.push queue_fn(path2,file, type)
       # q.start()
@@ -574,14 +590,19 @@ delete_files = ->
   return
 
 addNewFile = (file, type, size)->
-  db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', #{Date.now()}, '#{type}', #{size})"
-
+  # db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', #{Date.now()}, '#{type}', #{size})", ->
+  #   totalDownloadSize += size
+  #   console.log totalDownloadSize
+  cmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', #{Date.now()}, '#{type}', #{size})"
+  q.push queue_fn(size,cmd)
+  q.start()
+  return
 
 db.run  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT, atime INT)", (err) ->
   if err
     console.log err
   console.log "Created database"
-  initialize_db()
+  # initialize_db()
   initialize_path downloadLocation, "downloading"
 
 module.exports.GFile = GFile
