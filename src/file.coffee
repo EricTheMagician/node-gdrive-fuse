@@ -24,8 +24,8 @@ regexPattern = ///^[a-zA-Z0-9]*-([0-9]*)-([0-9]*)$///
 if config.maxCacheSize
   maxCache =  config.maxCacheSize * 1024 * 1024
 else
-  console.log "max cache size was not set. you should exit and manually set it"
-  console.log "defaulting to a 10 GB cache"
+  logger.info "max cache size was not set. you should exit and manually set it"
+  logger.info "defaulting to a 10 GB cache"
   maxCache  = 10737418240
 
 
@@ -136,9 +136,9 @@ class GFile extends EventEmitter
       .on 'error', (err)->
         unless once
           once = true
-          console.log "error"
-          console.log err
-          console.log err.code
+          logger.error "error"
+          logger.error err
+          logger.error err.code
           if err.code == "EMFILE"
             logger.debug "There was an error with downloading files: EMFILE"
             logger.debug err
@@ -168,10 +168,7 @@ class GFile extends EventEmitter
           ws.end()
           base = pth.basename(saveLocation)
           chunkSize = end-start + 1
-          totalDownloadSize += chunkSize
-          db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{base}', #{Date.now()}, 'downloading', #{chunkSize})"
-          if totalDownloadSize > 0.95*maxCache
-            delete_files()
+          addNewFile(base,'downloading', chunkSize )
           cb(null)
         return
       return
@@ -480,13 +477,15 @@ queue_fn = (size, cmd) ->
   fn = (done) ->
     db.run cmd, (err) ->
       if err
-        console.log "init run path"
-        console.log err
+        logger.error "init run path - #{cmd}"
+        logger.error err
         done()
         return
 
       totalDownloadSize += size
-      console.log "totalDownloadSize: #{totalDownloadSize}"
+      if totalDownloadSize > 0.95*maxCache
+        delete_files()
+      logger.silly "totalDownloadSize: #{totalDownloadSize}"
       done()
       return
   return fn
@@ -504,75 +503,24 @@ initialize_path = (path, type) ->
         count += 1
         totalSize += size
 
-        if count > 15
-          q.push queue_fn(size, cmd)
-          q.start()
+        if count > 250
+          q.push queue_fn(totalSize, cmd)
           count = 0
           totalSize = 0
           cmd = basecmd
         else
           cmd += ','
 
-          # return
+    #Make sure the queue is empty
+    if count > 0
+      q.push queue_fn(totalSize, cmd.slice(0,-1)) #remove the last comma
+      count = 0
+      totalSize = 0
+      cmd = basecmd
 
-
-      
-      # path2 = pth.join(path,file)
-      # q.push queue_fn(path2,file, type)
-      # q.start()
-      # queue_fn(path2,file, type)
+    q.start()
     return
   return
-      #   fs.readdir downloadLocation, (err, downloadFiles) ->
-
-      #     downloadFiles = (pth.join(downloadLocation,file) for file in downloadFiles)
-      #     logger.silly "finished parsing uploading files"
-      #     async.map downloadFiles, memoizeStat, (err, stats) ->
-      #       unless stats.length == 0
-      #         for stat in stats
-      #           if stat
-      #             totalDownloadSize += stat.size
-      #             logger.silly totalDownloadSize
-
-      #       logger.silly "total download size is #{totalDownloadSize}"
-
-      #       totalSize = totalUploadSize + totalDownloadSize
-      #       logger.silly "total size is #{totalSize}"
-
-      #       if totalSize > maxCache
-      #         #assume that files and stats are from the download directory
-      #         all = zip(downloadFiles,stats)
-      #         all.sort(sortStats)
-      #         logger.debug "Watcher: event #{event} triggered by #{filename} - totalSize: #{totalSize}) - maxCacheSize #{maxCache}"
-      #       else
-      #         logger.silly "totalSize was less than maxCache"
-      #         locked = false
-      #         return
-
-
-      #       for info in all
-      #         if totalSize < 0.9*maxCache
-      #           locked = false
-      #           return
-      #         totalSize -= info[1].size
-      #         path = pth.join(info[0])
-      #         delete memoizeStat.memo[info[0]]
-      #         logger.silly "deleting #{path}"
-      #         fs.unlinkSync(path)
-      #       locked = false
-      #       return
-      #     return
-      #   return
-      # return
-
-initialize_db = ->
-  db.all "SELECT * from files", (err, rows) ->
-    for row in rows
-      if row.type == "downloading"
-        totalDownloadSize += row.size
-      else if row.type == "uploading"
-        totalUploadSize += row.size
-    console.log(totalDownloadSize)
 
 delete_files = ->
   db.all "SELECT * from files ORDER BY atime, size ASC", (err, rows) ->
@@ -600,8 +548,8 @@ addNewFile = (file, type, size)->
 
 db.run  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT, atime INT)", (err) ->
   if err
-    console.log err
-  console.log "Created database"
+    logger.log err
+  logger.info "Opened a connection to the database"
   # initialize_db()
   initialize_path downloadLocation, "downloading"
 
