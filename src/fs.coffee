@@ -178,7 +178,7 @@ class GDriveFS extends fuse.FileSystem
           else
             #wait for filesystem to finish uploading file and retry again
             fn = ->
-              @open(context,inode,fileInfo,reply)
+              self.open(context,inode,fileInfo,reply)
               return
             setTimeout(fn,15457)
 
