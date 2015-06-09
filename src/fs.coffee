@@ -750,15 +750,28 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
       moveToDownload(file, fd, uploadedFileLocation, start, cb)
       return
     fs.close fd, (err) ->
-      cmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
       start = 0
       end = Math.min(start + GFile.chunkSize, file.size)-1
 
-      while end < file.size      
-        cmd += "('#{file.id}-#{start}-#{end}',#{Date.now()},'downloading',#{end-start+1}),"
+      totalSize = 0
+      count = 0
+      basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
+      cmd = basecmd
+      while start < file.size      
+        size = end - start + 1
+        count += 1
+        totalSize += size
+        if count > 750
+          cmd += "('#{file.id}-#{start}-#{end}',#{Date.now()},'downloading',#{size})"
+          queue_fn(totalSize, cmd)()
+          cmd = basecmd
+          count = 0
+          totalSize = 0
+        else
+          cmd += "('#{file.id}-#{start}-#{end}',#{Date.now()},'downloading',#{size}),"
         start += GFile.chunkSize
         end = Math.min(start + GFile.chunkSize, file.size)-1
-      queue_fn(file.size,cmd.slice(0,-1))()
+      queue_fn(totalSize,cmd.slice(0,-1))()
       if err
         logger.debug "unable to close file after transffering #{uploadedFile}"
         cb()
