@@ -499,6 +499,8 @@ initialize_path = (path, type) ->
       expectedSize = file.match(regexPattern)
       if(expectedSize != null)
         size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+        if size == 0
+          logger.debug "expectedSize for #{file} is 0. #{expectedSize}"
         cmd += "('#{file}', 0, '#{type}', #{size})"        
         count += 1
         totalSize += size
@@ -509,7 +511,11 @@ initialize_path = (path, type) ->
           totalSize = 0
           cmd = basecmd
         else
-          cmd += ','
+          cmd += ','          
+      else
+        logger.debug "expectedSize is null for this file: #{file}"
+
+
 
     #Make sure the queue is empty
     if count > 0
@@ -537,8 +543,10 @@ _delete_files_ = (start,end, rows) ->
   row = rows[end]
   count = end - start + 1
   if totalDownloadSize >= (0.8*maxCache)
-    totalDownloadSize -= row.size
-    fs.unlink pth.join(downloadLocation, row.name), () ->
+    fs.unlink pth.join(downloadLocation, row.name), (err) ->
+      unless err
+        totalDownloadSize -= row.size
+
       if count > 200
         cmd = "DELETE FROM files WHERE name in ("
         for row in rows[start...end]         
@@ -573,7 +581,7 @@ _delete_files_ = (start,end, rows) ->
           delete_once = false
         else
           _delete_files_(end, end, rows)
-        return
+      return
   else
     if end > start
       cmd = "DELETE FROM files WHERE name in ("
@@ -585,8 +593,11 @@ _delete_files_ = (start,end, rows) ->
         if err
           logger.error "There was an error with database while final deleting files"
           logger.error err
-        delete_once = false
         return
+    logger.info "finished deleting files"
+    logger.info "current size of cache is: #{totalDownloadSize/1024/1024} GB"
+    delete_once = false
+
 
   return
 
