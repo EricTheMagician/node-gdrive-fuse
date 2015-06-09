@@ -607,7 +607,7 @@ class GDriveFS extends fuse.FileSystem
           else          
             uploadTree.remove inode
           saveUploadTree()      
-          
+
           return
         return
 
@@ -752,7 +752,8 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
     fs.close fd, (err) ->
       start = 0
       end = Math.min(start + GFile.chunkSize, file.size)-1
-
+      done = ->
+        return
       totalSize = 0
       count = 0
       basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
@@ -763,7 +764,7 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
         totalSize += size
         if count > 750
           cmd += "('#{file.id}-#{start}-#{end}',#{Date.now()},'downloading',#{size})"
-          queue_fn(totalSize, cmd)()
+          queue_fn(totalSize, cmd)(done)
           cmd = basecmd
           count = 0
           totalSize = 0
@@ -771,7 +772,7 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
           cmd += "('#{file.id}-#{start}-#{end}',#{Date.now()},'downloading',#{size}),"
         start += GFile.chunkSize
         end = Math.min(start + GFile.chunkSize, file.size)-1
-      queue_fn(totalSize,cmd.slice(0,-1))()
+      queue_fn(totalSize,cmd.slice(0,-1))(done)
       if err
         logger.debug "unable to close file after transffering #{uploadedFile}"
         cb()
