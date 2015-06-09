@@ -483,7 +483,7 @@ queue_fn = (size, cmd) ->
         return
 
       totalDownloadSize += size
-      if totalDownloadSize > 0.95*maxCache
+      if totalDownloadSize > 0.90*maxCache
         delete_files()
       logger.silly "totalDownloadSize: #{totalDownloadSize}"
       done()
@@ -503,7 +503,7 @@ initialize_path = (path, type) ->
         count += 1
         totalSize += size
 
-        if count > 250
+        if count > 750
           q.push queue_fn(totalSize, cmd)
           count = 0
           totalSize = 0
@@ -521,21 +521,72 @@ initialize_path = (path, type) ->
     q.start()
     return
   return
-
-delete_files = ->
-  db.all "SELECT * from files ORDER BY atime, size ASC", (err, rows) ->
-    for row in rows
-      if row.type == "downloading"
-        if totalDownloadSize >= (0.9*maxCache)
-          totalDownloadSize -= row.size
-          fs.unlink pth.join(downloadLocation, row.name), ()->
-            return
-          db.run("DELETE FROM files WHERE name='#{row.name}'")
-        else
-          return
-
+delete_once = false
+delete_files = ->  
+  delete_once = true
+  unless delete_once
+    logger.debug "deleting files"
+    db.all "SELECT * from files ORDER BY atime, size ASC", (err, rows) ->
+      _delete_files_(0,0,rows)
     return
   return
+
+_delete_files_ = (start,end, rows) ->
+  row = rows[end]
+  count = end - start + 1
+  if totalDownloadSize >= (0.8*maxCache)
+    totalDownloadSize -= row.size
+    fs.unlink pth.join(downloadLocation, row.name), () ->
+      if count > 200
+        cmd = "DELETE FROM files WHERE name in ("
+        for row in rows[start...end]         
+          cmd += "'#{row.name}',"
+        cmd += "'#{rows[end].name}')"
+      
+        db.run cmd, (err) ->
+          if err
+            logger.error "There was an error with database while deleting files"
+            logger.err err
+            delete_once = false
+            logger.debug "finished deleting files"
+            return
+
+          end += 1
+          if end == rows.length
+            logger.debug "finished deleting files"
+            delete_once = false
+          else
+            _delete_files_(end, end, rows)
+          return
+
+
+      else 
+        end += 1
+        if end == rows.length
+          delete_once = false
+          logger.debug "finished deleting files"
+        else
+          _delete_files_(end, end, rows)
+        return
+  else
+    if end > start
+      cmd = "DELETE FROM files WHERE name in ("
+      for row in rows[start...end]         
+        cmd += "'#{row.name}',"
+      cmd += "'#{rows[end].name}')"
+      
+      db.run cmd, (err) ->
+        if err
+          logger.error "There was an error with database while final deleting files"
+          logger.error err
+        delete_once = false
+        return
+
+  return
+
+
+
+
 
 addNewFile = (file, type, size)->
   # db.run "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES ('#{file}', #{Date.now()}, '#{type}', #{size})", ->
@@ -555,3 +606,4 @@ db.run  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT,
 
 module.exports.GFile = GFile
 module.exports.addNewFile = addNewFile
+module.exports.queue_fn = queue_fn

@@ -22,6 +22,7 @@ f = require("./file");
 logger = f.logger
 GFile = f.GFile
 addNewFile = f.addNewFile
+queue_fn = f.queue_fn
 queue = require 'queue'
 
 {exec} = require('child_process')
@@ -139,7 +140,7 @@ class GDriveFS extends fuse.FileSystem
 
   setattr: (context, inode, attrs, reply) ->
     logger.debug "setting attr for #{inode}"
-    console.log attrs
+    logger.silly attrs
     file = inodeTree.get inode
     unless file
       reply.err errnoMap.ENOENT
@@ -734,7 +735,6 @@ class GDriveFS extends fuse.FileSystem
 
 
 
-    #recursively read and write streams
 moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
 
   end = Math.min(start + GFile.chunkSize, file.size)-1
@@ -743,7 +743,6 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
   wstream = fs.createWriteStream(savePath)
 
   rstream.on 'end',  ->        
-    addNewFile("#{file.id}-#{start}-#{end}", 'downloading', end-start + 1)
   
     start += GFile.chunkSize
     wstream.end()
@@ -751,6 +750,15 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
       moveToDownload(file, fd, uploadedFileLocation, start, cb)
       return
     fs.close fd, (err) ->
+      cmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
+      start = 0
+      end = Math.min(start + GFile.chunkSize, file.size)-1
+
+      while end < file.size      
+        cmd += "('#{file.id}-#{start}-#{end}',#{Date.now()},'downloading',#{end-start+1}),"
+        start += GFile.chunkSize
+        end = Math.min(start + GFile.chunkSize, file.size)-1
+      queue_fn(file.size,cmd.slice(0,-1))()
       if err
         logger.debug "unable to close file after transffering #{uploadedFile}"
         cb()
