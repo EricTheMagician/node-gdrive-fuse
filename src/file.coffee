@@ -523,9 +523,11 @@ initialize_path = (path, type) ->
   return
 delete_once = false
 delete_files = ->  
-  delete_once = true
   unless delete_once
-    logger.debug "deleting files"
+    delete_once = true
+    logger.info "deleting files to make space in the cache"
+    logger.info "current size of cache is: #{totalDownloadSize/1024/1024} GB"
+
     db.all "SELECT * from files ORDER BY atime, size ASC", (err, rows) ->
       _delete_files_(0,0,rows)
     return
@@ -548,12 +550,14 @@ _delete_files_ = (start,end, rows) ->
             logger.error "There was an error with database while deleting files"
             logger.err err
             delete_once = false
-            logger.debug "finished deleting files"
+            logger.info "finsihed deleting files by error"
+            logger.info "current size of cache is: #{totalDownloadSize/1024/1024} GB"
             return
 
           end += 1
           if end == rows.length
-            logger.debug "finished deleting files"
+            logger.info "finsihed deleting files by delelting all files"
+            logger.info "current size of cache is: #{totalDownloadSize/1024/1024} GB"
             delete_once = false
           else
             _delete_files_(end, end, rows)
@@ -563,8 +567,10 @@ _delete_files_ = (start,end, rows) ->
       else 
         end += 1
         if end == rows.length
+          logger.info "finsihed deleting files by delelting all files"
+          logger.debug "and then running the database cmd"
+          logger.info "current size of cache is: #{totalDownloadSize/1024/1024} GB"
           delete_once = false
-          logger.debug "finished deleting files"
         else
           _delete_files_(end, end, rows)
         return
