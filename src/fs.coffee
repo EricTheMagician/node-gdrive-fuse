@@ -606,8 +606,8 @@ class GDriveFS extends fuse.FileSystem
             q.start()
           else          
             uploadTree.remove inode
-            saveUploadTree()      
-
+          saveUploadTree()      
+          
           return
         return
 
