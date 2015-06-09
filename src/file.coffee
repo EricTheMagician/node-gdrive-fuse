@@ -20,7 +20,7 @@ queue = require 'queue'
 db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
 q = queue({concurrency: 1, timeout: 7200000 })
 totalDownloadSize = 0
-regexPattern = ///^[a-zA-Z0-9]*-([0-9]*)-([0-9]*)$///
+regexPattern = ///^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$///
 if config.maxCacheSize
   maxCache =  config.maxCacheSize * 1024 * 1024
 else
