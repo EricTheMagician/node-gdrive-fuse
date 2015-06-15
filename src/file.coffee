@@ -14,21 +14,6 @@ else
 
 config.cacheLocation ||=  '/tmp/cache'
 
-#setup cache size monitoring
-sqlite3 = require 'sqlite3'
-queue = require 'queue'
-db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
-q = queue({concurrency: 1, timeout: 7200000 })
-totalDownloadSize = 0
-regexPattern = ///^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$///
-if config.maxCacheSize
-  maxCache =  config.maxCacheSize * 1024 * 1024
-else
-  logger.info "max cache size was not set. you should exit and manually set it"
-  logger.info "defaulting to a 10 GB cache"
-  maxCache  = 10737418240
-
-
 #download location
 downloadLocation = pth.join config.cacheLocation, 'download'
 fs.ensureDirSync downloadLocation
@@ -59,6 +44,21 @@ logger = new (winston.Logger)({
 
 module.exports.logger = logger
 config.advancedChunks ||= 5
+
+#setup cache size monitoring
+sqlite3 = require 'sqlite3'
+queue = require 'queue'
+db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
+q = queue({concurrency: 1, timeout: 7200000 })
+totalDownloadSize = 0
+regexPattern = ///^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$///
+if config.maxCacheSize
+  maxCache =  config.maxCacheSize * 1024 * 1024
+else
+  logger.info "max cache size was not set. you should exit and manually set it"
+  logger.info "defaulting to a 10 GB cache"
+  maxCache  = 10737418240
+
 
 #opened files
 openedFiles = new hashmap()
