@@ -271,7 +271,9 @@ class GFile extends EventEmitter
                   file.open(start, cb)
                 else
                   logger.error "there was an handled error while opening files for reading"
+                  cb(err)
                 return
+              
               #make sure that there's only one file opened
               if openedFiles.has "#{file.id}-#{start}"
                 file = openedFiles.get("#{file.id}-#{start}")
@@ -281,9 +283,10 @@ class GFile extends EventEmitter
                 cb null, file.fd
                 fs.close fd, ->
                   return
-                return
 
                 file.to = setTimeout(fn, cacheTimeout)
+                return
+
               openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
               cb null, fd
               return
