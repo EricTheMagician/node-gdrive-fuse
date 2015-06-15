@@ -536,6 +536,7 @@ delete_files = ->
 
     db.all "SELECT * from files ORDER BY atime, size ASC", (err, rows) ->
       _delete_files_(0,0,rows)
+      return
     return
   return
 
@@ -545,6 +546,7 @@ _delete_files_ = (start,end, rows) ->
   if totalDownloadSize >= (0.8*maxCache)
     fs.unlink pth.join(downloadLocation, row.name), (err) ->
       unless err
+        #if there is an error, it usually is because there was a file that was in the db that was already deleted
         totalDownloadSize -= row.size
 
       if count > 200
