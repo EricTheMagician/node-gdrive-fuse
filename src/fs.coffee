@@ -175,16 +175,19 @@ class GDriveFS extends fuse.FileSystem
         file = inodeTree.get(inode)
         if file instanceof GFile
           if file.downloadUrl #make sure that the file has been fully uploaded
-            reply.open(fileInfo)
+            reply.open(fileInfo)            
           else
             #wait for filesystem to finish uploading file and retry again
-            fn = ->
-              self.open(context,inode,fileInfo,reply)
-              return
-            setTimeout(fn,15457)
+            reply.err PosixError.EACCESS
+          return  
+            # fn = ->
+            #   self.open(context,inode,fileInfo,reply)
+            #   return
+            # setTimeout(fn,15457)
 
         else
           reply.errerrnoMap.EISDIR
+          return
       else
         reply.err errnoMap.ENOENT
       return
