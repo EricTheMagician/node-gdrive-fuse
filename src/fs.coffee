@@ -178,7 +178,7 @@ class GDriveFS extends fuse.FileSystem
             reply.open(fileInfo)            
           else
             #wait for filesystem to finish uploading file and retry again
-            reply.err PosixError.EACCESS
+            reply.err PosixError.EACCES
           return  
             # fn = ->
             #   self.open(context,inode,fileInfo,reply)
