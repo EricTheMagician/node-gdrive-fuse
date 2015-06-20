@@ -340,6 +340,8 @@ class GFile extends EventEmitter
             return
           _readAheadFn()
         catch error
+          logger.error "There was an error while reading file. Retrying"
+          logger.error error
           file.read(start,end, readAhead, cb)
 
         return
