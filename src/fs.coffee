@@ -753,6 +753,9 @@ moveToDownload = (file, fd, uploadedFileLocation, start,cb) ->
       moveToDownload(file, fd, uploadedFileLocation, start, cb)
       return
     fs.close fd, (err) ->
+      if err
+        logger.error "There was an error closing file #{fd} - #{file.id} - #{file.name} after moving upload file to download"
+        logger.error err
       start = 0
       end = Math.min(start + GFile.chunkSize, file.size)-1
       done = ->

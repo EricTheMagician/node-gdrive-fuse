@@ -262,15 +262,10 @@ class GFile extends EventEmitter
             fs.open path, 'r', (err,fd) ->
               if err
                 if err.code == "EMFILE"
-                  for key in openedFiles.keys()
-                    o = openedFiles.get key
-                    clearTimeout o.to
-                    fs.close o.fd, ->
-                      return
-                    openedFiles.remove key
                   file.open(start, cb)
                 else
                   logger.error "there was an handled error while opening files for reading"
+                  logger.error
                   cb(err)
                 return
               
@@ -285,6 +280,7 @@ class GFile extends EventEmitter
                   return
 
                 file.to = setTimeout(fn, cacheTimeout)
+                openedFiles.set "#{file.id}-#{start}", file
                 return
 
               openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
@@ -324,6 +320,9 @@ class GFile extends EventEmitter
               __once__ = true
               file.removeListener 'downloaded', listenCallback
               #logger.silly "listen callback #{file.id}-#{chunkStart}"
+
+              # we need to re-emit because of the -mt flag from fuse.
+              # otherwise, this 
               file.emit 'downloaded', cStart
               file.read(start,end, readAhead, cb)
 
