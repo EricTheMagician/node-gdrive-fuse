@@ -678,6 +678,7 @@ class GDriveFS extends fuse.FileSystem
           modifiedDate: true
         if newParentInode != oldParentInode
           newParent = inodeTree.get newParentInode
+          oldParent = parent
           unless newParent
             reply.err PosixError.ENOENT
             return
