@@ -216,7 +216,7 @@ class GFile extends EventEmitter
   open: (start,cb) =>
     file = @
     fn = ->
-      opened = openedFiles.has("#{file.id}-#{start}")
+      opened = openedFiles.get("#{file.id}-#{start}")
       if opened 
         unless opened.fd
           logger.debug "opened.fd was false"
