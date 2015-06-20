@@ -265,7 +265,7 @@ class GFile extends EventEmitter
                   file.open(start, cb)
                 else
                   logger.error "there was an handled error while opening files for reading"
-                  logger.error
+                  logger.error err
                   cb(err)
                 return
               
@@ -276,7 +276,10 @@ class GFile extends EventEmitter
 
 
                 cb null, file.fd
-                fs.close fd, ->
+                fs.close fd, (err) ->
+                  if err
+                    logger.error "There was an error closing an already opened file"
+                    logger.error err
                   return
 
                 file.to = setTimeout(fn, cacheTimeout)
