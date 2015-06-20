@@ -417,11 +417,14 @@ parseChanges = (items) ->
       if  f.name != cfile.title
         logger.info "#{f.name} was renamed to #{cfile.title}"
         f.name = cfile.title
+      if f instanceof GFile
+        f.downloadUrl = cfile.downloadUrl
+
+      unless cfile.parents
+        continue
       if f.parentid != cfile.parents[0].id
         logger.info "#{f.name} has moved"
         f.parentid = cfile.parents[0].id
-      if f instanceof GFile
-        f.downloadUrl = cfile.downloadUrl
       continue
 
 
