@@ -216,7 +216,13 @@ class GFile extends EventEmitter
   open: (start,cb) =>
     file = @
     fn = ->
-      if openedFiles.has("#{file.id}-#{start}")
+      opened = openedFiles.has("#{file.id}-#{start}")
+      if opened 
+        unless opened.fd
+          logger.debug "opened.fd was false"
+          logger.debug file
+          logger.debug opened
+          return 
         fs.close openedFiles.get("#{file.id}-#{start}").fd, (err) ->
           if err
             logger.error "There was an error with closing file #{file.name}"
@@ -230,7 +236,6 @@ class GFile extends EventEmitter
       clearTimeout(f.to)
       f.to = setTimeout(fn, cacheTimeout)
       cb null, f.fd
-      openedFiles.set "#{file.id}-#{start}", file
       return
 
     else
@@ -257,18 +262,17 @@ class GFile extends EventEmitter
               #make sure that there's only one file opened.
               #multiple files can be opened at once because of the fuse multithread
               if openedFiles.has "#{file.id}-#{start}"
-                file = openedFiles.get("#{file.id}-#{start}")
-                clearTimeout file.to
+                opened = openedFiles.get("#{file.id}-#{start}")
+                clearTimeout opened.to
 
-                cb null, file.fd
+                cb null, opened.fd
                 fs.close fd, (err) ->
                   if err
                     logger.error "There was an error closing an already opened file"
                     logger.error err
                   return
 
-                file.to = setTimeout(fn, cacheTimeout)
-                openedFiles.set "#{file.id}-#{start}", file
+                opened.to = setTimeout(fn, cacheTimeout)
                 return
 
               openedFiles.set "#{file.id}-#{start}", {fd: fd, to: setTimeout(fn, cacheTimeout) }
@@ -339,9 +343,9 @@ class GFile extends EventEmitter
             cb(buffer.slice(0,bytesRead))
             return
           _readAheadFn()
-        catch error
+        catch e
           logger.error "There was an error while reading file. Retrying"
-          logger.error error
+          logger.error e
           file.read(start,end, readAhead, cb)
 
         return
