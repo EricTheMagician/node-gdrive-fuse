@@ -65,19 +65,6 @@ openedFiles = new hashmap()
 downloadTree = new hashmap()
 buf0 = new Buffer(0)
 
-closeAllOpenedFiles = ->
-  for key in openedFiles.keys()
-    value = openedFiles.get key
-    clearTimeout(value.to)
-    fs.close value.fd, (err) ->
-      if err
-        logger.debug "There was an error closing file #{key}"
-        logger.debug value
-      else
-        openedFiles.remove key
-      return
-    return
-  return
 
 
 ######################################
@@ -111,7 +98,6 @@ class GFile extends EventEmitter
       if err.code == "EMFILE"
         logger.debug "There was an error with downloading files: EMFILE"
         logger.debug err
-        closeAllOpenedFiles()
       cb(err)
       this.end()
       return        
@@ -142,7 +128,6 @@ class GFile extends EventEmitter
           if err.code == "EMFILE"
             logger.debug "There was an error with downloading files: EMFILE"
             logger.debug err
-            closeAllOpenedFiles()
 
           cb(err)
         this.end()     
@@ -157,7 +142,6 @@ class GFile extends EventEmitter
         if err.code == "EMFILE"
           logger.debug "There was an error with downloading files: EMFILE"
           logger.debug err
-          closeAllOpenedFiles()
         cb(err)
         this.end()
         ws.end()
@@ -246,6 +230,7 @@ class GFile extends EventEmitter
       clearTimeout(f.to)
       f.to = setTimeout(fn, cacheTimeout)
       cb null, f.fd
+      openedFiles.set "#{file.id}-#{start}", file
       return
 
     else
@@ -254,7 +239,7 @@ class GFile extends EventEmitter
       try
         fs.stat path, (err, stats) ->
           if err
-            logger.silly "there was an debug stat-ing a file in file.open"
+            logger.silly "there was an error stat-ing a file in file.open"
             logger.silly err
             cb err,false
             return
@@ -269,11 +254,11 @@ class GFile extends EventEmitter
                   cb(err)
                 return
               
-              #make sure that there's only one file opened
+              #make sure that there's only one file opened.
+              #multiple files can be opened at once because of the fuse multithread
               if openedFiles.has "#{file.id}-#{start}"
                 file = openedFiles.get("#{file.id}-#{start}")
                 clearTimeout file.to
-
 
                 cb null, file.fd
                 fs.close fd, (err) ->
