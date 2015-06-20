@@ -420,7 +420,8 @@ parseChanges = (items) ->
       if f instanceof GFile
         f.downloadUrl = cfile.downloadUrl
 
-      unless cfile.parents
+      #check that the file has parents
+      if (!cfile.parents) or cfile.parents.length == 0
         continue
       if f.parentid != cfile.parents[0].id
         logger.info "#{f.name} has moved"
