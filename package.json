@@ -19,7 +19,7 @@
     "async": "^0.9.0",
     "coffee-script": "~1.8.0",
     "fs-extra": "^0.10.0",
-    "fusejs": "git://github.com/thejinx0r/fusejs#51a1a8e04365fad67c9b021bb2e9143715df8058",
+    "fusejs": "git://github.com/thejinx0r/fusejs#48ee41ec4f998d40f47cbb7f99c37031eb8ee183",
     "googleapis": "^1.0.20",
     "hashmap": "^1.1.0",
     "mmmagic": "~0.3.14",
