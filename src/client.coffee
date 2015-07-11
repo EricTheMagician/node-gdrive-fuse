@@ -373,83 +373,89 @@ parseChanges = (items) ->
   notFound = []
   logger.log items
   for i in items
+    try
+    
+      if i.deleted or i.file.labels.trashed #check if it is deleted
+        if idToInode.has i.fileId #check to see if the file was not already removed from folderTree
+          logger.debug "#{i.file.title} was deleted"
+          id = i.fileId
+          inode = idToInode.get id
+          obj = inodeTree.get inode
+          inodeTree.remove inode
+          idToInode.remove id
 
-    if i.deleted or i.file.labels.trashed #check if it is deleted
-      if idToInode.has i.fileId #check to see if the file was not already removed from folderTree
-        logger.debug "#{i.file.title} was deleted"
-        id = i.fileId
-        inode = idToInode.get id
-        obj = inodeTree.get inode
-        inodeTree.remove inode
-        idToInode.remove id
+          parent = inodeTree.get obj.parentid
+          unless parent
+            continue
+          idx = parent.children.indexOf inode
+          if idx >= 0
+            parent.children.splice(idx, 1)
+        else
+          try
+            logger.debug "processing a file that was marked as deleted, but not preset in the inodeTree: #{i.file.title} with id #{i.file.id}"
+          catch e
+            logger.debug "processfile a file that was marked as deleted but not present in the inodeTree"
+            logger.debug i
+        continue
 
-        parent = inodeTree.get obj.parentid
-        unless parent
+      cfile = i.file #changed file
+      unless cfile
+        continue
+
+
+      #if it is not deleted or trashed, check to see if it's new or not
+      inode = idToInode.get(cfile.id)
+      if inode
+        f = inodeTree.get(inode)
+        logger.debug "#{f.name} was updated"
+
+        unless f
+          idToPath.remove path
+          notFound.push i
           continue
-        idx = parent.children.indexOf inode
-        if idx >= 0
-          parent.children.splice(idx, 1)
-      else
-        try
-          logger.debug "processing a file that was marked as deleted, but not preset in the inodeTree: #{i.file.title} with id #{i.file.id}"
-        catch e
-          logger.debug "processfile a file that was marked as deleted but not present in the inodeTree"
-          logger.debug i
-      continue
+        f.ctime = (new Date(cfile.createdDate)).getTime()
+        f.mtime = (new Date(cfile.modifiedDate)).getTime()
+        if  f.name != cfile.title
+          logger.info "#{f.name} was renamed to #{cfile.title}"
+          f.name = cfile.title
+        if f instanceof GFile
+          f.downloadUrl = cfile.downloadUrl
 
-    cfile = i.file #changed file
-    unless cfile
-      continue
+        #check that the file has parents
+        if (!cfile.parents) or cfile.parents.length == 0
+          continue
+        if f.parentid != cfile.parents[0].id
+          logger.info "#{f.name} has moved"
+          f.parentid = cfile.parents[0].id
+        continue
 
 
-    #if it is not deleted or trashed, check to see if it's new or not
-    inode = idToInode.get(cfile.id)
-    if inode
-      f = inodeTree.get(inode)
-      logger.debug "#{f.name} was updated"
+      if cfile == undefined or cfile.parents == undefined or cfile.parents[0] == undefined
+        logger.debug "changed file had empty parents"
+        logger.debug cfile
+        continue
 
-      unless f
-        idToPath.remove path
+      parentId = cfile.parents[0].id
+      parentInode = idToInode.get(parentId)
+      unless parentInode
         notFound.push i
         continue
-      f.ctime = (new Date(cfile.createdDate)).getTime()
-      f.mtime = (new Date(cfile.modifiedDate)).getTime()
-      if  f.name != cfile.title
-        logger.info "#{f.name} was renamed to #{cfile.title}"
-        f.name = cfile.title
-      if f instanceof GFile
-        f.downloadUrl = cfile.downloadUrl
+      parent = inodeTree.get parentInode
+      inodes = value.inode for value in inodeTree.values()
+      inode = Math.max(inodes) + 1
+      idToInode.set cfile.id, inode
+      parent.children.push inode
+      if cfile.mimeType == 'application/vnd.google-apps.folder'
+        logger.debug "#{cfile.title} is a new folder"
+        inodeTree.set inode, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
+      else
+        logger.debug "#{cfile.title} is a new file"
+        inodeTree.set inode, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
 
-      #check that the file has parents
-      if (!cfile.parents) or cfile.parents.length == 0
-        continue
-      if f.parentid != cfile.parents[0].id
-        logger.info "#{f.name} has moved"
-        f.parentid = cfile.parents[0].id
+    catch e
+      logger.debug("There was an error while parsing charges");
+      logger.debug(err, i);
       continue
-
-
-    if cfile == undefined or cfile.parents == undefined or cfile.parents[0] == undefined
-      logger.debug "changed file had empty parents"
-      logger.debug cfile
-      continue
-
-    parentId = cfile.parents[0].id
-    parentInode = idToInode.get(parentId)
-    unless parentInode
-      notFound.push i
-      continue
-    parent = inodeTree.get parentInode
-    inodes = value.inode for value in inodeTree.values()
-    inode = Math.max(inodes) + 1
-    idToInode.set cfile.id, inode
-    parent.children.push inode
-    if cfile.mimeType == 'application/vnd.google-apps.folder'
-      logger.debug "#{cfile.title} is a new folder"
-      inodeTree.set inode, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable )
-    else
-      logger.debug "#{cfile.title} is a new file"
-      inodeTree.set inode, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable)
     
   if notFound.length > 0 and notFound.length < items.length
     parseChanges(notFound)
