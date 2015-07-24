@@ -1,39 +1,39 @@
-"use strict"
-var pth = require('path')
+"use strict";
+var pth = require('path');
 var fs = require('fs-extra');
 var winston = require('winston');
-var EventEmitter = require('events').EventEmitter
-var request = require('request')
+var EventEmitter = require('events').EventEmitter;
+var request = require('request');
 
 /*
 ######################################
 ######### Setup File Config ##########
 ######################################
 */
-var config = {}
+var config = {};
 if(fs.existsSync('config.json'))
   config = fs.readJSONSync('config.json');
 if( !config.cacheLocation)
   config.cacheLocation =  "/tmp/cache";
 if( !config.advancedChunks)
-  config.advancedChunks = 5
+  config.advancedChunks = 5;
 if(!config.chunkSize)
-  config.chunkSize = 1024*1024*16
+  config.chunkSize = 1024*1024*16;
 
 var google = require('googleapis');
-var GDrive = google.drive({ version: 'v2' })
-var OAuth2Client = google.auth.OAuth2
-var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
+var GDrive = google.drive({ version: 'v2' });
+var OAuth2Client = google.auth.OAuth2;
+var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob");
 oauth2Client.setCredentials(config.accessToken);
-var uploadLocation = pth.join(config.cacheLocation, 'upload')
-fs.ensureDirSync(uploadLocation)
+var uploadLocation = pth.join(config.cacheLocation, 'upload');
+fs.ensureDirSync(uploadLocation);
 
-var downloadLocation = pth.join(config.cacheLocation, 'download')
-fs.ensureDirSync(downloadLocation)
+var downloadLocation = pth.join(config.cacheLocation, 'download');
+fs.ensureDirSync(downloadLocation);
 
 function printDate(){
-  var d = new Date()
-  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}T${d.getHours()}:${d.getMinutes()}::${d.getSeconds()}`
+  var d = new Date();
+  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}T${d.getHours()}:${d.getMinutes()}::${d.getSeconds()}`;
 }
 // setup winston logger
 
@@ -42,37 +42,38 @@ var transports = [new (winston.transports.File)({
   level:'debug' ,
   maxsize: 10485760, //10mb
   maxFiles: 3
-})]
+})];
 if(config.debug)
-  transports.push(new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true }))
+  transports.push(new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true }));
 else
-  transports.push(new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true }))
+  transports.push(new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true }));
 
 var logger = new (winston.Logger)({
   transports: transports
-})
+});
 
 // module.exports.logger = logger
 
 // setup cache size monitoring
-var sqlite3 = require('sqlite3')
-var queue = require('queue')
+var sqlite3 = require('sqlite3');
+var queue = require('queue');
+fs.ensureDirSync(pth.join(config.cacheLocation,'data'));
 var db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
-var q = queue({concurrency: 1, timeout: 7200000 })
-var totalDownloadSize = 0
-var regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/
-var maxCache  = 10737418240
+var q = queue({concurrency: 1, timeout: 7200000 });
+var totalDownloadSize = 0;
+var regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
+var maxCache  = 10737418240;
 if(config.maxCacheSize)
-  maxCache =  config.maxCacheSize * 1024 * 1024
+  maxCache =  config.maxCacheSize * 1024 * 1024;
 else{
-  logger.info( "max cache size was not set. you should exit and manually set it")
-  logger.info( "defaulting to a 10 GB cache")
+  logger.info( "max cache size was not set. you should exit and manually set it");
+  logger.info( "defaulting to a 10 GB cache");
 }
 
 // opened files
-var openedFiles = new Map()
-var downloadTree = new Map()
-var buf0 = new Buffer(0)
+var openedFiles = new Map();
+var downloadTree = new Map();
+var buf0 = new Buffer(0);
 
 
 /*
@@ -87,7 +88,7 @@ class GFile extends EventEmitter{
   //   return 1024*1024*16; //set default chunk size to 16MB. this should be changed at run time
   // }
   constructor(downloadUrl, id, parentid, name, size, ctime, mtime, inode, permission, mode){
-    super()
+    super();
     if(!mode){
       mode = 33279;//0o100777;
     }
@@ -105,9 +106,9 @@ class GFile extends EventEmitter{
 
   static download(url, start,end, size, saveLocation, cb ){
     if(config.accessToken == null){
-      logger.debug("access token was null when downloading files")
-      cb("expiredUrl")
-      return
+      logger.debug("access token was null when downloading files");
+      cb("expiredUrl");
+      return;
     }
 
     var options ={
@@ -117,54 +118,53 @@ class GFile extends EventEmitter{
         "Authorization": `Bearer ${config.accessToken.access_token}`,
         "Range": `bytes=${start}-${end}`,
       }
-    }
+    };
 
-    var ws = fs.createWriteStream(saveLocation)
+    var ws = fs.createWriteStream(saveLocation);
     ws.on('error', function downloadWriteStreamError(err){
-      logger.error("There was an error with writing during the download")
-      logger.error(err)
+      logger.error("There was an error with writing during the download");
+      logger.error(err);
       if (err.code == "EMFILE"){
-        logger.debug( "There was an error with downloading files: EMFILE" )
-        logger.debug( err )
+        logger.debug( "There was an error with downloading files: EMFILE" );
+        logger.debug( err );
       }
-      cb(err)
-      this.end()
-      return
+      cb(err);
+      this.end();
+      return;
     });
-    var once = false
+    var once = false;
     try{
       request(options)
       .on( 'response', function requestResponseCallback(resp){
         if(resp.statusCode === 401 || resp.statusCode === 403 ){
           if (!once){
-            once = true
+            once = true;
             setTimeout(
                 function expiredUrlTimeout(){
-                  cb("expiredUrl")
+                  cb("expiredUrl");
                 }
                 , 2000);
           }
-          ws.end()
-          this.end()
-          return
+          ws.end();
+          this.end();
+          return;
         }
         if(resp.statusCode >= 500){
           if(!once){
             setTimeout(
                 function requestResponseCallback500(){
-                  cb(500)
+                  cb(500);
                 }
                 , 1000);
           }
-          ws.end()
-          this.end()
+          ws.end();
+          this.end();
           return;
         }
-
       })
       .on( 'error', function writeStreamErrorCallback(err){
         if (!once){
-          once = true
+          once = true;
           logger.error( "error" );
           logger.error( err );
           logger.error( err.code );
@@ -176,49 +176,41 @@ class GFile extends EventEmitter{
           cb(err);
         }
         this.end();
-        ws.end()   ;
-        return
+        ws.end();
       })
-      .pipe(
-        ws
-        )
+      .pipe(ws)
       .on('error', function pipeDownloadStreamErrorCallback(err){
-        logger.error("There was an error with piping during the download")
-        logger.error(err)
+        logger.error("There was an error with piping during the download");
+        logger.error(err);
         if (err.code == "EMFILE"){
-          logger.debug("There was an error with downloading files: EMFILE")
-          logger.debug(err)
+          logger.debug("There was an error with downloading files: EMFILE");
+          logger.debug(err);
         }
         if(!once){
-          once = true
-          cb(err)
+          once = true;
+          cb(err);
         }
-        this.end()
-        ws.end()
-        return
+        this.end();
+        ws.end();
       })
-
       .on('close', function pipeStreamCloseCallback(){
         if(!once){
           once = true
-          var base = pth.basename(saveLocation)
-          var chunkSize = end-start + 1
+          let base = pth.basename(saveLocation);
+          let chunkSize = end-start + 1;
           addNewFile(base,'downloading', chunkSize )
           cb(null)
         }
-        this.end()
+        this.end();
         ws.end()
-        return
       })
-      return
+      return;
     }catch(e){
-      logger.error("There was an uncaught error while downloading" )
-      logger.error( e )
-      ws.end()
+      logger.error("There was an uncaught error while downloading" );
+      logger.error( e );
+      ws.end();
     }
-    
-
-    return
+    return;
   }
   getAttrSync(){
     var attr = {
@@ -240,54 +232,57 @@ class GFile extends EventEmitter{
       mtime: this.mtime,
       ctime: this.ctime,
       inode: this.inode
-    }
-    cb(0,attr)
+    };
+    cb(0,attr);
   }
 
   recursive(start,end){
     var file = this;
     var path = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
-    if(start >= file.size)
+    if(start >= file.size){
       return;
+    }
     file.open(start, function openFileCallbackRecursive(err, fd){
       if(err || fd == false){
         if (!downloadTree.has(`${file.id}-${start}`)){
-          logger.silly(`starting to recurse ${file.name}-${start}`)
-          downloadTree.set(`${file.id}-${start}`, 1)
-
+          logger.silly(`starting to recurse ${file.name}-${start}`);
+          downloadTree.set(`${file.id}-${start}`, 1);
           GFile.download(file.downloadUrl, start,end, file.size, path, function recursiveDownloadCallback(err){
-                downloadTree.delete(`${file.id}-${start}`)
-                file.emit( 'downloaded', start);
-                function emitFromRecursiveTimeout(){
-                  file.emit( 'downloaded', start);
-                }
-                setTimeout( emitFromRecursiveTimeout, 1000);
-                logger.silly(`finishing recurse ${file.id}-${start}`);
-                return;
-              }
-
-
-          )
-          return;
+            if(err){
+              logger.error(`There was an error while during recursiveDownloadCallback`);
+              logger.error(err);
+              // GFile.download(file.downloadUrl, start,end, file.size, path,recursiveDownloadCallback);
+            }
+            downloadTree.delete(`${file.id}-${start}`);
+            file.emit( 'downloaded', start);
+            function emitFromRecursiveTimeout(){
+              file.emit( 'downloaded', start);
+            }
+            setTimeout( emitFromRecursiveTimeout, 1000);
+            logger.silly(`finishing recurse ${file.id}-${start}`);
+          });
         }
       }
-    })
+    });
   }
 
-  open(start,cb){
-    var file = this;
+  open(_start,cb){
+    let start = _start;
+    let file = this;
     function openedFileCallCloseTimeout(){
-      var opened = openedFiles.get(`${file.id}-${start}`);
+      let opened = openedFiles.get(`${file.id}-${start}`);
       if(opened){
         if(!opened.fd ){
+          debugger;
           logger.debug( "opened.fd was false");
           logger.debug( file);
           logger.debug( opened);
           return ;
         }
-        fs.close(openedFiles.get(`${file.id}-${start}`).fd, function openedFileCallCloseCallback(err){
+        fs.close(opened.fd, function openedFileCallCloseCallback(err){
           if (err){
-            logger.error( `There was an error with closing file ${file.name}` );
+            console.log(opened.fd);
+            logger.error( `There was an error with closing file ${file.name}-${start} with fd ${opened.fd}` );
             logger.error( err );
           }
           openedFiles.delete(`${file.id}-${start}`);
@@ -302,8 +297,8 @@ class GFile extends EventEmitter{
       cb(null, f.fd);
       return;
     }else{
-      var end = Math.min(start + config.chunkSize, file.size ) - 1
-      var path = pth.join(downloadLocation, `${file.id}-${start}-${end}`)
+      let end = Math.min(start + config.chunkSize, file.size ) - 1;
+      let path = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
       try{
         fs.stat( path, function open_file_stat_callback(err, stats){
           if (err){
@@ -318,16 +313,17 @@ class GFile extends EventEmitter{
                 if (err.code == "EMFILE"){
                   file.open(start, cb)
                 }else{
-                  logger.error("there was an handled error while opening files for reading")
-                  logger.error(err)
-                  cb(err)
+                  logger.error("there was an handled error while opening files for reading");
+                  logger.error(err);
+                  cb(err);
                 }
-                return
+                return;
               }
+              
               // make sure that there's only one file opened.
               // multiple files can be opened at once because of the fuse multithread
-              if(openedFiles.has `${file.id}-${start}`){
-                var opened = openedFiles.get(`${file.id}-${start}`);
+              if(openedFiles.has(`${file.id}-${start}`)){
+                let opened = openedFiles.get(`${file.id}-${start}`);
                 clearTimeout(opened.to)
 
                 cb(null, opened.fd)
@@ -361,124 +357,118 @@ return;
 
 
 
-read(start,end, readAhead, cb){
-  var file = this;
-  end = Math.min(end, this.size-1);
-  var chunkStart = Math.floor((start)/config.chunkSize)* config.chunkSize
-  var chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1
-  var nChunks = (chunkEnd - chunkStart)/config.chunkSize
-  function _readAheadFn(){
-    if (readAhead){
-      if (chunkStart <= start < (chunkStart + 131072)){
-        file.recursive( Math.floor(file.size / config.chunkSize) * config.chunkSize, file.size-1)
-        for(var i = 1; i<= config.advancedChunks; i++ ){
-          file.recursive(chunkStart + i * config.chunkSize, chunkEnd + i * config.chunkSize)
+  read(start,end, readAhead, cb){
+    let file = this;
+    end = Math.min(end, this.size-1);
+    let chunkStart = Math.floor((start)/config.chunkSize)* config.chunkSize;
+    let chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1;
+    let nChunks = (chunkEnd - chunkStart)/config.chunkSize;
+    function _readAheadFn(){
+      if (readAhead){
+        if (chunkStart <= start < (chunkStart + 131072)){
+          file.recursive( Math.floor(file.size / config.chunkSize) * config.chunkSize, file.size-1);
+          for(let i = 1; i<= config.advancedChunks; i++ ){
+            file.recursive(chunkStart + i * config.chunkSize, chunkEnd + i * config.chunkSize);
+          }
         }
-
       }
     }
-    return
-  }
-  var __once__ = false;
-  function listenCallback(cStart){
-    if (!__once__){
-      // #logger.silly "listen callback #{file.id}-#{chunkStart},#{cStart}"
-      if ( cStart <= start < (cStart + config.chunkSize-1)  ){
-        // #logger.debug "once #{ __once__ } -- #{cStart} -- #{start}"
-        __once__ = true
-        file.removeListener( 'downloaded', listenCallback)
-        // #logger.silly "listen callback #{file.id}-#{chunkStart}"
-
-        // # we need to re-emit because of the -mt flag from fuse.
-        // # otherwise, this
-        debugger
-        file.emit('downloaded', cStart)
-        file.read(start,end, readAhead, cb)
+    let __once__ = false;
+    function listenCallback(cStart){
+      if (!__once__){
+        // #logger.silly "listen callback #{file.id}-#{chunkStart},#{cStart}"
+        if ( cStart <= start < (cStart + config.chunkSize-1)  ){
+          // #logger.debug "once #{ __once__ } -- #{cStart} -- #{start}"
+          __once__ = true;
+          file.removeListener( 'downloaded', listenCallback);
+          // #logger.silly "listen callback #{file.id}-#{chunkStart}"
+  
+          // # we need to re-emit because of the -mt flag from fuse.
+          // # otherwise, this
+          file.emit('downloaded', cStart);
+          file.read(start,end, readAhead, cb);
+        }
       }
     }
-  }
 
-  if(nChunks < 1){
+    if(nChunks < 1){
 
-    debugger
-    var path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`)
-    if (downloadTree.has( `${file.id}-${chunkStart}` )){
-      logger.silly(`download tree has ${file.id}-${chunkStart}`);
-
-
+      // var path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`);
+      if (downloadTree.has( `${file.id}-${chunkStart}` ))
+      {
+        logger.silly(`download tree has ${file.id}-${chunkStart}`);
         file.on('downloaded', listenCallback);
         _readAheadFn();
         return;
       }
-
+  
       // try to open the file or get the file descriptor
       file.open( chunkStart, function openFileFromRead(err,fd){
-        debugger
+          
         //fd can returns false if the file does not exist yet
         if(err || fd == false){
-          file.download(start, end, readAhead, cb)
-          _readAheadFn()
-          return
+          file.download(start, end, readAhead, cb);
+          _readAheadFn();
+          return;
         }
 
-        downloadTree.delete( `${file.id}-${chunkStart}`)
+        //if the file is already opened
+        downloadTree.delete( `${file.id}-${chunkStart}`);
 
         // if the file is opened, read from it
         var readSize = end-start;
-        var buffer = new Buffer(readSize+1)
+        var buffer = new Buffer(readSize+1);
         try{
           fs.read( fd,buffer, 0, readSize+1, start-chunkStart, function fsReadCallback(err, bytesRead, buffer){
+            if(err){
+              logger.error(`There was an error while reading file -- ${file.name} -- ${file.id}-${start}`);
+            }
             cb(buffer.slice(0,bytesRead));
           });
           _readAheadFn();
         }catch(e){
-          logger.error( "There was an error while reading file. Retrying")
-          logger.error( e)
-          file.read(start,end, readAhead, cb)
+          logger.error( "There was an error while reading file. Retrying");
+          logger.error( e);
+          file.read(start,end, readAhead, cb);
         }
 
-        return;
       });
-
+  
 
     }else if(nChunks < 2){
-      var end1 = chunkStart + config.chunkSize - 1
-      var start2 = chunkStart + config.chunkSize
+      var end1 = chunkStart + config.chunkSize - 1;
+      var start2 = chunkStart + config.chunkSize;
 
-
-      file.read( start, end1,true,       function callback1_multiple_chunks(buffer1){
-            if(buffer1.length == 0){
-              cb(buffer1)
-              return
-            }
-            function callback2_multiple_chunks(buffer2){
-              if(buffer2.length == 0){
-                cb(buffer1);
-                return;
-              }
-              cb( Buffer.concat([buffer1, buffer2]) );
-              return;
-            }
-
-            file.read( start2, end, true, callback2_multiple_chunks);
+      file.read( start, end1,true, function callback1_multiple_chunks(buffer1){
+        if(buffer1.length == 0){
+          cb(buffer1);
+          return;
+        }
+        function callback2_multiple_chunks(buffer2){
+          if(buffer2.length == 0){
+            cb(buffer1);
             return;
           }
-      );
+          cb( Buffer.concat([buffer1, buffer2]) );
+        }
+
+        file.read( start2, end, true, callback2_multiple_chunks);
+      });
 
     }else{
-      logger.debug(`too many chunks requested, ${nChunks}`)
+      logger.debug(`too many chunks requested, ${nChunks}`);
       cb(buf0);
     }
 
   }
 
   updateUrl(cb){
-    var file = this
+    var file = this;
     var data = {
       fileId: file.id,
       acknowledgeAbuse  : true,
       fields: "downloadUrl"
-    }
+    };
     GDrive.files.get( data, function updateUrlCallback(err, res){
       if (err){
         logger.error( `There was an error while getting an updated url for ${file.name}` );
@@ -490,12 +480,12 @@ read(start,end, readAhead, cb){
 
       oauth2Client.refreshAccessToken( function refreshAccessTokenFromUpdateUrlCallback(err, tokens){
         if (err){
-          logger.debug( "there was an error while updating url" )
-          logger.debug( "err", err )
+          logger.debug( "there was an error while updating url" );
+          logger.debug( "err", err );
         }else{
           config.accessToken = tokens;
         }
-        cb(file.downloadUrl)
+        cb(file.downloadUrl);
       });
     });
   }
@@ -503,41 +493,40 @@ read(start,end, readAhead, cb){
   download(start, end, readAhead, cb){
     // if file chunk already exists, just download it
     // else download it
-    var file = this
-    var chunkStart = Math.floor((start)/config.chunkSize) * config.chunkSize
-    var chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1 //and make sure that it's not bigger than the actual file
-    var nChunks = (chunkEnd - chunkStart)/config.chunkSize
+    var file = this;
+    var chunkStart = Math.floor((start)/config.chunkSize) * config.chunkSize;
+    var chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1; //and make sure that it's not bigger than the actual file
+    var nChunks = (chunkEnd - chunkStart)/config.chunkSize;
 
     function downloadSingleChunkCallback(err){      
+      function emitDownloadCallbackTimeout(){
+        file.emit('downloaded', chunkStart);
+      }
       if (err){
         if (err === "expiredUrl"){
           file.updateUrl(
-              function updateUrlFromDownloadCallback(url){
-                GFile.download(url, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback)
-              }
-          )
+            function updateUrlFromDownloadCallback(url){
+              GFile.download(url, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
+            }
+          );
         }else{
-          logger.error( "there was an error downloading file")
-          logger.error( err)
-          cb(buf0)
-          downloadTree.delete(`${file.id}-${chunkStart}`)
-          file.emit('downloaded', chunkStart)
-          function emitDownloadCallbackTimeout(){
-            file.emit('downloaded', chunkStart)
-          }
-          setTimeout(emitDownloadCallbackTimeout, 1000)
+          logger.error( "there was an error downloading file");
+          logger.error( err);
+          cb(buf0);
+          downloadTree.delete(`${file.id}-${chunkStart}`);
+          file.emit('downloaded', chunkStart);
+          setTimeout(emitDownloadCallbackTimeout, 1000);
         }
-        return
+        return;
       }
-      downloadTree.delete(`${file.id}-${chunkStart}`)
+      downloadTree.delete(`${file.id}-${chunkStart}`);
       file.read(start,end, readAhead, cb);
-      file.emit('downloaded', chunkStart)
-      return
+      file.emit('downloaded', chunkStart);
     }
     if( nChunks < 1){
-      var path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`)
+      var path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`);
       if (downloadTree.has(`${file.id}-${chunkStart}`)){
-        file.read(start,end,readAhead,cb)
+        file.read(start,end,readAhead,cb);
       }else{
         logger.debug( `starting to download ${file.name}, chunkStart: ${chunkStart}` );
         downloadTree.set(`${file.id}-${chunkStart}`, 1);
@@ -547,27 +536,22 @@ read(start,end, readAhead, cb){
     }else if(nChunks < 2){
       var end1 = chunkStart + config.chunkSize - 1;
       var start2 = chunkStart + config.chunkSize;
-
-
-      file.read( start, end1,true,       function callback1_downloading_multiple_chunks(buffer1){
-            if (buffer1.length == 0){
-              cb(buffer1);
-              return
-            }
-            function callback2_downloading_multiple_chunks(buffer2){
-              if( buffer2.length == 0){
-                cb(buffer1);
-                return;
-              }
-              cb( Buffer.concat([buffer1, buffer2]) );
-            }
-
-            file.read( start2, end, true, callback2_downloading_multiple_chunks);
+      file.read( start, end1,true, function callback1_downloading_multiple_chunks(buffer1){
+        function callback2_downloading_multiple_chunks(buffer2){
+          if( buffer2.length == 0){
+            cb(buffer1);
             return;
           }
-      );
+          cb( Buffer.concat([buffer1, buffer2]) );
+        }
+        if (buffer1.length == 0){
+          cb(buffer1);
+          return;
+        }
 
-
+        file.read( start2, end, true, callback2_downloading_multiple_chunks);
+        return;
+      });
     }else{
       logger.debug(`too many chunks requested, ${nChunks}`);
       cb(buf0);

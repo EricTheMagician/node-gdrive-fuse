@@ -270,7 +270,6 @@ class GDriveFS extends fuse.FileSystem{
         // logger.log "silly", "reading file #{path} - #{offset}:#{len}"
         var once = false
         function readDataCallback(dataBuf){
-            debugger
             if(!once){
                 once = true;
                 reply.buffer(dataBuf, dataBuf.length);

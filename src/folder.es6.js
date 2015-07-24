@@ -5,8 +5,8 @@ var rest = require( 'restler');
 var request = require( 'request');
 var pth = require( 'path');
 var mmm = require('mmmagic');
-// var f = require("./file");
-// var logger = (f.logger);
+var f = require("./file.es6.js");
+var logger = (f.logger);
 
 var config = {};
 if(fs.existsSync('config.json'))
