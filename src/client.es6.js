@@ -393,7 +393,7 @@ function getLargestChangeId(cb){
         if( !err){
             res.largestChangeId = parseInt(res.largestChangeId) + 1;
             largestChangeId = res.largestChangeId;
-            fs.outputJsonSync(`${config.cacheLocation}/data/largestChangeId.json`, res);
+            fs.outputJson(`${config.cacheLocation}/data/largestChangeId.json`, res, function(){});
         }
         if(typeof(cb) == 'function'){
             cb()
@@ -551,7 +551,7 @@ function parseChanges(items){
     }
 
     if(items.length > 0){
-        fs.outputJsonSync(`${config.cacheLocation}/data/largestChangeId.json`, {largestChangeId: largestChangeId});
+        fs.outputJson(`${config.cacheLocation}/data/largestChangeId.json`, {largestChangeId: largestChangeId}), function(){};
         saveFolderTree();
     }
 
