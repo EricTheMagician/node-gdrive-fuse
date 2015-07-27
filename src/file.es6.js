@@ -281,7 +281,6 @@ class GFile extends EventEmitter{
         }
         fs.close(opened.fd, function openedFileCallCloseCallback(err){
           if (err){
-            console.log(opened.fd);
             logger.error( `There was an error with closing file ${file.name}-${start} with fd ${opened.fd}` );
             logger.error( err );
           }
@@ -336,6 +335,8 @@ class GFile extends EventEmitter{
                 });
 
                 opened.to = setTimeout(openedFileCallCloseTimeout, cacheTimeout)
+                openedFiles.set(`${file.id}-${start}`, opened);
+
                 return
               }
 
