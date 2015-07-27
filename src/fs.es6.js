@@ -367,7 +367,7 @@ class GDriveFS extends fuse.FileSystem{
                         return;
                     }else{
                         var inodes = [];
-                        for (value of inodeTree.values() ){
+                        for (let value of inodeTree.values() ){
                             inodes.push(value);
                         }
                         var inode = Math.max(inodes) + 1;
