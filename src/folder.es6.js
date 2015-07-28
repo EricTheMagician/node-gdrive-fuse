@@ -20,12 +20,16 @@ var magic = new Magic(mmm.MAGIC_MIME_TYPE);
 
 var uploadTree = new Map();
 
+var google = require('googleapis');
+var OAuth2Client = google.auth.OAuth2;
+var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob");
+oauth2Client.setCredentials(config.accessToken);
 
 var lockRefresh = false;
 function refreshToken(cb){
   if(!lockRefresh){
     lockRefresh = true
-    GFolder.oauth.refreshAccessToken( function refreshAccessTokenCallback(err,tokens){
+    oauth2Client.refreshAccessToken( function refreshAccessTokenCallback(err,tokens){
       if (!err) {
         config.accessToken = tokens;
         fs.outputJson('config.json', config, function writeConfigCallback(err) {
@@ -370,7 +374,7 @@ class GFolder {
     }
     var filePath = pth.join(uploadLocation, upFile.cache);
     // if the file is already being uploaded, don't try again.
-    if (upFile && upFile.uploading) {
+    if ( upFile.uploading) {
       logger.debug(`${fileName} is already being uploaded`);
       cb("uploading");
       return
@@ -529,8 +533,9 @@ class GFolder {
 
           });
         });
-        setTimeout(uploadFunction, 5000)
       }
+      setTimeout(uploadFunction, 5000)
+      
     });
   }
 }
