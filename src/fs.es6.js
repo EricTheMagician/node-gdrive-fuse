@@ -926,7 +926,7 @@ function uploadCallback(inode, cb){
 
         logger.info( `successfully uploaded ${file.name}`);
 
-        uploadTree.remove(inode);
+        uploadTree.delete(inode);
         saveUploadTree();
         if (inodeTree.has(inode)){
             logger.debug(`${file.name} already existed in inodeTree`);
