@@ -121,7 +121,7 @@ function getNewRangeEnd(location, fileSize, cb){
 
         return
       })
-  return
+  return;
 }
 
 function getUploadResumableLink(parentId, fileName, fileSize, mime, cb){
@@ -204,8 +204,11 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
       "Content-Range": `bytes ${start}-${fileSize-1}/${fileSize}`
     }
   };
-
+  function uploadGetNewRangeEndCallback(err,end){
+    cb(err, { rangeEnd: end});
+  }
   function uploadRequestCallback(err, resp, body){
+
 
     if(err) {
       getNewRangeEnd(location, fileSize, uploadGetNewRangeEndCallback);
@@ -238,7 +241,7 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
         statusCode: 308,
         rangeEnd: rangeEnd
       });
-      return
+      return;
     }
 
     if ( 200 == resp.statusCode || resp.statusCode == 201){
