@@ -516,7 +516,7 @@ class GDriveFS extends fuse.FileSystem{
             var now = (new Date).getTime();
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
             var inodes = [];
-            for (value of inodeTree.values() ){
+            for (let value of inodeTree.values() ){
                 inodes.push(value.inode );
             }
             var inode = Math.max(inodes) + 1
