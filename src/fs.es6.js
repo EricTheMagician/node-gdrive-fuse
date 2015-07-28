@@ -468,38 +468,39 @@ class GDriveFS extends fuse.FileSystem{
 
         var now = (new Date).getTime();
         var inodes = [];
-        for( value of inodeTree.values()){
-            inodes.push (value.inode );
-            var inode = Math.max(inodes) + 1;
+        for ( let value of inodeTree.values() ){
+            inodes.push(value.inode);
+        }    
+        var inodeCount = Math.max( Math.max.apply(null,inodes) + 1,2);
 
-            var file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
-            inodeTree.set( inode, file );
-            parent.children.push(inode);
+        var file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
+        inodeTree.set( inode, file );
+        parent.children.push(inode);
 
-            logger.debug (`mknod: parentid: ${parent.id} -- inode ${inode}` );
-            logger.info  (`adding a new file ${name} to folder ${parent.name}` );
-            var attr = file.getAttrSync();
+        logger.debug (`mknod: parentid: ${parent.id} -- inode ${inode}` );
+        logger.info  (`adding a new file ${name} to folder ${parent.name}` );
+        var attr = file.getAttrSync();
 
-            var upFile ={
-                cache: MD5(parent.id + name),
-                uploading: false
-            }
-            uploadTree.set( inode, upFile);
-            saveUploadTree();
-
-
-            entry = {
-                inode: attr.inode,
-                generation: 2,
-                attr: attr
-                //attr_timeout: 30,
-                //entry_timeout: 60
-            };
-
-            reply.entry(entry);
-            return;
+        var upFile ={
+            cache: MD5(parent.id + name),
+            uploading: false
         }
+        uploadTree.set( inode, upFile);
+        saveUploadTree();
+
+
+        entry = {
+            inode: attr.inode,
+            generation: 2,
+            attr: attr
+            //attr_timeout: 30,
+            //entry_timeout: 60
+        };
+
+        reply.entry(entry);
+        return;
     }
+    
 
 
     create(context, parentInode, name, mode, fileInfo, reply){
