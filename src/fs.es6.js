@@ -883,11 +883,11 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
 
 //function to create a callback for file uploading
 function uploadCallback(inode, cb){
-    var file = inodeTree.get(inode)
-    var parentInode = idToInode.get(file.parentid)
-    var parent = inodeTree.get(parentInode)
 
     return function (err, result){
+        var file = inodeTree.get(inode)
+        var parentInode = idToInode.get(file.parentid)
+        var parent = inodeTree.get(parentInode)
         if(err){
             if (err === "invalid mime"){
                 logger.debug(`the mimetype of ${path} was invalid`);
