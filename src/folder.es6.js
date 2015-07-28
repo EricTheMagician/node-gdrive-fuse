@@ -516,13 +516,7 @@ class GFolder {
               }
             }
 
-            logger.info( `Starting
-            to
-            upload
-            file
-            ${fileName}
-            ` )
-            ;
+            logger.info( `Starting to upload file ${fileName} ` );
             if (upFile.location) {
               location = upFile.location;
               getNewRangeEnd(location, size, cbNewEnd);
