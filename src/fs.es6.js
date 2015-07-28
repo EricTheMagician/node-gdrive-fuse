@@ -191,7 +191,7 @@ class GDriveFS extends fuse.FileSystem{
                 var file = inodeTree.get(inode);
                 if (file instanceof GFile){
                     if (file.size == 0){
-                        // logger.debug "#{path} size was 0"
+                        // logger.debug(`${path} size was 0`);
                         if (uploadTree.has(inode)){
                             var cache = uploadTree.get(inode).cache;
                             fs.open( pth.join(uploadLocation, cache), 'w+', function openFileForWritingCallback(err,fd){
@@ -267,7 +267,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     read(context, inode, len, offset, fileInfo, reply){
-        // logger.log "silly", "reading file #{path} - #{offset}:#{len}"
+        // logger.silly( `reading file ${path} - ${offset}:${len}`);
         var once = false
         function readDataCallback(dataBuf){
             if(!once){
@@ -299,7 +299,7 @@ class GDriveFS extends fuse.FileSystem{
     write(context, inode, buffer, position, fileInfo, reply){
 
         // path = inodeToPath.get inode
-        // logger.log "silly", "writing to file #{path} - position: #{position}, length: #{buffer.length}"
+        // logger.silly( `writing to file ${path} - position: ${position}, length: ${buffer.length}"
 
         var file = inodeTree.get( inode )
         if (!file){
@@ -310,7 +310,7 @@ class GDriveFS extends fuse.FileSystem{
         var size = file.size
         fs.write( fileInfo.fh, buffer, 0, buffer.length, position, function fsWriteCallback(err, bytesWritten, buffer){
             if (err){
-                logger.debug( "there was an error writing for file #{file.name}" )
+                logger.debug( `there was an error writing for file ${file.name}` )
                 logger.debug( err )
                 logger.debug( "position", position, "fh", fileInfo.fh )
                 reply.err(err.errno);
@@ -338,8 +338,8 @@ class GDriveFS extends fuse.FileSystem{
     mkdir(context, parentInode, name, mode, reply){
         // parentPath = inodeToPath.get parentInode
         // path = pth.join parentPath, name
-        // logger.debug "creating folder #{path}"
-        logger.debug( "creating folder #{name}" );
+        // logger.debug(`creating folder ${path}");
+        logger.debug( `creating folder ${name}` );
         var parent = inodeTree.get( parentInode);
         if( parent ){ //make sure that the parent exists
             if (parent instanceof GFolder){ //make sure that the parent is a folder
@@ -376,7 +376,7 @@ class GDriveFS extends fuse.FileSystem{
                         inodeTree.set( inode, folder );
                         idToInode.set( folder.id, inode );
                         var attr = folder.getAttrSync();
-                        entry = {
+                        let entry = {
                             inode: attr.inode,
                             generation: 2,
                             attr: attr,
@@ -476,8 +476,8 @@ class GDriveFS extends fuse.FileSystem{
             inodeTree.set( inode, file );
             parent.children.push(inode);
 
-            logger.debug ("mknod: parentid: #{parent.id} -- inode #{inode}" );
-            logger.info  ("adding a new file #{name} to folder #{parent.name}" );
+            logger.debug (`mknod: parentid: ${parent.id} -- inode ${inode}` );
+            logger.info  (`adding a new file ${name} to folder ${parent.name}` );
             var attr = file.getAttrSync();
 
             var upFile ={
@@ -524,8 +524,8 @@ class GDriveFS extends fuse.FileSystem{
             inodeTree.set(inode, file)
             parent.children.push(inode);
 
-            logger.debug( "create: parentid: #{parent.id} -- inode #{inode}");
-            logger.info ("adding a new file #{name} to folder #{parent.name}");
+            logger.debug( `create: parentid: ${parent.id} -- inode ${inode}`);
+            logger.info (`adding a new file ${name} to folder ${parent.name}`);
 
             client.saveFolderTree();
 
@@ -652,7 +652,7 @@ class GDriveFS extends fuse.FileSystem{
                     q.push(
                         function uploadQueueFunction(cb){
                             if( parent instanceof GFile){
-                                logger.debug("While uploading, #{name} was a file - #{parent}");
+                                logger.debug(`While uploading, ${name} was a file - ${parent}`);
                                 cb();
                                 return;
                             }
@@ -819,7 +819,7 @@ class GDriveFS extends fuse.FileSystem{
 function moveToDownload (file, fd, uploadedFileLocation, start,cb){
 
     var end = Math.min(start + GFile.chunkSize, file.size)-1
-    var savePath = pth.join(config.cacheLocation, 'download', `${file.id}-#{start}-#{end}`);
+    var savePath = pth.join(config.cacheLocation, 'download', `${file.id}-${start}-${end}`);
     var rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
     var wstream = fs.createWriteStream(savePath)
 
@@ -833,7 +833,7 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
         }
         fs.close( fd, function moveToDownloadFinishCopying(err){
             if(err){
-                logger.error( "There was an error closing file #{fd} - #{file.id} - #{file.name} after moving upload file to download" );
+                logger.error( `There was an error closing file ${fd} - ${file.id} - ${file.name} after moving upload file to download` );
                 logger.error( err );
             }
             var start = 0
@@ -853,14 +853,14 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
                     count = 0;
                     totalSize = 0;
                 }else{
-                    cmd += `('${file.id}-${start}-${end}',#{Date.now()},'downloading',${size}),`
+                    cmd += `('${file.id}-${start}-${end}',${Date.now()},'downloading',${size}),`
                 }
                 start += GFile.chunkSize;
                 end = Math.min(start + GFile.chunkSize, file.size)-1
             }
             queue_fn(totalSize,cmd.slice(0,-1))(function(){});
             if (err){
-                logger.debug("unable to close file after transffering #{uploadedFile}");
+                logger.debug(`unable to close file after transffering ${uploadedFile}`);
                 cb();
                 return;
             }
@@ -885,7 +885,7 @@ function uploadCallback(inode, cb){
     return function (err, result){
         if(err){
             if (err === "invalid mime"){
-                logger.debug("the mimetype of #{path} was invalid");
+                logger.debug(`the mimetype of ${path} was invalid`);
                 cb();
                 return
             }

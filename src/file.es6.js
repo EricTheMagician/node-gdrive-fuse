@@ -291,7 +291,7 @@ class GFile extends EventEmitter{
     var cacheTimeout = 6000 ;
     if(openedFiles.has( `${file.id}-${start}`)){
       let f = openedFiles.get(`${file.id}-${start}`);
-      clearTimeout(f.to);
+      clearTimeout(f.to)
       f.to = setTimeout(openedFileCallCloseTimeout, cacheTimeout);
       cb(null, f.fd);
       return;

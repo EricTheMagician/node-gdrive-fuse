@@ -76,9 +76,9 @@ function getRangeEnd(range){
 function getNewRangeEnd(location, fileSize, cb){
   var options = {
     headers: {
-      "Authorization": "Bearer #{config.accessToken.access_token}",
+      "Authorization": `Bearer ${config.accessToken.access_token}`,
       "Content-Length": 0,
-      "Content-Range": "bytes */#{fileSize}"
+      "Content-Range": `bytes */${fileSize}`
     }
   };
 
@@ -129,7 +129,7 @@ function getUploadResumableLink(parentId, fileName, fileSize, mime, cb){
   var options = {
     timeout: 300000,
     headers: {
-      "Authorization": "Bearer #{config.accessToken.access_token}",
+      "Authorization": `Bearer ${config.accessToken.access_token}`,
       "X-Upload-Content-Type": mime,
       "X-Upload-Content-Length": fileSize
     }
@@ -371,7 +371,7 @@ class GFolder {
     var filePath = pth.join(uploadLocation, upFile.cache);
     // if the file is already being uploaded, don't try again.
     if (upFile && upFile.uploading) {
-      logger.debug("#{fileName} is already being uploaded");
+      logger.debug(`${fileName} is already being uploaded`);
       cb("uploading");
       return
     }
@@ -380,7 +380,7 @@ class GFolder {
 
     fs.stat(filePath, function uploadStatCallback(err, stats) {
       if (err || stats == undefined) {
-        logger.debug("there was an errror while trying to upload file #{fileName}");
+        logger.debug(`there was an errror while trying to upload file ${fileName}`);
         logger.debug(err);
         if (err.code == "ENOENT") {
           // file was deleted
@@ -398,8 +398,8 @@ class GFolder {
       if (size == 0) {
         fs.unlink(filePath, function deleteFilesCallback(err) {
           if (err) {
-            logger.debug("there was an error removing a file of size 0, #{filePath}")
-            logger.debug(err)
+            logger.debug(`there was an error removing a file of size 0, ${filePath}`);
+            logger.debug(err);
           }
           cb({code: "ENOENT"});
           upFile.uploading = false;
@@ -410,7 +410,7 @@ class GFolder {
       function uploadFunction() {
         fs.stat(filePath, function uploadStatCallback2(err, stats2) {
           if (err || stats2 == undefined) {
-            logger.debug("there was an errror while trying to upload file #{fileName} with path #{inode}");
+            logger.debug(`there was an errror while trying to upload file ${fileName} with path ${inode}`);
             if (err.code == "ENOENT") {
               // file was deleted
               uploadTree.remove(inode);
@@ -470,7 +470,7 @@ class GFolder {
                 if (start < size) {
                   uploadData(upFile.location, filePath, start, size, mime, cbUploadData);
                 } else {
-                  logger.debug("successfully uploaded file #{inode}");
+                  logger.debug(`successfully uploaded file ${inode}`);
                   cb(null, res.result);
                 }
               }
@@ -494,19 +494,19 @@ class GFolder {
             function cbNewEnd(err, end) {
               if (err) {
                 delete upFile.location
-                logger.debug("there was an error with getting a new range end for #{inode}");
+                logger.debug(`there was an error with getting a new range end for ${inode}`);
                 logger.debug("err", err);
                 getUploadResumableLink(folder.id, fileName, size, mime, cbNewLink);
                 return;
               }
 
               if (end <= 0) {
-                logger.debug("tried to get new range for #{inode}, but it was #{end}");
+                logger.debug(`tried to get new range for ${inode}, but it was ${end}`);
                 delete upFile.location;
                 getUploadResumableLink(folder.id, fileName, size, mime, cbNewLink);
               } else {
                 var start = end + 1;
-                logger.debug("got new range end for #{inode}: #{end}");
+                logger.debug(`got new range end for ${inode}: ${end}`);
                 // once new range end is obtained, start uploading in chunks
                 uploadData(location, filePath, start, size, mime, cbUploadData);
               }
