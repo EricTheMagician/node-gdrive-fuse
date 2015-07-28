@@ -823,14 +823,14 @@ class GDriveFS extends fuse.FileSystem{
 
 function moveToDownload (file, fd, uploadedFileLocation, start,cb){
 
-    var end = Math.min(start + GFile.chunkSize, file.size)-1
+    var end = Math.min(start + config.chunkSize, file.size)-1
     var savePath = pth.join(config.cacheLocation, 'download', `${file.id}-${start}-${end}`);
     var rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
     var wstream = fs.createWriteStream(savePath)
 
     rstream.on('end',  function moveToDownloadReadStream(){
 
-        start += GFile.chunkSize;
+        start += config.chunkSize;
         wstream.end();
         if (start < file.size){
             moveToDownload(file, fd, uploadedFileLocation, start, cb);
@@ -842,7 +842,7 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
                 logger.error( err );
             }
             var start = 0
-            var end = Math.min(start + GFile.chunkSize, file.size)-1
+            var end = Math.min(start + config.chunkSize, file.size)-1
             var totalSize = 0
             var count = 0
             var basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
@@ -860,8 +860,8 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
                 }else{
                     cmd += `('${file.id}-${start}-${end}',${Date.now()},'downloading',${size}),`
                 }
-                start += GFile.chunkSize;
-                end = Math.min(start + GFile.chunkSize, file.size)-1
+                start += config.chunkSize;
+                end = Math.min(start + config.chunkSize, file.size)-1
             }
             queue_fn(totalSize,cmd.slice(0,-1))(function(){});
             if (err){
