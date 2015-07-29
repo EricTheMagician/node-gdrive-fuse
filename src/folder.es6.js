@@ -307,8 +307,9 @@ function saveUploadTree(){
   if(!lockUploadTree){
     lockUploadTree = true;
     var toSave = {}
-    for(var key in uploadTree.keys()){
-      var value = uploadTree.get( key);
+    for(let item of uploadTree){
+      let key = item[0];
+      let value = item[1];
       toSave[key] = value;
     }
     logger.debug("saving upload tree");
@@ -391,7 +392,7 @@ class GFolder {
         logger.debug(err);
         if (err.code == "ENOENT") {
           // file was deleted
-          uploadTree.remove(inode);
+          uploadTree.delete(inode);
         }
         upFile.uploading = false;
         cb(err);
@@ -420,7 +421,7 @@ class GFolder {
             logger.debug(`there was an errror while trying to upload file ${fileName} with path ${inode}`);
             if (err.code == "ENOENT") {
               // file was deleted
-              uploadTree.remove(inode);
+              uploadTree.delete(inode);
             }
             cb(err)
             upFile.uploading = false;
