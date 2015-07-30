@@ -313,7 +313,11 @@ function saveUploadTree(){
       toSave[key] = value;
     }
     logger.debug("saving upload tree");
-    fs.outputJson( pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave, function unlockSavingFolderTree(){
+    fs.outputJson( pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave, function unlockSavingUploadTree(err){
+      if(err){
+        logger.error("There was an error saving the upload tree");
+        logger.error(err);
+      }
       lockUploadTree = false;
     });
   }
