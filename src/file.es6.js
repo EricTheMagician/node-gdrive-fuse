@@ -249,8 +249,10 @@ class GFile extends EventEmitter{
           downloadTree.set(`${file.id}-${start}`, 1);
           GFile.download(file.downloadUrl, start,end, file.size, path, function recursiveDownloadCallback(err){
             if(err){
-              logger.error(`There was an error while during recursiveDownloadCallback`);
-              logger.error(err);
+              if(err != "expiredUrl"){
+                logger.error(`There was an error while during recursiveDownloadCallback`);
+                logger.error(err);
+              }
               // GFile.download(file.downloadUrl, start,end, file.size, path,recursiveDownloadCallback);
             }
             downloadTree.delete(`${file.id}-${start}`);
