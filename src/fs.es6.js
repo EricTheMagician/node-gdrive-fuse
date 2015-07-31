@@ -421,13 +421,7 @@ class GDriveFS extends fuse.FileSystem{
                     if (folder.children.length == 0) {
                         drive.files.trash({fileId: folder.id}, function removeDirCallback(err, res) {
                             if (err) {
-                                logger.error( `unable
-                  to
-                  remove
-                  folder
-                  ${path}
-                  `)
-                                ;
+                                logger.error( `unable to remove folder ${path}`);
                                 reply.err(errnoMap.EIO);
                                 return;
                             }
@@ -435,8 +429,8 @@ class GDriveFS extends fuse.FileSystem{
                             if (idx >= 0) {
                                 parent.children.splice(idx, 1);
                             }
-                            inodeTree.remove(childInode)
-                            idToInode.remove(folder.id);
+                            inodeTree.delete(childInode)
+                            idToInode.delete(folder.id);
 
                             reply.err(0)
                             client.saveFolderTree();
@@ -591,8 +585,8 @@ class GDriveFS extends fuse.FileSystem{
             }
 
             parent.children.splice( parent.children.indexOf(childInode), 1)
-            inodeTree.remove( childInode );
-            idToInode.remove( file.id );
+            inodeTree.delete( childInode );
+            idToInode.delete( file.id );
             client.saveFolderTree();
 
             drive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
@@ -604,7 +598,7 @@ class GDriveFS extends fuse.FileSystem{
 
             if (uploadTree.has( childInode )){
                 var cache = uploadTree.get(childInode).cache;
-                uploadTree.remove(childInode)
+                uploadTree.delete(childInode)
                 fs.unlink(pth.join(uploadLocation,cache), function unlinkDeleteFileCallback(err){});
             }
 
@@ -668,7 +662,7 @@ class GDriveFS extends fuse.FileSystem{
 
                     q.start()
                 }else{
-                    uploadTree.remove(inode);
+                    uploadTree.delete(inode);
                     saveUploadTree();
                 }
             });
@@ -899,7 +893,7 @@ function uploadCallback(inode, cb){
                 return;
             }
             if(err.code === "ENOENT"){
-                uploadTree.remove(inode);
+                uploadTree.delete(inode);
                 cb();
                 return;
             }
@@ -977,7 +971,7 @@ function resumeUpload(){
             if( inodeTree.has(inode) )
                 var file = inodeTree.get(inode);
             else{
-                uploadTree.remove(inode);
+                uploadTree.delete(inode);
                 return;
             }
 
@@ -1002,8 +996,8 @@ function resumeUpload(){
                     }
                 }
             }else{
-                inodeTree.remove  (inode)
-                uploadTree.remove (inode)
+                inodeTree.delete(inode)
+                uploadTree.delete(inode)
                 parentInode = idToInode.get(value.parentid);
                 parent = inodeTree.get(parentInode)
                 if (parent){
