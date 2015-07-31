@@ -651,7 +651,7 @@ class GDriveFS extends fuse.FileSystem{
                      */
 
 
-                    if( 0 < file.size ||  file.size <= 10485760){ //10MB
+                    if( 0 < file.size &&  file.size <= 10485760){ //10MB
                         parent.upload( file.name, inode, uploadCallback(inode, function(){})    );
                     }else if(file.size >  10485760 ){}
                     q.push(
