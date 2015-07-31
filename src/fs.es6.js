@@ -966,8 +966,7 @@ function resumeUpload(){
     // uploadWork = null
     if (uploadTree.size > 0){
         logger.info( "resuming file uploading" );
-        var inodes = uploadTree.keys();
-        uploadTree.forEach( function uploadTreeResume(value,inode){
+        for(let inode of uploadTree.keys()){
             if( inodeTree.has(inode) )
                 var file = inodeTree.get(inode);
             else{
@@ -1009,7 +1008,7 @@ function resumeUpload(){
                 var path = pth.join(uploadLocation, value.cache)
                 fs.unlink(path, function(){});
             }
-        });
+        };
     }
 
 }
