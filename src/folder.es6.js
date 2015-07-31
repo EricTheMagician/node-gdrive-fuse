@@ -549,9 +549,8 @@ if( fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json')) ){
   logger.info( "loading upload tree" );
   fs.readJson( pth.join(config.cacheLocation, 'data','uploadTree.json'), function readUploadTreeCallback(err, data){
     try{
-      for( key of Object.keys(data) ){
-    
-        value = data[key];
+      for( let key of Object.keys(data) ){
+        let value = data[key];
         value.uploading = false;
         uploadTree.set( key, value)
       }
