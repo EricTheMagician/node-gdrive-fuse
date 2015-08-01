@@ -977,6 +977,7 @@ function resumeUpload(){
 
             // check to see if the file was released by the filesystem
             // if it wasn't released by the filesystem, it means that the file was not finished transfering
+            let value = uploadTree.get(inode);
             if (value.released){
                 var parentInode = idToInode.get( file.parentid )
                 value.uploading = false
