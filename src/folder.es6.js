@@ -552,7 +552,7 @@ if( fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json')) ){
       for( let key of Object.keys(data) ){
         let value = data[key];
         value.uploading = false;
-        uploadTree.set( key, value)
+        uploadTree.set( parseInt(key), value)
       }
     }catch (error){
       logger.error("There was an error parsing upload tree");

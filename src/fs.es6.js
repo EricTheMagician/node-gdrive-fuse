@@ -966,32 +966,33 @@ function resumeUpload(){
     // uploadWork = null
     if (uploadTree.size > 0){
         logger.info( "resuming file uploading" );
-        for(let _inode of uploadTree.keys()){
-            let inode = parseInt(_inode);
-            if( inodeTree.has(inode) )
-                var file = inodeTree.get(inode);
-            else{
+        for(let inode of uploadTree.keys()){
+
+            if( !inodeTree.has(inode) ){
                 uploadTree.delete(inode);
-                return;
+                continue;
             }
+            let file = inodeTree.get(inode);
 
             // check to see if the file was released by the filesystem
             // if it wasn't released by the filesystem, it means that the file was not finished transfering
             let value = uploadTree.get(inode);
-            if (value.released){
-                var parentInode = idToInode.get( file.parentid )
-                value.uploading = false
+            if(value.released){
+                let parentInode = idToInode.get( file.parentid );
+                value.uploading = false;
                 if (inodeTree.has(parentInode)){
-                    var parent = inodeTree.get(parentInode)
+                    let parent = inodeTree.get(parentInode)
                     if (parent instanceof GFolder){
-                        inodeTree.set(key, value);
+                        value.location = false;
+                        uploadTree.set(inode, value);
+
                         q.push(
                             function resumeUploadQueueFunction(cb){
                                 parent.upload(file.name, inode, uploadCallback(inode,cb));
                             }
                         )
                         q.start();
-                        return;
+                        continue;
                     }else{
                         logger.debug(`While resuming uploads, ${parent} was not a folder`);
                     }
@@ -999,18 +1000,20 @@ function resumeUpload(){
             }else{
                 inodeTree.delete(inode)
                 uploadTree.delete(inode)
-                parentInode = idToInode.get(value.parentid);
-                parent = inodeTree.get(parentInode)
+                let parentInode = idToInode.get(value.parentid);
+                let parent = inodeTree.get(parentInode)
                 if (parent){
-                    var idx = parent.children.indexOf(inode)
+                    let idx = parent.children.indexOf(inode);
                     if (idx > 0){
-                        parent.children.splice(idx, 1)
+                        parent.children.splice(idx, 1);
                     }
                 }
-                var path = pth.join(uploadLocation, value.cache)
+                let path = pth.join(uploadLocation, value.cache);
                 fs.unlink(path, function(){});
             }
         };
+        saveUploadTree();
+
     }
 
 }
