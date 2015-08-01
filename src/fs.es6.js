@@ -966,7 +966,8 @@ function resumeUpload(){
     // uploadWork = null
     if (uploadTree.size > 0){
         logger.info( "resuming file uploading" );
-        for(let inode of uploadTree.keys()){
+        for(let _inode of uploadTree.keys()){
+            let inode = parseInt(_inode);
             if( inodeTree.has(inode) )
                 var file = inodeTree.get(inode);
             else{
