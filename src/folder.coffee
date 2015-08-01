@@ -471,7 +471,7 @@ if fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json'))
       for key in Object.keys(data)
         value = data[key]
         value.uploading = false
-        uploadTree.set key, value
+        uploadTree.set parseInt(key), value
       return
     catch error
       return
