@@ -875,6 +875,7 @@ resumeUpload = ->
     logger.info "resuming file uploading"
     inodes = uploadTree.keys()
     uploadTree.forEach (value,inode) ->
+      inode = parseInt(inode)
       if inodeTree.has(inode)
         file = inodeTree.get(inode)
       else
