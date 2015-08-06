@@ -454,7 +454,7 @@ parseChanges = (items) ->
 
     catch e
       logger.debug("There was an error while parsing charges");
-      logger.debug(err, i);
+      logger.debug(e, i);
       continue
     
   if notFound.length > 0 and notFound.length < items.length
