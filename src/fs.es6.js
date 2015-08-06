@@ -111,7 +111,7 @@ class GDriveFS extends fuse.FileSystem{
                     if(cnode){
                         var attr = cnode.getAttrSync();
                         //console.log( cnode.name, cnode.inode);
-                        var len = reply.addDirEntry(cnode.name, size, {inode: cnode.inode}, offset);
+                        var len = reply.addDirEntry(cnode.name, size, cnode, offset);
                         totalSize += len
                     }
                 }
@@ -799,7 +799,10 @@ class GDriveFS extends fuse.FileSystem{
                 var entry = {
                     inode: childInode,
                     generation: 2,
-                    attr: attr
+                    attr: attr,
+                    mode: attr.mode,
+                    atime: attr.atime,
+                    ctime: attr.ctime
                     // attr_timeout: 5,
                     // entry_timeout: 5
                 };
