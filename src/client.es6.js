@@ -541,7 +541,7 @@ function parseChanges(items){
         }
       }catch(error){
               logger.debug("There was an error while parsing charges");
-              logger.debug(err, i);
+              logger.debug(error, i);
       }
 
     }
