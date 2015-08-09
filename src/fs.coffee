@@ -890,7 +890,7 @@ resumeUpload = ->
         if inodeTree.has parentInode
           parent = inodeTree.get parentInode
           if parent instanceof GFolder
-            inodeTree.set key, value
+            inodeTree.set inode, value
             q.push (cb) ->
               parent.upload file.name, inode, uploadCallback(inode,cb)
               return
