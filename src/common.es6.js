@@ -4,9 +4,9 @@
 ######### Setup File Config ##########
 ######################################
 */
-var fs = require('fs-extra');
-var pth = require('path');
-var winston = require('winston');
+const fs = require('fs-extra');
+const pth = require('path');
+const winston = require('winston');
 
 var config = {};
 if(fs.existsSync('config.json'))
@@ -17,13 +17,13 @@ if( !config.advancedChunks)
   config.advancedChunks = 5;
 if(!config.chunkSize)
   config.chunkSize = 1024*1024*16;
-var maxCache = 10737418240;
+var maxCache;
 if(config.maxCacheSize){
-  maxCache =  config.maxCacheSize * 1024 * 1024;
+   maxCache =  config.maxCacheSize * 1024 * 1024;
 }else{
   logger.info( "max cache size was not set. you should exit and manually set it");
   logger.info( "defaulting to a 10 GB cache");
-  max
+   maxCache = 10737418240;
 }
 
 
@@ -43,12 +43,12 @@ const dataLocation = pth.join(config.cacheLocation, 'data');
 fs.ensureDirSync(dataLocation);
 
 function printDate(){
-  var d = new Date();
+  const d = new Date();
   return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}T${d.getHours()}:${d.getMinutes()}::${d.getSeconds()}`;
 }
 // setup winston logger
 
-var transports = [new (winston.transports.File)({
+const transports = [new (winston.transports.File)({
   filename: '/tmp/GDriveF4JS.log',
   level:'debug' ,
   maxsize: 10485760, //10mb
@@ -102,6 +102,7 @@ module.exports = {
 	dataLocation: dataLocation,
 	oauth2Client: oauth2Client,
 	config: config,
-	GDrive: GDrive
+	GDrive: GDrive,
+	maxCache: maxCache
 
 }

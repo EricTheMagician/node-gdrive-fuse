@@ -24,9 +24,9 @@ let totalDownloadSize = 0;
 const regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
 
 // opened files
-var openedFiles = new Map();
-var downloadTree = new Map();
-var buf0 = new Buffer(0);
+const openedFiles = new Map();
+const downloadTree = new Map();
+const buf0 = new Buffer(0);
 
 
 /*
@@ -64,7 +64,7 @@ class GFile extends EventEmitter{
       return;
     }
 
-    var options ={
+    const options ={
       url: url,
       encoding: null,
       headers:{
@@ -73,7 +73,7 @@ class GFile extends EventEmitter{
       }
     };
 
-    var ws = fs.createWriteStream(saveLocation);
+    const ws = fs.createWriteStream(saveLocation);
     ws.on('error', function downloadWriteStreamError(err){
       logger.error("There was an error with writing during the download");
       logger.error(err);
@@ -166,7 +166,7 @@ class GFile extends EventEmitter{
     return;
   }
   getAttrSync(){
-    var attr = {
+    const attr = {
       mode: this.mode,
       size: this.size,
       nlink: 1,
@@ -178,7 +178,7 @@ class GFile extends EventEmitter{
   }
 
   getAttr(cb){
-    var attr = {
+    const attr = {
       mode: this.mode,
       size: this.size,
       nlink: 1,
@@ -190,8 +190,8 @@ class GFile extends EventEmitter{
   }
 
   recursive(start,end){
-    var file = this;
-    var path = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
+    const file = this;
+    const path = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
     if(start >= file.size){
       return;
     }
@@ -243,7 +243,8 @@ class GFile extends EventEmitter{
         });
       }
     }
-    var cacheTimeout = 6000 ;
+    
+    const cacheTimeout = 6000 ;
     if(openedFiles.has( `${file.id}-${start}`)){
       let f = openedFiles.get(`${file.id}-${start}`);
       clearTimeout(f.to)
@@ -372,8 +373,8 @@ return;
         downloadTree.delete( `${file.id}-${chunkStart}`);
 
         // if the file is opened, read from it
-        var readSize = end-start;
-        var buffer = new Buffer(readSize+1);
+        const readSize = end-start;
+        const buffer = new Buffer(readSize+1);
         try{
           fs.read( fd,buffer, 0, readSize+1, start-chunkStart, function fsReadCallback(err, bytesRead, buffer){
             if(err){
@@ -392,8 +393,8 @@ return;
   
 
     }else if(nChunks < 2){
-      var end1 = chunkStart + config.chunkSize - 1;
-      var start2 = chunkStart + config.chunkSize;
+      const end1 = chunkStart + config.chunkSize - 1;
+      const start2 = chunkStart + config.chunkSize;
 
       file.read( start, end1,true, function callback1_multiple_chunks(buffer1){
         if(buffer1.length == 0){
@@ -419,8 +420,8 @@ return;
   }
 
   updateUrl(cb){
-    var file = this;
-    var data = {
+    const file = this;
+    const data = {
       fileId: file.id,
       acknowledgeAbuse  : true,
       fields: "downloadUrl"
@@ -443,10 +444,11 @@ return;
   download(start, end, readAhead, cb){
     // if file chunk already exists, just download it
     // else download it
-    var file = this;
-    var chunkStart = Math.floor((start)/config.chunkSize) * config.chunkSize;
-    var chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1; //and make sure that it's not bigger than the actual file
-    var nChunks = (chunkEnd - chunkStart)/config.chunkSize;
+    const file = this;
+    const chunkStart = Math.floor((start)/config.chunkSize) * config.chunkSize;
+    const chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1; //and make sure that it's not bigger than the actual file
+    const nChunks = (chunkEnd - chunkStart)/config.chunkSize;
+    const path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`);
 
     function downloadSingleChunkCallback(err){      
       function emitDownloadCallbackTimeout(){
@@ -474,7 +476,6 @@ return;
       file.emit('downloaded', chunkStart);
     }
     if( nChunks < 1){
-      var path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`);
       if (downloadTree.has(`${file.id}-${chunkStart}`)){
         file.read(start,end,readAhead,cb);
       }else{
@@ -484,8 +485,8 @@ return;
       }
 
     }else if(nChunks < 2){
-      var end1 = chunkStart + config.chunkSize - 1;
-      var start2 = chunkStart + config.chunkSize;
+      const end1 = chunkStart + config.chunkSize - 1;
+      const start2 = chunkStart + config.chunkSize;
       file.read( start, end1,true, function callback1_downloading_multiple_chunks(buffer1){
         function callback2_downloading_multiple_chunks(buffer2){
           if( buffer2.length == 0){
@@ -541,12 +542,12 @@ function initialize_path(path, type){
   fs.readdir( path, function initialize_path_callback(err, files){
     var count = 0
     var totalSize = 0
-    var basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
+    const basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
     var cmd = basecmd
     for( let file of files){
-      var expectedSize = file.match(regexPattern)
+      const expectedSize = file.match(regexPattern)
       if(expectedSize != null){
-        var size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
+        const size = Math.max(parseInt(expectedSize[2])- parseInt(expectedSize[1]) + 1, 0)
         if(size == 0){
           logger.debug( `expectedSize for ${file} is 0. ${expectedSize}` )
         }
@@ -595,7 +596,7 @@ function delete_files(){
 }
 
 function _delete_files_(start,end, rows){
-  var row = rows[end]
+  const row = rows[end]
   var count = end - start + 1
   if( totalDownloadSize >= (0.8*maxCache) ){
     fs.unlink( pth.join(downloadLocation, row.name), function unlink_delete_file_callback(err){
