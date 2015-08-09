@@ -33,6 +33,7 @@ const GDrive = google.drive({ version: 'v2' });
 const OAuth2Client = google.auth.OAuth2;
 const oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob");
 oauth2Client.setCredentials(config.accessToken);
+google.options({ auth: oauth2Client });
 
 // ensure directory exist for upload, download and data folders
 const uploadLocation = pth.join(config.cacheLocation, 'upload');
