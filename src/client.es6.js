@@ -38,7 +38,6 @@ var now = (new Date).getTime();
 var OAuth2Client = google.auth.OAuth2
 var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
 var largestChangeId = 1;
-
 /*
  *
  * Client functions
@@ -88,7 +87,6 @@ function getAllFiles(){
         }
         else{
             // logger.log 'info', "Finished downloading folder structure from google"
-            getLargestChangeId();
             parseFilesFolders();
             // logger.debug __items_to_parse_from_google__
             saveFolderTree();
@@ -237,35 +235,36 @@ function parseFilesFolders (){
 }
 
 function parseFolderTreeInode(){
-    var jsonFile =  `${config.cacheLocation}/data/inodeTree.json`;
-    var now = Date.now();
+    const  jsonFile =  `${config.cacheLocation}/data/inodeTree.json`;
+    const now = Date.now();
     fs.readJson( jsonFile, function readJsonFolderTreeCallback(err, data){
         try{
-            for( key of Object.keys(data) ){
-                var o = data[key]
-                var inode = o.inode;
+            for( let key of Object.keys(data) ){
+                const o = data[key]
+                const inode = o.inode;
 
                 // add to idToPath
                 idToPath.set(o.id,key);
                 idToPath.set(o.parentid, pth.dirname(key));
 
                 if( 'size' in o)
-                    inodeTree.set( key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission ) )
+                    inodeTree.set( key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission ) );
                 else
-                    inodeTree.set( key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children) )
+                    inodeTree.set( key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children) );
 
-                var changeFile = `${config.cacheLocation}/data/largestChangeId.json`;
-                fs.exists( changeFile, function checkLargestChangeIdJsonExistsCallback(exists){
-                    if (exists){
-                        fs.readJson(changeFile, function readLargestChangedIdCallback(err, data){
-                            var largestChangeId = data.largestChangeId;
-                            if(require.main != module){
-                                loadChanges();
-                            }
-                        });
-                    }
-                });
             }
+            const changeFile = `${config.cacheLocation}/data/largestChangeId.json`;
+            fs.exists( changeFile, function checkLargestChangeIdJsonExistsCallback(exists){
+                if (exists){
+                    fs.readJson(changeFile, function readLargestChangedIdCallback(err, data){                            
+                        largestChangeId = data.largestChangeId;
+                        if(require.main != module){
+                            loadChanges();
+                        }
+                    });
+                }
+            });
+
 
         }catch(error){
             // if there was an error with reading the file, just download the whole structure again
@@ -375,7 +374,7 @@ function saveFolderTree(){
             toSave[key] = saved;
         }
 
-        fs.outputJson(`${config.cacheLocation}/data/inodeTree.json`, toSave,  function saveFolderTreeCallback(){});
+        fs.outputJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(){});
         lockFolderTree = false;
     }
 }
@@ -387,20 +386,17 @@ function getLargestChangeId(cb){
     };
     function getLargestChangeIdCallback(err, res){
         if( !err){
-            res.largestChangeId = parseInt(res.largestChangeId) + 1;
-            largestChangeId = res.largestChangeId;
-            fs.outputJson(`${config.cacheLocation}/data/largestChangeId.json`, res, function(){});
+            largestChangeId = parseInt(res.largestChangeId) + 1;
+            fs.outputJson(pth.join(dataLocation,"largestChangeId.json"), {largestChangeId:largestChangeId}, function(){});
         }
-        if(typeof(cb) == 'function'){
-            cb()
-        }
+        cb();
     }
     drive.changes.list(opts, getLargestChangeIdCallback);
 }
 
 function loadPageChange(start, items, cb){
 
-    var opts ={
+    const opts ={
         maxResults: 500,
         startChangeId: start
     };
@@ -418,7 +414,7 @@ function loadPageChange(start, items, cb){
 
 
 function loadChanges(cb){
-    var id = largestChangeId
+    const id = largestChangeId;
     logger.debug(`Getting changes from Google Drive. The last change id was ${largestChangeId}.`)
 
     function loadChangesCallback(err, newId, items, pageToken){
@@ -446,7 +442,7 @@ function parseChanges(items){
             if( idToInode.has(i.fileId) ){ // check to see if the file was not already removed from folderTree
                 logger.debug(`${i.file.title} was deleted`)
                 var id = i.fileId;
-                var inode = idToInode.get(id)
+                let inode = idToInode.get(id)
                 var obj = inodeTree.get(inode)
                 inodeTree.delete(inode);
                 idToInode.delete(id);
@@ -470,16 +466,16 @@ function parseChanges(items){
             continue
         }
 
-        var cfile = i.file // changed file
+        const cfile = i.file // changed file
         if( !cfile){
-            continue
+            continue;
         }
 
 
         //if it is not deleted or trashed, check to see if it's new or not
         var inode = idToInode.get(cfile.id)
         if(inode){
-            var f = inodeTree.get(inode);
+            const f = inodeTree.get(inode);
             logger.debug( `${f.name} was updated`);
 
             if(!f){
@@ -525,7 +521,8 @@ function parseChanges(items){
         for( let value of inodeTree.values() ){
             inodes.push( value.inode );
         }
-        var inode = Math.max.apply(null, inodes) + 1
+        
+        inode = Math.max.apply(null, inodes) + 1
         idToInode.set(cfile.id, inode);
         parent.children.push(inode);
         if( cfile.mimeType == 'application/vnd.google-apps.folder'){
@@ -587,7 +584,6 @@ if(!config.accessToken){
             logger.info("Access Token Set")
             loadFolderTree();
 
-
             fs.outputJsonSync('config.json', config)
             return
         });
@@ -597,12 +593,9 @@ if(!config.accessToken){
 
 }else{
     oauth2Client.setCredentials(config.accessToken);
-    console.log( "Access Token Set" );
+    logger.info( "Access Token Set" );
     loadFolderTree();
 }
-google.options({ auth: oauth2Client });
-//GFile.oauth = oauth2Client;
-//GFolder.oauth = oauth2Client;
 
 module.exports.idToInode = idToInode
 module.exports.inodeTree = inodeTree
