@@ -1,8 +1,6 @@
 "use strict";
 var google = require( 'googleapis' );
 var fs = require( 'fs-extra' );
-var winston = require( 'winston' );
-var rest = require( 'restler' );
 var pth = require( 'path' );
 var fuse = require( 'fusejs' );
 var os = require( 'os' );
@@ -13,13 +11,12 @@ var PosixError = fuse.PosixError;
 var client = require('./client.es6.js');
 var inodeTree = client.inodeTree;
 var idToInode = client.idToInode;
-var drive = client.drive;
+
 var folder = require("./folder.es6.js");
 var uploadTree = folder.uploadTree;
 var GFolder = folder.GFolder;
 var saveUploadTree = folder.saveUploadTree;
 var f = require("./file.es6.js");
-var logger = f.logger;
 var GFile = f.GFile;
 var addNewFile = f.addNewFile;
 var queue_fn = f.queue_fn;
@@ -27,19 +24,13 @@ var queue = require('queue');
 
 var exec = require('child_process').exec;
 
-// read input config
-var config = {};
-if (fs.existsSync ('config.json') ){
-    config = fs.readJSONSync('config.json')
-}
-if( !config.cacheLocation)
-    config.cacheLocation =  "/tmp/cache";
-if( !config.refreshDelay)
-    config.refreshDelay = 60000;
-if (!config.mountPoint)
-    config.mountPoint = "/tmp/mnt";
+var common = require('./common.es6.js');
+var config = common.config
+var dataLocation = common.dataLocation;
+var uploadLocation = common.uploadLocation;
+var downloadLocation = common.downloadLocation;
+var logger = common.logger;
 
-var uploadLocation = pth.join(config.cacheLocation, 'upload')
 var q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) // default to 4 concurrent uploads
 
 
@@ -83,8 +74,8 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     releasedir(context, inode, fileInfo, reply){
-        console.log('Releasedir was called!');
-        console.log(fileInfo);
+        // console.log('Releasedir was called!');
+        // console.log(fileInfo);
         reply.err(0);
     }
 
@@ -720,7 +711,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     access(context, inode, mask, reply){
-        console.log('Access was called!');
+        // console.log('Access was called!');
         reply.err(0);
         return;
     }

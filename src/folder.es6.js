@@ -5,55 +5,21 @@ var rest = require( 'restler');
 var request = require( 'request');
 var pth = require( 'path');
 var mmm = require('mmmagic');
-var f = require("./file.es6.js");
-var logger = (f.logger);
 
-var config = {};
-if(fs.existsSync('config.json'))
-  config = fs.readJSONSync('config.json');
-if( !config.cacheLocation)
-  config.cacheLocation =  "/tmp/cache";
-var uploadLocation = pth.join(config.cacheLocation, 'upload');
+var common = require('./common.es6.js');
+var config = common.config
+var dataLocation = common.dataLocation;
+var uploadLocation = common.uploadLocation;
+var downloadLocation = common.downloadLocation;
+var logger = common.logger;
+var oauth2Client = common.oauth2Client;
+var refreshToken = common.refreshAccessToken;
+
 
 var Magic = mmm.Magic;
 var magic = new Magic(mmm.MAGIC_MIME_TYPE);
 
 var uploadTree = new Map();
-
-var google = require('googleapis');
-var OAuth2Client = google.auth.OAuth2;
-var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob");
-oauth2Client.setCredentials(config.accessToken);
-
-var lockRefresh = false;
-function refreshToken(cb){
-  if(!lockRefresh){
-    lockRefresh = true
-    oauth2Client.refreshAccessToken( function refreshAccessTokenCallback(err,tokens){
-      if (!err) {
-        config.accessToken = tokens;
-        fs.outputJson('config.json', config, function writeConfigCallback(err) {
-          if (err) {
-            // logger.debug "failed to save config from folder.coffee"
-          } else {
-            // logger.debug "succesfully saved config from folder.coffee"
-            cb();
-          }
-          lockRefresh = false
-        });
-      } else {
-        // logger.debug "There was an error with refreshing access token"
-        // logger.debug err
-        refreshToken(cb);
-      }
-    });
-  }else{
-    cb();
-  }
-
-  return;
-}
-
 
 
 

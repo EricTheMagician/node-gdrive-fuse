@@ -1,74 +1,27 @@
 "use strict";
-var pth = require('path');
-var fs = require('fs-extra');
-var winston = require('winston');
-var EventEmitter = require('events').EventEmitter;
-var request = require('request');
+const pth = require('path');
+const fs = require('fs-extra');
+const winston = require('winston');
+const EventEmitter = require('events').EventEmitter;
+const request = require('request');
 
-/*
-######################################
-######### Setup File Config ##########
-######################################
-*/
-var config = {};
-if(fs.existsSync('config.json'))
-  config = fs.readJSONSync('config.json');
-if( !config.cacheLocation)
-  config.cacheLocation =  "/tmp/cache";
-if( !config.advancedChunks)
-  config.advancedChunks = 5;
-if(!config.chunkSize)
-  config.chunkSize = 1024*1024*16;
+const common = require('./common.es6.js');
+const config = common.config
+const dataLocation = common.dataLocation;
+const uploadLocation = common.uploadLocation;
+const downloadLocation = common.downloadLocation;
+const logger = common.logger;
+const GDrive = common.GDrive;
+const oauth2Client = common.oauth2Client;
+const refreshAccessToken = common.refreshAccessToken
+const maxCache = common.maxCache;
 
-var google = require('googleapis');
-var GDrive = google.drive({ version: 'v2' });
-var OAuth2Client = google.auth.OAuth2;
-var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob");
-oauth2Client.setCredentials(config.accessToken);
-var uploadLocation = pth.join(config.cacheLocation, 'upload');
-fs.ensureDirSync(uploadLocation);
-
-var downloadLocation = pth.join(config.cacheLocation, 'download');
-fs.ensureDirSync(downloadLocation);
-
-function printDate(){
-  var d = new Date();
-  return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}T${d.getHours()}:${d.getMinutes()}::${d.getSeconds()}`;
-}
-// setup winston logger
-
-var transports = [new (winston.transports.File)({
-  filename: '/tmp/GDriveF4JS.log',
-  level:'debug' ,
-  maxsize: 10485760, //10mb
-  maxFiles: 3
-})];
-if(config.debug)
-  transports.push(new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true }));
-else
-  transports.push(new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true }));
-
-var logger = new (winston.Logger)({
-  transports: transports
-});
-
-// module.exports.logger = logger
-
-// setup cache size monitoring
-var sqlite3 = require('sqlite3');
-var queue = require('queue');
-fs.ensureDirSync(pth.join(config.cacheLocation,'data'));
-var db = new sqlite3.Database(pth.join(config.cacheLocation, 'data','sqlite.db'));
-var q = queue({concurrency: 1, timeout: 7200000 });
-var totalDownloadSize = 0;
-var regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
-var maxCache  = 10737418240;
-if(config.maxCacheSize)
-  maxCache =  config.maxCacheSize * 1024 * 1024;
-else{
-  logger.info( "max cache size was not set. you should exit and manually set it");
-  logger.info( "defaulting to a 10 GB cache");
-}
+const sqlite3 = require('sqlite3');
+const queue = require('queue');
+const db = new sqlite3.Database(pth.join(dataLocation,'sqlite.db'));
+const q = queue({concurrency: 1, timeout: 7200000 });
+let totalDownloadSize = 0;
+const regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
 
 // opened files
 var openedFiles = new Map();
@@ -481,13 +434,7 @@ return;
       }
       file.downloadUrl = res.downloadUrl;
 
-      oauth2Client.refreshAccessToken( function refreshAccessTokenFromUpdateUrlCallback(err, tokens){
-        if (err){
-          logger.debug( "there was an error while updating url" );
-          logger.debug( "err", err );
-        }else{
-          config.accessToken = tokens;
-        }
+      refreshAccessToken( function refreshAccessTokenFromUpdateUrlCallback(){
         cb(file.downloadUrl);
       });
     });
@@ -744,4 +691,3 @@ db.run(  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT
 module.exports.GFile = GFile
 module.exports.addNewFile = addNewFile
 module.exports.queue_fn = queue_fn
-module.exports.logger = logger

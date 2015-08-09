@@ -3,7 +3,7 @@ var google = require('googleapis');
 var drive = google.drive({ version: 'v2' })
 var readline = require('readline');
 var fs = require('fs-extra');
-var winston = require('winston');
+
 var rest = require('restler');
 var pth = require('path');
 
@@ -12,18 +12,14 @@ var GFolder = folder.GFolder
 var f = require("./file.es6.js")
 var GFile = f.GFile
 var uploadTree = folder.uploadTree
-var logger = f.logger
 
-// read input config
-var config = {}
-if(fs.existsSync('config.json'))
-    config = fs.readJSONSync('config.json');
-if( !config.cacheLocation)
-    config.cacheLocation =  "/tmp/cache";
-if( !config.refreshDelay)
-    config.refreshDelay = 60000;
-var dataLocation = pth.join( config.cacheLocation, 'data' );
-fs.ensureDirSync( dataLocation );
+var common = require('./common.es6.js');
+var config = common.config
+var dataLocation = common.dataLocation;
+var uploadLocation = common.uploadLocation;
+var downloadLocation = common.downloadLocation;
+var logger = common.logger;
+
 
 var __items_to_parse_from_google__ = []
 
