@@ -31,7 +31,7 @@ const uploadLocation = common.uploadLocation;
 const downloadLocation = common.downloadLocation;
 const logger = common.logger;
 const drive = common.GDrive
-var largestChangeId = common.currentLargestInode;
+var currentLargestInode = common.currentLargestInode;
 const q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) // default to 4 concurrent uploads
 
 
