@@ -88,7 +88,7 @@ function getAllFiles(){
             parseFilesFolders();
             // logger.debug __items_to_parse_from_google__
             saveFolderTree();
-            getLargestChangeId();
+            getLargestChangeId(function(){});
             if(require.main != module)
                 setTimeout(loadChanges, 90000);
         }
@@ -275,6 +275,7 @@ function parseFolderTree(){
             getAllFiles();
             return;
         }
+
         try{
             for( let key of Object.keys(data)){
                 var o = data[key];
