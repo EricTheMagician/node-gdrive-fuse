@@ -95,6 +95,8 @@ function refreshAccessToken(cb){
 }
 
 
+var currentLargestInode = 1;
+
 module.exports = {
 	refreshAccessToken: refreshAccessToken,
 	logger: logger,
@@ -103,7 +105,9 @@ module.exports = {
 	dataLocation: dataLocation,
 	oauth2Client: oauth2Client,
 	config: config,
+	google: google,
 	GDrive: GDrive,
-	maxCache: maxCache
+	maxCache: maxCache,
+	currentLargestInode:currentLargestInode
 
 }

@@ -1,26 +1,27 @@
 "use strict"
-var google = require('googleapis');
-var drive = google.drive({ version: 'v2' })
-var readline = require('readline');
-var fs = require('fs-extra');
+const readline = require('readline');
+const fs = require('fs-extra');
 
-var rest = require('restler');
-var pth = require('path');
+const rest = require('restler');
+const pth = require('path');
 
-var folder = require("./folder.es6.js")
-var GFolder = folder.GFolder
-var f = require("./file.es6.js")
-var GFile = f.GFile
-var uploadTree = folder.uploadTree
+const folder = require("./folder.es6.js")
+const GFolder = folder.GFolder
+const f = require("./file.es6.js")
+const GFile = f.GFile
+const uploadTree = folder.uploadTree
 
-var common = require('./common.es6.js');
-var config = common.config
-var dataLocation = common.dataLocation;
-var uploadLocation = common.uploadLocation;
-var downloadLocation = common.downloadLocation;
-var logger = common.logger;
-
-
+const common = require('./common.es6.js');
+const config = common.config
+const dataLocation = common.dataLocation;
+const uploadLocation = common.uploadLocation;
+const downloadLocation = common.downloadLocation;
+const logger = common.logger;
+const google = common.google;
+const drive = common.GDrive;
+const oauth2Client = common.oauth2Client;
+var currentLargestInode = common.currentLargestInode;
+var largestChangeId = 1;
 var __items_to_parse_from_google__ = []
 
 /*
@@ -29,15 +30,12 @@ var __items_to_parse_from_google__ = []
  *
  */
 
-var inodeTree = new Map();
-var idToInode = new Map();
+const inodeTree = new Map();
+const idToInode = new Map();
 
-var now = (new Date).getTime();
+const now = (new Date).getTime();
 
 
-var OAuth2Client = google.auth.OAuth2
-var oauth2Client = new OAuth2Client(config.clientId || "520595891712-6n4r5q6runjds8m5t39rbeb6bpa3bf6h.apps.googleusercontent.com"  , config.clientSecret || "cNy6nr-immKnVIzlUsvKgSW8", config.redirectUrl || "urn:ietf:wg:oauth:2.0:oob")
-var largestChangeId = 1;
 /*
  *
  * Client functions
@@ -112,13 +110,8 @@ function parseFilesFolders (){
         rootFound = true;
     }
 
-    var now = (new Date).getTime()
+    const now = (new Date).getTime()
 
-    var inodes = [];
-    for ( let value of inodeTree.values() ){
-        inodes.push(value.inode);
-    }    
-    var inodeCount = Math.max( Math.max.apply(null,inodes) + 1,2)
     logger.info("Parinsg data, looking for root foolder");
     // # google does not return the list of files and folders in a particular order.
     // # so find the root folder first,
@@ -161,8 +154,8 @@ function parseFilesFolders (){
             // #   logger.log "debug", "folder.parents is undefined or empty"
             // #   logger.log "debug", f
             // #   continue
-            var pid = f.parents[0].id //parent id
-            var parentInode = idToInode.get(pid)
+            const pid = f.parents[0].id //parent id
+            const parentInode = idToInode.get(pid)
             if(parentInode){
 
                 // if the parent exists, get it
@@ -182,15 +175,14 @@ function parseFilesFolders (){
                 if (idToInode.has(f.id)){
                     continue
                 }
-
-                idToInode.set( f.id, inodeCount);
+                currentLargestInode++;
+                idToInode.set( f.id, currentLargestInode);
 
                 // push this current folder to the parent's children list
-                if( parent.children.indexOf(inodeCount) < 0 ){
-                    parent.children.push(inodeCount);
-                    inodeTree.set(inodeCount, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable , []));
+                if( parent.children.indexOf(currentLargestInode) < 0 ){
+                    parent.children.push(currentLargestInode);
+                    inodeTree.set(currentLargestInode, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), currentLargestInode, f.editable , []));
                 }
-                inodeCount++
             }else{
                 notFound.push(f)
             }
@@ -215,12 +207,13 @@ function parseFilesFolders (){
                 continue
             }
 
-            //add file to parent list
-            parent.children.push(inodeCount);
+            currentLargestInode++;
 
-            idToInode.set( f.id, inodeCount);
-            inodeTree.set( inodeCount, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), inodeCount, f.editable) );
-            inodeCount++;
+            //add file to parent list
+            parent.children.push(currentLargestInode);
+
+            idToInode.set( f.id, currentLargestInode);
+            inodeTree.set( currentLargestInode, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), currentLargestInode, f.editable) );
         }else{
             left.push(f)
         }
@@ -305,6 +298,11 @@ function parseFolderTree(){
                 }else{
                     inodeTree.set( o.inode, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children));
                 }
+                if( o.inode  > currentLargestInode)
+                {
+                    currentLargestInode = o.inode;
+                }
+
             }
 
             var changeFile = `${config.cacheLocation}/data/largestChangeId.json`
