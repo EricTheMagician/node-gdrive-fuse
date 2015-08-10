@@ -365,6 +365,7 @@ class GDriveFS extends fuse.FileSystem{
                             inodes.push(value.inode);
                         }    
                         currentLargestInode++;
+                        inode = currentLargestInode;
                         parent.children.push( inode );
                         const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), currentLargestInode, res.editable, [])
                         inodeTree.set( currentLargestInode, folder );
