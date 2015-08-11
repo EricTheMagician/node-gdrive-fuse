@@ -515,12 +515,8 @@ function parseChanges(items){
             continue;
         }
         parent = inodeTree.get(parentInode);
-        var inodes = []
-        for( let value of inodeTree.values() ){
-            inodes.push( value.inode );
-        }
-        
-        inode = Math.max.apply(null, inodes) + 1
+        common.currentLargestInode++;
+        inode = common.currentLargestInode;
         idToInode.set(cfile.id, inode);
         parent.children.push(inode);
         if( cfile.mimeType == 'application/vnd.google-apps.folder'){
