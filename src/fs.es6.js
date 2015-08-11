@@ -31,7 +31,7 @@ const uploadLocation = common.uploadLocation;
 const downloadLocation = common.downloadLocation;
 const logger = common.logger;
 const drive = common.GDrive
-var currentLargestInode = common.currentLargestInode;
+
 const q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) // default to 4 concurrent uploads
 
 
@@ -364,12 +364,12 @@ class GDriveFS extends fuse.FileSystem{
                         for ( let value of inodeTree.values() ){
                             inodes.push(value.inode);
                         }    
-                        currentLargestInode++;
-                        const inode = currentLargestInode;
+                        common.currentLargestInode++;
+                        const inode = common.currentLargestInode;
                         parent.children.push( inode );
-                        const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), currentLargestInode, res.editable, [])
-                        inodeTree.set( currentLargestInode, folder );
-                        idToInode.set( folder.id, currentLargestInode );
+                        const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), common.currentLargestInode, res.editable, [])
+                        inodeTree.set( common.currentLargestInode, folder );
+                        idToInode.set( folder.id, common.currentLargestInode );
                         const attr = folder.getAttrSync();
                         let entry = {
                             inode: attr.inode,
@@ -456,8 +456,8 @@ class GDriveFS extends fuse.FileSystem{
         }
 
         const now = (new Date).getTime();
-        currentLargestInode++;
-        const inode = currentLargestInode;
+        common.currentLargestInode++;
+        const inode = common.currentLargestInode;
 
         const file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
         inodeTree.set( inode, file );
@@ -503,8 +503,8 @@ class GDriveFS extends fuse.FileSystem{
             const now = (new Date).getTime();
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
-            currentLargestInode++;
-            const inode = currentLargestInode;
+            common.currentLargestInode++;
+            const inode = common.currentLargestInode;
             const file = new GFile(null, null, parent.id, name, 0, now, now, inode, true);
             inodeTree.set(inode, file)
             parent.children.push(inode);
@@ -921,8 +921,8 @@ function uploadCallback(inode, cb){
             file.mtime =  (new Date(result.modifiedDate)).getTime()
         }else{
             logger.debug(`${file.name} folderTree did not exist`);
-            currentLargestInode++;
-            let inode = currentLargestInode;
+            common.currentLargestInode++;
+            let inode = common.currentLargestInode;
             const file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)
         }
         // update parent

@@ -20,7 +20,6 @@ const logger = common.logger;
 const google = common.google;
 const drive = common.GDrive;
 const oauth2Client = common.oauth2Client;
-var currentLargestInode = common.currentLargestInode;
 var largestChangeId = 1;
 var __items_to_parse_from_google__ = []
 
@@ -175,13 +174,13 @@ function parseFilesFolders (){
                 if (idToInode.has(f.id)){
                     continue
                 }
-                currentLargestInode++;
-                idToInode.set( f.id, currentLargestInode);
+                common.currentLargestInode++;
+                idToInode.set( f.id, common.currentLargestInode);
 
                 // push this current folder to the parent's children list
-                if( parent.children.indexOf(currentLargestInode) < 0 ){
-                    parent.children.push(currentLargestInode);
-                    inodeTree.set(currentLargestInode, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), currentLargestInode, f.editable , []));
+                if( parent.children.indexOf(common.currentLargestInode) < 0 ){
+                    parent.children.push(common.currentLargestInode);
+                    inodeTree.set(common.currentLargestInode, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), common.currentLargestInode, f.editable , []));
                 }
             }else{
                 notFound.push(f)
@@ -207,13 +206,13 @@ function parseFilesFolders (){
                 continue
             }
 
-            currentLargestInode++;
+            common.currentLargestInode++;
 
             //add file to parent list
-            parent.children.push(currentLargestInode);
+            parent.children.push(common.currentLargestInode);
 
-            idToInode.set( f.id, currentLargestInode);
-            inodeTree.set( currentLargestInode, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), currentLargestInode, f.editable) );
+            idToInode.set( f.id, common.currentLargestInode);
+            inodeTree.set( common.currentLargestInode, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), common.currentLargestInode, f.editable) );
         }else{
             left.push(f)
         }
@@ -299,9 +298,9 @@ function parseFolderTree(){
                 }else{
                     inodeTree.set( o.inode, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children));
                 }
-                if( o.inode  > currentLargestInode)
+                if( o.inode  > common.currentLargestInode)
                 {
-                    currentLargestInode = o.inode;
+                    common.currentLargestInode = o.inode;
                 }
 
             }
