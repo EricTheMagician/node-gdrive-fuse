@@ -238,17 +238,18 @@ class GDriveFS extends fuse.FileSystem
 
           fs.open pth.join(uploadLocation, cache), 'w', (err,fd) ->
             if err
-              cb -errnoMap[err.code]
+              reply.err errnoMap[err.code]
             else
-              cb 0, fd
+              fileInfo.fh = fd
+              reply.open(fileInfo)
             return
 
           return
         else
-          cb -errnoMap.EPERM
+          reply.err( errnoMap.EPERM )
           return
 
-      cb(-errnoMap.ENOENT)
+      reply.err(errnoMap.ENOENT)
       return
 
     if flags.rdwr #read/write
