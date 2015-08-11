@@ -554,7 +554,7 @@ class GDriveFS extends fuse.FileSystem{
 
             // make sure the file still exists in the inodeTree
             // if not, remove it
-            if(file){
+            if(!file){
                 const idx = parent.children.indexOf(childInode);
                 parent.children.splice(idx,1);
                 continue;
@@ -570,6 +570,7 @@ class GDriveFS extends fuse.FileSystem{
                 return;
             }
 
+            //now we are pretty sure that the inode is the correct one
             parent.children.splice( parent.children.indexOf(childInode), 1)
             inodeTree.delete( childInode );
             idToInode.delete( file.id );
@@ -602,7 +603,7 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     release(context, inode, fileInfo, reply){
-        logger.silly(`closing file ${inode}`)
+        logger.silly(`closing file ${inode}`);
         if (uploadTree.has (inode) ){
             logger.debug(`${inode} was in the upload tree`);
             // close the file
