@@ -824,8 +824,8 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
                 logger.error( `There was an error closing file ${fd} - ${file.id} - ${file.name} after moving upload file to download` );
                 logger.error( err );
             }
-            const start = 0
-            const end = Math.min(start + config.chunkSize, file.size)-1
+            var start = 0
+            var end = Math.min(start + config.chunkSize, file.size)-1
             var totalSize = 0
             var count = 0
             const basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
