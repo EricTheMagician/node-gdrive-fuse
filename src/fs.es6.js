@@ -912,8 +912,8 @@ function uploadCallback(inode, cb){
         uploadTree.delete(inode);
         saveUploadTree();
         if (inodeTree.has(inode)){
-            logger.debug(`${file.name} already existed in inodeTree`);
             const file = inodeTree.get(inode);
+            logger.debug(`${file.name} already existed in inodeTree`);
             file.downloadUrl = result.downloadUrl
             file.id = result.id
             file.size = parseInt(result.fileSize)
