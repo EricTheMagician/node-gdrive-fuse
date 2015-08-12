@@ -104,6 +104,7 @@ class GFile extends EventEmitter{
         }
         if(resp.statusCode >= 500){
           if(!once){
+            once = true;
             setTimeout(
                 function requestResponseCallback500(){
                   cb(500);
