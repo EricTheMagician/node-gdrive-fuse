@@ -57,7 +57,7 @@ class GFile extends EventEmitter{
     this.mode = mode;
   }
 
-  static download( fileId, start,end, size, saveLocation, cb ){
+  static download(url, start,end, size, saveLocation, cb ){
     if(config.accessToken == null){
       logger.debug("access token was null when downloading files");
       cb("expiredUrl");
@@ -65,7 +65,7 @@ class GFile extends EventEmitter{
     }
 
     const options ={
-      url:  `https://www.googleapis.com/drive/v2/files/${fileId}?alt=media`,
+      url: url,
       encoding: null,
       headers:{
         "Authorization": `Bearer ${config.accessToken.access_token}`,
@@ -200,7 +200,7 @@ class GFile extends EventEmitter{
         if (!downloadTree.has(`${file.id}-${start}`)){
           logger.silly(`starting to recurse ${file.name}-${start}`);
           downloadTree.set(`${file.id}-${start}`, 1);
-          GFile.download(file.id, start,end, file.size, path, function recursiveDownloadCallback(err){
+          GFile.download(file.downloadUrl, start,end, file.size, path, function recursiveDownloadCallback(err){
             if(err){
               if(err != "expiredUrl"){
                 logger.error(`There was an error while during recursiveDownloadCallback`);
@@ -458,7 +458,7 @@ return;
         if (err === "expiredUrl"){
           file.updateUrl(
             function updateUrlFromDownloadCallback(url){
-              GFile.download(file.id, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
+              GFile.download(url, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
             }
           );
         }else{
@@ -481,7 +481,7 @@ return;
       }else{
         logger.debug( `starting to download ${file.name}, chunkStart: ${chunkStart}` );
         downloadTree.set(`${file.id}-${chunkStart}`, 1);
-        GFile.download(file.id, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
+        GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
       }
 
     }else if(nChunks < 2){
