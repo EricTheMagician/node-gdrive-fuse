@@ -79,7 +79,7 @@ function refreshAccessToken(cb){
 		{
 			// logger.debug "There was an error with refreshing access token"
 			// logger.debug err
-			refreshToken(cb);
+			refreshAccessToken(cb);
 			return;
 		}
 
