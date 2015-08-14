@@ -2,7 +2,6 @@
 const readline = require('readline');
 const fs = require('fs-extra');
 
-const rest = require('restler');
 const pth = require('path');
 
 const folder = require("./folder.es6.js")
@@ -20,19 +19,11 @@ const logger = common.logger;
 const google = common.google;
 const drive = common.GDrive;
 const oauth2Client = common.oauth2Client;
+
+const inodeTree = require('./inodetree.js');
+
 var largestChangeId = 1;
 var __items_to_parse_from_google__ = []
-
-/*
- *
- * Client Variables
- *
- */
-
-const inodeTree = new Map();
-const idToInode = new Map();
-
-const now = (new Date).getTime();
 
 
 /*
@@ -56,11 +47,7 @@ function getPageFiles(pageToken, total, cb)
         {
             logger.error ("There was an error while downloading files from google, retrying")
             logger.error (err)
-            getPageFilesCallback = function getPageFilesCallback()
-            {
-                getPageFiles(pageToken, total, cb);
-            }
-            setTimeout(fn, 4000);
+            setTimeout(function getPageFilesErr(){getPageFiles(pageToken, total, cb);} , 4000);
             return;
         }
         __items_to_parse_from_google__ = __items_to_parse_from_google__.concat(resp.items);
@@ -86,7 +73,9 @@ function getAllFiles(){
             // logger.log 'info', "Finished downloading folder structure from google"
             parseFilesFolders();
             // logger.debug __items_to_parse_from_google__
-            saveFolderTree();
+            inodeTree.saveFolderTree();
+            findFoldersWithUnknownParents();
+            inodeTree.saveFolderTree();
             getLargestChangeId(function(){});
             if(require.main != module)
                 setTimeout(loadChanges, 90000);
@@ -100,40 +89,46 @@ function parseFilesFolders (){
     var items = __items_to_parse_from_google__;
     __items_to_parse_from_google__ = [];
     logger.debug( "Starting to parse items from google." );
-    logger.debug( `There are ${items.length}  items to parse and the current inodeTree size is ${inodeTree.size}.` );
+    logger.debug( `There are ${items.length}  items to parse and the current inodeTree size is ${inodeTree.map.size}.` );
     var files = [];
     var folders = [];
-    var root = inodeTree.get(1);
+    var root = inodeTree.getFromInode(1);
     var rootFound = false;
-    if(root && root.id){
+    if(root != null && root.id != null){
         rootFound = true;
+        logger.info("Parinsg data");
+    }else{
+        logger.info("Parinsg data, looking for root foolder");
     }
 
     const now = (new Date).getTime()
 
-    logger.info("Parinsg data, looking for root foolder");
     // # google does not return the list of files and folders in a particular order.
     // # so find the root folder first,
     // # then parse the folders
     // # and then parse files
 
-    fs.outputJsonSync(`${config.cacheLocation}/data/unparsed.json`, items);
-
     for( let i of items ){
-        if ((! (i.parents) ) || i.parents.length == 0){
-            continue
+        if (  (! (i.parents) ) || i.parents.length == 0){
+            if(rootFound){
+                i.parents = [ {id:root.id, isRoot: true} ];
+            } else {
+                notFound.push(i);
+                continue;
+            }
         }
         if(i.deleted || i.labels.trashed || i.labels.hidden){
             continue;
         }
 
+
         if(i.mimeType === "application/vnd.google-apps.folder"){
             if(!rootFound){
                 if(i.parents[0].isRoot){
-                    inodeTree.set(1, new GFolder(i.parents[0].id, null, 'root',now, now,1, true));
-                    idToInode.set(i.parents[0].id, 1);
+                    let inode = inodeTree.insert( new GFolder(i.parents[0].id, null, 'root',now, now, true));
                     logger.info( "root node found");
                     rootFound = true;
+                    root = inodeTree.getFromInode(inode);
                 }
             }
 
@@ -153,35 +148,33 @@ function parseFilesFolders (){
             // #   logger.log "debug", "folder.parents is undefined or empty"
             // #   logger.log "debug", f
             // #   continue
-            const pid = f.parents[0].id //parent id
-            const parentInode = idToInode.get(pid)
-            if(parentInode){
+            if(inodeTree.getFromId(f.id) ){
+                continue
+            }
 
-                // if the parent exists, get it
-                var parent = inodeTree.get(parentInode)
+            const pid = f.parents[0].id; //parent id
+            const parent = inodeTree.getFromId(pid);
+            if(parent){
 
                 // check to see if parent is a folder
-                if (parent && parent instanceof GFolder){
-                    if(!parent.hasOwnProperty( "children")){
-                        parent.children = [];
-                    }
-                }else{
-                    notFound.push(f);
+                if (!( parent instanceof GFolder)) {
+                    // notFound.push(f);
+                    logger.debug("possible error with parsing files");
+                    logger.debug("parent:", parent);
+                    logger.debug("child:", i);
                     continue;
                 }
 
+
+
                 // check to see if id has already been set
-                if (idToInode.has(f.id)){
-                    continue
+                // sometimes the file has come
+                if (inodeTree.getFromId(f.id)){
+                    continue;
                 }
-                common.currentLargestInode++;
-                idToInode.set( f.id, common.currentLargestInode);
 
                 // push this current folder to the parent's children list
-                if( parent.children.indexOf(common.currentLargestInode) < 0 ){
-                    parent.children.push(common.currentLargestInode);
-                    inodeTree.set(common.currentLargestInode, new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), common.currentLargestInode, f.editable , []));
-                }
+                inodeTree.insert( new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable , []));
             }else{
                 notFound.push(f)
             }
@@ -198,23 +191,22 @@ function parseFilesFolders (){
 
     logger.info("Parsing files");
     for(let f of files){
-        var pid = f.parents[0].id;
-        var parentInode = idToInode.get(pid);
-        if (parentInode){
-            var parent = inodeTree.get(parentInode)
+        if(inodeTree.getFromId(f.id) ){
+            continue
+        }
+
+        const pid = f.parents[0].id;
+        const parent = inodeTree.getFromId(pid);
+        if (parent){
             if( !parent.children ){
-                continue
+                continue;
             }
 
-            common.currentLargestInode++;
-
             //add file to parent list
-            parent.children.push(common.currentLargestInode);
+            const inode = inodeTree.insert( new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable) );
 
-            idToInode.set( f.id, common.currentLargestInode);
-            inodeTree.set( common.currentLargestInode, new GFile(f.downloadUrl, f.id, pid, f.title, parseInt(f.fileSize), (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), common.currentLargestInode, f.editable) );
         }else{
-            left.push(f)
+            left.push(f);
         }
     }
 
@@ -223,108 +215,30 @@ function parseFilesFolders (){
     // logger.info "Finished parsing files"
     // logger.info "Everything should be ready to use"
     // saveFolderTree()
-    logger.debug(`After attempting to parse, there is ${inodeTree.size} items in the inodeTree and ${__items_to_parse_from_google__.length} items that were not yet parseable`);
+    logger.debug(`After attempting to parse, there is ${inodeTree.map.size} items in the inodeTree and ${__items_to_parse_from_google__.length} items that were not yet parseable`);
 }
 
-function parseFolderTreeInode(){
-    const  jsonFile =  `${config.cacheLocation}/data/inodeTree.json`;
-    const now = Date.now();
-    fs.readJson( jsonFile, function readJsonFolderTreeCallback(err, data){
-        try{
-            for( let key of Object.keys(data) ){
-                const o = data[key]
-                const inode = o.inode;
 
-                // add to idToPath
-                idToPath.set(o.id,key);
-                idToPath.set(o.parentid, pth.dirname(key));
-
-                if( 'size' in o)
-                    inodeTree.set( key, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission ) );
+function loadFolderTreeCallback(err){
+    if(err){
+        getAllFiles();
+        return;
+    }
+    const changeFile = pth.join(dataLocation,'largestChangeId.json');
+    fs.exists( changeFile, function checkLargestChangeIdJsonExistsCallback(exists){
+        if (exists){
+            fs.readJson(changeFile, function readLargestChangedIdCallback(err, data){
+                if (err)
+                    largestChangeId = 1;
                 else
-                    inodeTree.set( key, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children) );
-
-            }
-            const changeFile = `${config.cacheLocation}/data/largestChangeId.json`;
-            fs.exists( changeFile, function checkLargestChangeIdJsonExistsCallback(exists){
-                if (exists){
-                    fs.readJson(changeFile, function readLargestChangedIdCallback(err, data){                            
-                        largestChangeId = data.largestChangeId;
-                        if(require.main != module){
-                            loadChanges();
-                        }
-                    });
+                    largestChangeId = data.largestChangeId
+                if( require.main != module){
+                    loadChanges();
                 }
             });
-
-
-        }catch(error){
-            // if there was an error with reading the file, just download the whole structure again
-            getAllFiles();
         }
     });
-}
 
-function parseFolderTree(){
-    var jsonFile =  `${config.cacheLocation}/data/inodeTree.json`;
-    var now = Date.now();
-    fs.readJson( jsonFile, function readFolderTreeCallback(err, data){
-        if(err){
-            logger.debug(err)
-            getAllFiles();
-            return;
-        }
-
-        try{
-            for( let key of Object.keys(data)){
-                var o = data[key];
-                if(key == "1"){
-                    inodeTree.set( 1, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mitime, o.inode, o.permission, o.children) )
-                    idToInode.set( o.id, 1 );
-                    continue;
-                }
-
-                // make sure parent directory exists
-                if (!idToInode.has( o.parentid )){
-                    logger.debug("parent directory did not exist");
-                    logger.debug(o);
-                    continue;
-                }
-
-                idToInode.set(o.id, o.inode);
-
-                if('size' in o){
-                    inodeTree.set(o.inode, new GFile( o.downloadUrl, o.id, o.parentid, o.name, o.size, o.ctime, o.mtime, o.inode, o.permission ));
-                }else{
-                    inodeTree.set( o.inode, new GFolder(o.id, o.parentid, o.name, o.ctime, o.mtime, o.inode, o.permission,o.children));
-                }
-                if( o.inode  > common.currentLargestInode)
-                {
-                    common.currentLargestInode = o.inode;
-                }
-
-            }
-
-            var changeFile = `${config.cacheLocation}/data/largestChangeId.json`
-            fs.exists( changeFile, function checkLargestChangeIdJsonExistsCallback(exists){
-                if (exists){
-                    fs.readJson(changeFile, function readLargestChangedIdCallback(err, data){
-                        if (err)
-                            largestChangeId = 0;
-                        else
-                            largestChangeId = data.largestChangeId
-                        if( require.main != module){
-                            loadChanges();
-                        }
-                    });
-                }
-            });
-        }catch(error){
-            // if there was an error with reading the file, just download the whole structure again
-            logger.debug(error);
-            getAllFiles();
-        }
-    });
 }
 
 function loadFolderTree(){
@@ -333,7 +247,7 @@ function loadFolderTree(){
         logger.debug(`Folder tree exist status: ${exists}`);
         if (exists){
             logger.info("Loading folder structure");
-            parseFolderTree();
+            inodeTree.loadFolderTree(loadFolderTreeCallback);
         }else{
             logger.info( "Downloading full folder structure from google");
             getAllFiles();
@@ -342,40 +256,6 @@ function loadFolderTree(){
 }
 
 
-var lockFolderTree = false;
-function saveFolderTree(){
-    if(!lockFolderTree){
-        lockFolderTree = true
-        logger.debug( "saving folder tree");
-        var toSave = {};
-        for( let key of inodeTree.keys()){
-            var value = inodeTree.get(key);
-            var saved = {
-                downloadUrl: value.downloadUrl,
-                id: value.id,
-                parentid: value.parentid,
-                name: value.name,
-                ctime: value.ctime,
-                mtime: value.mtime,
-                inode: value.inode,
-                permission: value.permission,
-                mode: value.mode
-            };
-
-            if(value instanceof GFile){
-                saved.size = value.size;
-            }else{
-                saved.children = value.children;
-            }
-
-
-            toSave[key] = saved;
-        }
-
-        fs.outputJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(){});
-        lockFolderTree = false;
-    }
-}
 
 
 function getLargestChangeId(cb){
@@ -437,22 +317,11 @@ function parseChanges(items){
     for(let i of  items){
       try{
         if( i.deleted || i.file.labels.trashed){ // check if it is deleted
-            if( idToInode.has(i.fileId) ){ // check to see if the file was not already removed from folderTree
-                logger.debug(`${i.file.title} was deleted`)
-                var id = i.fileId;
-                let inode = idToInode.get(id)
-                var obj = inodeTree.get(inode)
-                inodeTree.delete(inode);
-                idToInode.delete(id);
+            let object = inodeTree.getFromId(i.fileId);
+            if( inodeTree.getFromId(object) ){ // check to see if the file was not already removed from folderTree
+                logger.debug(`${i.file.title} was deleted`);
+                inodeTree.delete(inode.inode);
 
-                var parent = inodeTree.get(obj.parentid);
-                if(!parent){
-                    continue
-                }
-                var idx = parent.children.indexOf(inode);
-                if(idx >= 0){
-                    parent.children.splice(idx, 1)
-                }
             }else{
                 try{
                     logger.debug( `processing a file that was marked as deleted, but not preset in the inodeTree: ${i.file.title} with id ${i.file.id}`);
@@ -471,16 +340,10 @@ function parseChanges(items){
 
 
         //if it is not deleted or trashed, check to see if it's new or not
-        var inode = idToInode.get(cfile.id)
-        if(inode){
-            const f = inodeTree.get(inode);
+        let f = inodeTree.getFromId(cfile.id)
+        if(f){
             logger.debug( `${f.name} was updated`);
 
-            if(!f){
-                idToPath.delete(path);
-                notFound.push(i);
-                continue;
-            }
             f.ctime = (new Date(cfile.createdDate)).getTime()
             f.mtime = (new Date(cfile.modifiedDate)).getTime()
             if(f.name != cfile.title){
@@ -497,7 +360,7 @@ function parseChanges(items){
             }
             if (f.parentid != cfile.parents[0].id){
                 logger.info (`${f.name} has moved`);
-                f.parentid = cfile.parents[0].id;
+                inodeTree.setNewParents(f,cfile.parents[0].id);
             }
             continue;
         }
@@ -509,22 +372,22 @@ function parseChanges(items){
         }
 
         var parentId = cfile.parents[0].id;
-        var parentInode = idToInode.get(parentId);
+        var parentInode = inodeTree.getFromId(parentId);
         if(!parentInode){
             notFound.push(i);
             continue;
         }
-        parent = inodeTree.get(parentInode);
+        parent = inodeTree.getFromInode(parentInode);
         common.currentLargestInode++;
         inode = common.currentLargestInode;
         idToInode.set(cfile.id, inode);
         parent.children.push(inode);
         if( cfile.mimeType == 'application/vnd.google-apps.folder'){
             logger.debug (`${cfile.title} is a new folder`);
-            inodeTree.set( inode, new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), inode, cfile.editable ));
+            inodeTree.insert(new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable ));
         }else{
             logger.debug  (`${cfile.title} is a new file`)
-            inodeTree.set (inode, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(),inode, cfile.editable))
+            inodeTree.insert(inode, new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable))
         }
       }catch(error){
               logger.debug("There was an error while parsing charges");
@@ -539,12 +402,89 @@ function parseChanges(items){
 
     if(items.length > 0){
         fs.outputJson(`${config.cacheLocation}/data/largestChangeId.json`, {largestChangeId: largestChangeId}), function(){};
-        saveFolderTree();
+        inodeTree.saveFolderTree();
     }
 
     logger.debug("Finished parsing changes from google");
     setTimeout(loadChanges, config.refreshDelay + Math.random() * (config.refreshDelay) * 0.25);
 }
+
+function findFoldersWithUnknownParents(){
+    var items = __items_to_parse_from_google__;
+    var folders = [];
+ 
+    for( let i of items ){
+        if ((! (i.parents) ) || i.parents.length == 0){
+            continue
+        }
+        if(i.deleted || i.labels.trashed || i.labels.hidden){
+            continue;
+        }
+
+        if(i.mimeType === "application/vnd.google-apps.folder"){
+            folders.push(i);
+        }
+    }
+    const foldersWithUnkownParents = new Set();
+    for(let f of folders){
+        let found =false;
+        for(let g of folders){
+            for(let p of f.parents){
+                if(p.id === g.id){
+                    found = true;
+                    break;
+                }
+            }
+            if(found){
+                break;
+            }            
+
+        }
+        if(!found){
+            // debugger;
+            foldersWithUnkownParents.add(f.parents[0].id);
+        }
+    }    
+    getParentsOfFoldersWithUnkownParents(foldersWithUnkownParents);    
+
+}
+
+function getParentsOfFoldersWithUnkownParents(foldersWithUnkownParents,cb){
+
+
+    var finishedDownloadingFolders = 0;
+
+    for(let folder of foldersWithUnkownParents){
+        drive.files.get({fileId: folder}, function getNewFolderCallback(err,f){
+            if(err){
+                logger.error(err);
+                drive.files.get({fileId: folder}, getNewFolderCallback);
+                return;
+            }
+            finishedDownloadingFolders++;
+            
+            var pid = inodeTree.getFromInode(1).parentid;
+            if(f.parents.length > 0){
+                pid = f.parents[0].id;
+            }
+
+            const folder =  new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable , []);
+
+            inodeTree.insert( folder);
+
+            // console.log(file);
+            if(finishedDownloadingFolders ==foldersWithUnkownParents.size ){
+                parseFilesFolders();
+            }
+
+        }
+
+        );
+
+    }
+
+}
+
 /*
  ####################################
  ###### Setting up the Client #######
@@ -591,9 +531,4 @@ if(!config.accessToken){
     loadFolderTree();
 }
 
-module.exports.idToInode = idToInode
-module.exports.inodeTree = inodeTree
-module.exports.saveFolderTree = saveFolderTree
-module.exports.drive = drive
 module.exports.loadChanges = loadChanges
-module.exports.parseFilesFolders = parseFilesFolders

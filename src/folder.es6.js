@@ -296,7 +296,7 @@ function saveUploadTree(){
 // ######################################
 // ######################################
 class GFolder {
-  constructor(id, parentid, name, ctime, mtime, inode, permission, children, mode) {
+  constructor(id, parentid, name, ctime, mtime, permission, children, mode) {
     if (!children)
       children = [];
     if (!mode) {
@@ -307,7 +307,6 @@ class GFolder {
     this.name = name;
     this.ctime = ctime;
     this.mtime = mtime;
-    this.inode = inode;
     this.permission = permission;
     this.children = children;
     this.mode = mode;

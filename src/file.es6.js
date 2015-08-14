@@ -40,7 +40,7 @@ class GFile extends EventEmitter{
   // static get chunkSize(){
   //   return 1024*1024*16; //set default chunk size to 16MB. this should be changed at run time
   // }
-  constructor(downloadUrl, id, parentid, name, size, ctime, mtime, inode, permission, mode){
+  constructor(downloadUrl, id, parentid, name, size, ctime, mtime, permission, mode){
     super();
     if(!mode){
       mode = 33279;//0o100777;
@@ -52,7 +52,6 @@ class GFile extends EventEmitter{
     this.size = size;
     this.ctime = ctime;
     this.mtime = mtime;
-    this.inode = inode;
     this.permission = permission;
     this.mode = mode;
   }

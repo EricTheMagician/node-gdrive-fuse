@@ -7,10 +7,10 @@ const os = require( 'os' );
 const MD5 = require( 'MD5' );
 const PosixError = fuse.PosixError;
 
+const inodeTree = require('./inodetree.js');
 
+//require the client so that it will load the folder tree correctly.
 const client = require('./client.es6.js');
-const inodeTree = client.inodeTree;
-const idToInode = client.idToInode;
 
 const folder = require("./folder.es6.js");
 const uploadTree = folder.uploadTree;
@@ -59,7 +59,7 @@ class GDriveFS extends fuse.FileSystem{
 
     getattr(context, inode, reply){
         if (inodeTree.has(inode)){
-            inodeTree.get(inode).getAttr(
+            inodeTree.getFromInode(inode).getAttr(
                 function getAttrCallback(status, attr){
                     reply.attr(attr, 5)
                 }
@@ -88,18 +88,18 @@ class GDriveFS extends fuse.FileSystem{
      */
     readdir(context, inode, requestedSize, offset, fileInfo, reply){
         if(inodeTree.has(inode)){
-            const object = inodeTree.get(inode);
+            const object = inodeTree.getFromInode(inode);
             if(object instanceof GFile){
                 reply.err( errnoMap.ENOTDIR)
             }else if (object instanceof GFolder){
                 const size = Math.max( requestedSize , object.children.length * 256);
                 // size = requestedSize
-                const parent = inodeTree.get(object.parentid);
+                const parent = inodeTree.getFromId(object.parentid);
                 var totalSize = 0;
                 // totalSize += reply.addDirEntry('.', requestedSize, {inode: object.inode}, offset);
                 // totalSize += reply.addDirEntry('..', requestedSize, {inode: parent.inode}, offset);
                 for( let child of object.children ){
-                    const cnode = inodeTree.get(child);
+                    const cnode = inodeTree.getFromInode(child);
                     if(cnode){
                         const attr = cnode.getAttrSync();
                         //console.log( cnode.name, cnode.inode);
@@ -124,7 +124,7 @@ class GDriveFS extends fuse.FileSystem{
     setattr(context, inode, attrs, reply){
         logger.debug( `setting attr for ${inode}`);
         logger.silly(attrs);
-        const file = inodeTree.get(inode);
+        const file = inodeTree.getFromInode(inode);
         if(!file){
             reply.err(errnoMap.ENOENT);
             return;
@@ -146,7 +146,7 @@ class GDriveFS extends fuse.FileSystem{
             file.mode = attrs.mode
         }
 
-        inodeTree.set( inode, file );
+        inodeTree.map.set( inode, file );
 
 
         reply.attr(file.getAttrSync(), 5);
@@ -158,7 +158,7 @@ class GDriveFS extends fuse.FileSystem{
         const flags = fileInfo.flags;
         if (flags.rdonly){ //read only
             if (inodeTree.has(inode)){
-                const file = inodeTree.get(inode);
+                const file = inodeTree.getFromInode(inode);
                 if (file instanceof GFile){
                     if (file.downloadUrl){ //make sure that the file has been fully uploaded
                         reply.open(fileInfo);
@@ -180,7 +180,7 @@ class GDriveFS extends fuse.FileSystem{
         if( flags.wronly ){ //write only
             logger.silly(`$tried to open file "${inode}" for writing`);
             if ( inodeTree.has(inode) ){ //if folderTree has path, make sure it's a file with size zero
-                const file = inodeTree.get(inode);
+                const file = inodeTree.getFromInode(inode);
                 if (file instanceof GFile){
                     if (file.size == 0){
                         // logger.debug(`${path} size was 0`);
@@ -270,7 +270,7 @@ class GDriveFS extends fuse.FileSystem{
 
         if( inodeTree.has(inode)){
             // make sure that we are only reading a file
-            const file = inodeTree.get(inode)
+            const file = inodeTree.getFromInode(inode)
             if (file instanceof GFile ){
 
                 // make sure the offset request is not bigger than the file itself
@@ -293,7 +293,7 @@ class GDriveFS extends fuse.FileSystem{
         // path = inodeToPath.get inode
         // logger.silly( `writing to file ${path} - position: ${position}, length: ${buffer.length}"
 
-        const file = inodeTree.get( inode )
+        const file = inodeTree.getFromInode( inode )
         if (!file){
             logger.debug( inode );
             reply.err( errnoMap.ENOENT );
@@ -332,12 +332,12 @@ class GDriveFS extends fuse.FileSystem{
         // path = pth.join parentPath, name
         // logger.debug(`creating folder ${path}");
         logger.debug( `creating folder ${name}` );
-        const parent = inodeTree.get( parentInode);
+        const parent = inodeTree.getFromInode( parentInode);
         if( parent ){ //make sure that the parent exists
             if (parent instanceof GFolder){ //make sure that the parent is a folder
 
                 for( let childInode of parent.children){ // make sure that the child doesn't already exist
-                    const child = inodeTree.get(childInode)
+                    const child = inodeTree.getFromInode(childInode)
                     if (child && child.name === name ){
                         reply.err(errnoMap.EEXIST);
                         return;
@@ -360,16 +360,7 @@ class GDriveFS extends fuse.FileSystem{
                     }else{
                         const now = (new Date).getTime()
 
-                        const inodes = [];
-                        for ( let value of inodeTree.values() ){
-                            inodes.push(value.inode);
-                        }    
-                        common.currentLargestInode++;
-                        const inode = common.currentLargestInode;
-                        parent.children.push( inode );
-                        const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), common.currentLargestInode, res.editable, [])
-                        inodeTree.set( common.currentLargestInode, folder );
-                        idToInode.set( folder.id, common.currentLargestInode );
+                        const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
                         const attr = folder.getAttrSync();
                         let entry = {
                             inode: attr.inode,
@@ -396,7 +387,7 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     rmdir(context, parentInode, name, reply) {
-        const parent = inodeTree.get(parentInode);
+        const parent = inodeTree.getFromInode(parentInode);
         logger.debug( `removing
       folder
       ${name}
@@ -405,7 +396,7 @@ class GDriveFS extends fuse.FileSystem{
 
         // make sure the actual directory exists
         for (childInode of parent.children) {
-            const folder = inodeTree.get(childInode);
+            const folder = inodeTree.getFromInode(childInode);
             if (folder.name === name) {
 
                 //make sure that it is a folder
@@ -423,7 +414,6 @@ class GDriveFS extends fuse.FileSystem{
                                 parent.children.splice(idx, 1);
                             }
                             inodeTree.delete(childInode)
-                            idToInode.delete(folder.id);
 
                             reply.err(0)
                             client.saveFolderTree();
@@ -445,10 +435,10 @@ class GDriveFS extends fuse.FileSystem{
 
     mknod(context, parentInode, name, mode, rdev, reply){
 
-        const parent = inodeTree.get(parentInode);
+        const parent = inodeTree.getFromInode(parentInode);
 
         for(childInode in parent.children){ //TODO: if file exists, delete it first
-            const child = inodeTree.get(childInode);
+            const child = inodeTree.getFromInode(childInode);
             if (child && child.name === name){
                 reply.err(PosixError.EEXIST);
                 return;
@@ -456,12 +446,9 @@ class GDriveFS extends fuse.FileSystem{
         }
 
         const now = (new Date).getTime();
-        common.currentLargestInode++;
-        const inode = common.currentLargestInode;
 
         const file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
-        inodeTree.set( inode, file );
-        parent.children.push(inode);
+        let inode = inodeTree.insert( file );
 
         logger.debug (`mknod: parentid: ${parent.id} -- inode ${inode}` );
         logger.info  (`adding a new file ${name} to folder ${parent.name}` );
@@ -490,7 +477,7 @@ class GDriveFS extends fuse.FileSystem{
 
 
     create(context, parentInode, name, mode, fileInfo, reply){
-        const parent = inodeTree.get (parentInode);
+        const parent = inodeTree.getFromInode(parentInode);
 
         if (parent){ //make sure parent exists
             logger.debug( `creating file ${name}`);
@@ -503,16 +490,13 @@ class GDriveFS extends fuse.FileSystem{
             const now = (new Date).getTime();
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
-            common.currentLargestInode++;
-            const inode = common.currentLargestInode;
-            const file = new GFile(null, null, parent.id, name, 0, now, now, inode, true);
-            inodeTree.set(inode, file)
-            parent.children.push(inode);
+            const file = new GFile(null, null, parent.id, name, 0, now, now, true);
+            const inode = inodeTree.insert(file)
 
             logger.debug( `create: parentid: ${parent.id} -- inode ${inode}`);
             logger.info (`adding a new file ${name} to folder ${parent.name}`);
 
-            client.saveFolderTree();
+            inodeTree.saveFolderTree();
 
             fs.open( systemPath, 'w', function createOpenFileCallback(err, fd){
                 if (err){
@@ -547,10 +531,10 @@ class GDriveFS extends fuse.FileSystem{
      */
     unlink(context, parentInode, name, reply){
         logger.debug( `removing file ${name}`);
-        const parent = inodeTree.get( parentInode );
+        const parent = inodeTree.getFromInode( parentInode );
 
         for( let childInode of parent.children ){
-            const file = inodeTree.get(childInode)
+            const file = inodeTree.getFromInode(childInode)
 
             // make sure the file still exists in the inodeTree
             // if not, remove it
@@ -573,8 +557,7 @@ class GDriveFS extends fuse.FileSystem{
             //now we are pretty sure that the inode is the correct one
             parent.children.splice( parent.children.indexOf(childInode), 1)
             inodeTree.delete( childInode );
-            idToInode.delete( file.id );
-            client.saveFolderTree();
+            inodeTree.saveFolderTree();
 
             drive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
                 if (err){
@@ -621,9 +604,8 @@ class GDriveFS extends fuse.FileSystem{
                     uploadTree.set(inode, upCache);
                     saveUploadTree();
 
-                    const file = inodeTree.get(inode);
-                    const parentInode = idToInode.get(file.parentid);
-                    const parent = inodeTree.get(parentInode);
+                    const file =   inodeTree.getFromInode(inode);
+                    const parent = inodeTree.getFromId(file.parentid);
                     /*
                      three cases:
                      if file size is 0: delete it and don't upload
@@ -688,7 +670,7 @@ class GDriveFS extends fuse.FileSystem{
         console.log('GetXAttr was called!');
         const parent = inodeToPath.get(parentInode)
         for( childInode of parent.children){
-            if(inodeTree.get(childInode).name === name){
+            if(inodeTree.getFromInode(childInode).name === name){
                 reply.err(0);
                 return;
             }
@@ -698,7 +680,7 @@ class GDriveFS extends fuse.FileSystem{
 
     listxattr(context, inode, size, reply){
         console.log("listxattr called");
-        const obj = inodeTree.get(inode);
+        const obj = inodeTree.getFromInode(inode);
         if (obj){
             // console.log(obj);
         }
@@ -714,14 +696,14 @@ class GDriveFS extends fuse.FileSystem{
 
     rename(context, oldParentInode, oldName, newParentInode, newName, reply){
         //find the currrent child
-        const parent = inodeTree.get(oldParentInode);
+        const parent = inodeTree.getFromInode(oldParentInode);
         if(!parent){
             reply.err(PosixError.ENOENT);
             return;
         }
 
         for( let childInode of parent.children){
-            const child = inodeTree.get(childInode);
+            const child = inodeTree.getFromInode(childInode);
             if (child.name === oldName){
                 // move to new folder if required
                 const params = {
@@ -732,7 +714,7 @@ class GDriveFS extends fuse.FileSystem{
                     modifiedDate: true
                 };
                 if( newParentInode != oldParentInode ){
-                    const newParent = inodeTree.get(newParentInode);
+                    const newParent = inodeTree.getFromInode(newParentInode);
                     const oldParent = parent;
                     if( !newParent ){
                         reply.err (PosixError.ENOENT);
@@ -777,9 +759,9 @@ class GDriveFS extends fuse.FileSystem{
             reply.err(PosixError.ENOENT);
         }
 
-        const parent = inodeTree.get( parentInode );
+        const parent = inodeTree.getFromInode( parentInode );
         for( let childInode of parent.children){
-            const child = inodeTree.get(childInode);
+            const child = inodeTree.getFromInode(childInode);
             if (child && child.name === name){
                 const attr = child.getAttrSync();
                 attr.size = attr.size || 4096
@@ -869,9 +851,9 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
 function uploadCallback(inode, cb){
 
     return function (err, result){
-        const file = inodeTree.get(inode)
-        const parentInode = idToInode.get(file.parentid)
-        const parent = inodeTree.get(parentInode)
+        const file = inodeTree.getFromInode(inode)
+        const parentInode = inodeTree.getFromId(file.parentid)
+        const parent = inodeTree.getFromInode(parentInode)
         if(err){
             if (err === "invalid mime"){
                 logger.debug(`the mimetype of ${path} was invalid`);
@@ -913,7 +895,7 @@ function uploadCallback(inode, cb){
         uploadTree.delete(inode);
         saveUploadTree();
         if (inodeTree.has(inode)){
-            const file = inodeTree.get(inode);
+            const file = inodeTree.getFromInode(inode);
             logger.debug(`${file.name} already existed in inodeTree`);
             file.downloadUrl = result.downloadUrl
             file.id = result.id
@@ -959,16 +941,16 @@ function resumeUpload(){
                 uploadTree.delete(inode);
                 continue;
             }
-            let file = inodeTree.get(inode);
+            let file = inodeTree.getFromInode(inode);
 
             // check to see if the file was released by the filesystem
             // if it wasn't released by the filesystem, it means that the file was not finished transfering
             let value = uploadTree.get(inode);
             if(value.released){
-                let parentInode = idToInode.get( file.parentid );
+                let parentInode = inodeTree.getFromId( file.parentid );
                 value.uploading = false;
                 if (inodeTree.has(parentInode)){
-                    let parent = inodeTree.get(parentInode)
+                    let parent = inodeTree.getFromInode(parentInode)
                     if (parent instanceof GFolder){
                         value.location = false;
                         uploadTree.set(inode, value);
@@ -987,8 +969,8 @@ function resumeUpload(){
             }else{
                 inodeTree.delete(inode)
                 uploadTree.delete(inode)
-                let parentInode = idToInode.get(value.parentid);
-                let parent = inodeTree.get(parentInode)
+                let parentInode = inodeTree.getFromId(value.parentid);
+                let parent = inodeTree.getFromInode(parentInode)
                 if (parent){
                     let idx = parent.children.indexOf(inode);
                     if (idx > 0){
@@ -1006,7 +988,7 @@ function resumeUpload(){
 }
 
 function start(count){
-    if( inodeTree.size > 1){
+    if( inodeTree.map.size > 1){
         try{
             logger.info('attempting to start f4js');
             var add_opts;
