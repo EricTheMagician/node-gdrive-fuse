@@ -276,7 +276,9 @@ class GDriveFS extends fuse.FileSystem{
                 // make sure the offset request is not bigger than the file itself
                 if (offset < file.size){
                     file.read(offset, offset+len-1,true,readDataCallback);
-                }else{
+                }else if(offset == file.size){
+                    reply.err(0);
+                }else{                    
                     reply.err(errnoMap.ESPIPE);
                 }
             }else{
