@@ -190,11 +190,11 @@ class GDriveFS extends fuse.FileSystem{
                                 if (err){
                                     logger.debug( "could not open file for writing" );
                                     logger.debug( err );
-                                    reply.err( errnoMap[err.code] );
+                                    reply.err( -err.errno );
                                     return;
                                 }
 
-                                fileInfo.fh = fd;
+                                fileInfo.file_handle = fd;
                                 reply.open(fileInfo);
                             });
                         }else{
@@ -300,11 +300,11 @@ class GDriveFS extends fuse.FileSystem{
             return;
         }
         const size = file.size
-        fs.write( fileInfo.fh, buffer, 0, buffer.length, position, function fsWriteCallback(err, bytesWritten, buffer){
+        fs.write( fileInfo.file_handle, buffer, 0, buffer.length, position, function fsWriteCallback(err, bytesWritten, buffer){
             if (err){
                 logger.debug( `there was an error writing for file ${file.name}` )
                 logger.debug( err )
-                logger.debug( "position", position, "fh", fileInfo.fh )
+                logger.debug( "position", position, "fh", fileInfo.file_handle )
                 reply.err(err.errno);
                 return;
             }
@@ -504,7 +504,7 @@ class GDriveFS extends fuse.FileSystem{
                     reply.err(errnoMap[err.code]);
                     return;
                 }
-                fileInfo.fh = fd;
+                fileInfo.file_handle = fd;
                 logger.debug( "setting upload Tree" );
                 const upFile = {
                     cache: cache,
@@ -590,7 +590,7 @@ class GDriveFS extends fuse.FileSystem{
         if (uploadTree.has (inode) ){
             logger.debug(`${inode} was in the upload tree`);
             // close the file
-            fs.close( fileInfo.fh, function closeFileCallback(err){
+            fs.close( fileInfo.file_handle, function closeFileCallback(err){
                 if (err){
                     reply.err(err.errno);
                     return;
@@ -635,8 +635,8 @@ class GDriveFS extends fuse.FileSystem{
                     saveUploadTree();
                 }
             });
-        }else if (fileInfo.fh){
-            fs.close(fileInfo.fh, function closeFileCallback(err){
+        }else if (fileInfo.file_handle){
+            fs.close(fileInfo.file_handle, function closeFileCallback(err){
                 if (err){
                     logger.error("There was an error closing file");
                     logger.error(err);
@@ -769,9 +769,6 @@ class GDriveFS extends fuse.FileSystem{
                     inode: childInode,
                     generation: 2,
                     attr: attr,
-                    mode: attr.mode,
-                    atime: attr.atime,
-                    ctime: attr.ctime
                     // attr_timeout: 5,
                     // entry_timeout: 5
                 };
