@@ -851,8 +851,7 @@ function uploadCallback(inode, cb){
 
     return function (err, result){
         const file = inodeTree.getFromInode(inode)
-        const parentInode = inodeTree.getFromId(file.parentid)
-        const parent = inodeTree.getFromInode(parentInode)
+        const parent = inodeTree.getFromId(file.parentid)
         if(err){
             if (err === "invalid mime"){
                 logger.debug(`the mimetype of ${path} was invalid`);
@@ -906,14 +905,13 @@ function uploadCallback(inode, cb){
             common.currentLargestInode++;
             let inode = common.currentLargestInode;
             const file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)
+            inodeTree.insert(file)
         }
         // update parent
         if( !(file.inode in parent.children)){
             parent.children.push(file.inode)
         }
-        inodeTree.set( file.inode, file );
-        idToInode.set( file.id, file.inode );
-        client.saveFolderTree();
+        inodeTree.saveFolderTree();
 
         // move the file to download folder after finished uploading
         fs.open( uploadedFileLocation, 'r', function openFileAfterUploadCallback(err,fd){
@@ -1024,7 +1022,7 @@ function start(count){
                 // opts.push "-f"
 
                 // opts.push "-mt"
-                // opts.push "-d"
+                opts.push("-d")
                 fuse.fuse.mount({
                     filesystem: GDriveFS,
                     options: opts.concat(add_opts)

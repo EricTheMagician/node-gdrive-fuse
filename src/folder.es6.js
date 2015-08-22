@@ -1,7 +1,6 @@
 "use strict";
 
 var fs = require( 'fs-extra');
-var rest = require( 'restler');
 var request = require( 'request');
 var pth = require( 'path');
 var mmm = require('mmmagic');
@@ -45,13 +44,34 @@ function getRangeEnd(range){
 
 function getNewRangeEnd(location, fileSize, cb){
   var options = {
+    url: location,
+    method: 'POST',
     headers: {
       "Authorization": `Bearer ${config.accessToken.access_token}`,
       "Content-Length": 0,
       "Content-Range": `bytes */${fileSize}`
     }
   };
+  request.post(location)
+  .on('response', function(resp){
+    debugger;
+    console.log(resp.statusCode);
 
+    if(resp.statusCode >= 200  && resp.statusCode < 300){
+      console.log(resp.statusCode);
+      debugger;
+    }
+    // #if the link is dead or bad
+    if( resp.statusCode == 404 || resp.statusCode == 410 || resp.statusCode == 401){
+      // logger.debug "the link is no longer valid"
+      cb(resp.statusCode, -1);
+      return;
+    }
+
+
+
+  });
+  /*
   rest.put(location, options)
       .on( 'complete', function getNewRangeEndCompleteCallback(res, resp){
         if(res instanceof Error){
@@ -87,6 +107,7 @@ function getNewRangeEnd(location, fileSize, cb){
 
         return
       })
+    */
   return;
 }
 
@@ -97,14 +118,55 @@ function getUploadResumableLink(parentId, fileName, fileSize, mime, cb){
   };
 
   var options = {
+    url: uploadUrl,
+    method: 'POST',
     timeout: 300000,
     headers: {
       "Authorization": `Bearer ${config.accessToken.access_token}`,
       "X-Upload-Content-Type": mime,
       "X-Upload-Content-Length": fileSize
-    }
+    },
+    body: data,
+    json: true
   };
 
+  request(options, function getUploadResumableLinkCompleteCallback(err, resp, result){
+    if( resp.statusCode == 401 || resp.statusCode == 400){
+      if( parseInt(resp.headers['content-length']) > 0){
+        // logger.error "There was an error with getting a new resumable link"
+        // logger.error result
+        if( result.error){
+          var error = result.error.errors[0];
+          var idx = error.message.indexOf("Media type")
+          if( idx >= 0 ){
+            cb("invalid mime");
+            return;
+          }
+        }
+      }else{
+        // logger.debug result
+      }
+
+      // logger.debug "refreshing access token while getting resumable upload links"
+
+      refreshToken(
+          function getUploadResumableLinkCompleteRetry(){
+            getUploadResumableLink(parentId, fileName, fileSize, mime, cb);
+          }
+      )
+    }else if(resp.statusCode == 200){
+      cb(null, resp.headers.location);
+    }else{
+      // # console.log resp.statusCode
+      // console.log(resp.headers)
+      // console.log(resp.req._headers)
+      // console.log(result)
+      cb(resp.statusCode);
+    }
+  });
+  
+  
+  /* 
   rest.postJson( uploadUrl, data, options)
       .on('complete', function getUploadResumableLinkCompleteCallback(result, resp){
         if(result instanceof Error){
@@ -151,6 +213,7 @@ function getUploadResumableLink(parentId, fileName, fileSize, mime, cb){
           }
         }
       });
+  */
 }
 
 function uploadData(location, fileLocation, start, fileSize, mime, cb){
