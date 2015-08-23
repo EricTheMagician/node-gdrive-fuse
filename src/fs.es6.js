@@ -1022,7 +1022,7 @@ function start(count){
                 // opts.push "-f"
 
                 // opts.push "-mt"
-                opts.push("-d")
+                // opts.push("-d")
                 fuse.fuse.mount({
                     filesystem: GDriveFS,
                     options: opts.concat(add_opts)
