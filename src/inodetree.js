@@ -30,7 +30,15 @@ class InodeTree {
 
 			if(this.currentLargestInode > 1){
 				const parent = this.getFromId(value.parentid);
-				parent.children.push(this.currentLargestInode);
+
+				//if the parent doesn't exist, put it in the root
+				if(parent){
+					parent.children.push(this.currentLargestInode);
+				}else{
+					const root = this.getFromInode(1);
+					root.children.push(this.currentLargestInode);
+					logger.info(`no parent found for item called "${value.name}". Placing it under the root folder`)  
+				}
 			}
 
 			this.idToInode.set(value.id, value);

@@ -463,9 +463,13 @@ function getParentsOfFoldersWithUnkownParents(foldersWithUnkownParents,cb){
             }
             finishedDownloadingFolders++;
             
-            var pid = inodeTree.getFromInode(1).parentid;
+            const rootid = inodeTree.getFromInode(1).parentid;
+            var pid = rootid;
             if(f.parents.length > 0){
                 pid = f.parents[0].id;
+                if(!inodeTree.getFromId(pid)){
+                    pid = rootid;
+                }
             }
 
             const folder =  new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable , []);
