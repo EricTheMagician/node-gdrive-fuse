@@ -1010,7 +1010,12 @@ function start(count){
             const debug = false;
 
             exec( command, function unmountCallback(err, data){
-                fs.ensureDirSync(config.mountPoint);
+                try{
+                    fs.ensureDirSync(config.mountPoint);
+                }catch(e){
+                    logger.error("could not ensure the mountpoint existed.");
+                    process.exit(1)
+                }
                 if (err){
                     logger.error( "unmount error:", err);
                 }
