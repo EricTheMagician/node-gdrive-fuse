@@ -372,7 +372,7 @@ class GDriveFS extends fuse.FileSystem{
                             entry_timeout: 5
                         };
                         reply.entry(entry);
-                        client.saveFolderTree();
+                        inodeTree.saveFolderTree();
                     }
                 });
             }else{
@@ -418,7 +418,7 @@ class GDriveFS extends fuse.FileSystem{
                             inodeTree.delete(childInode)
 
                             reply.err(0)
-                            client.saveFolderTree();
+                            inodeTree.saveFolderTree();
                         });
                         return;
                     } else {
