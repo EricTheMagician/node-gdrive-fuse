@@ -377,7 +377,7 @@ function parseChanges(items){
             notFound.push(i);
             continue;
         }
-        parent = inodeTree.getFromInode(parentInode);
+        const parent = inodeTree.getFromInode(parentInode);
         common.currentLargestInode++;
         inode = common.currentLargestInode;
         idToInode.set(cfile.id, inode);
