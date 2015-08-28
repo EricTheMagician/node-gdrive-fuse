@@ -379,7 +379,7 @@ function parseChanges(items){
         }
         const parent = inodeTree.getFromInode(parentInode);
         common.currentLargestInode++;
-        inode = common.currentLargestInode;
+        const inode = common.currentLargestInode;
         idToInode.set(cfile.id, inode);
         parent.children.push(inode);
         if( cfile.mimeType == 'application/vnd.google-apps.folder'){
