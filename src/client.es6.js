@@ -380,7 +380,6 @@ function parseChanges(items){
         const parent = inodeTree.getFromInode(parentInode);
         common.currentLargestInode++;
         const node = common.currentLargestInode;
-        parent.children.push(inode);
         if( cfile.mimeType == 'application/vnd.google-apps.folder'){
             logger.debug (`${cfile.title} is a new folder`);
             inodeTree.insert(new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable ));
