@@ -944,12 +944,11 @@ function resumeUpload(){
             // if it wasn't released by the filesystem, it means that the file was not finished transfering
             let value = uploadTree.get(inode);
             if(value.released){
-                let parentInode = inodeTree.getFromId( file.parentid );
+                let parent = inodeTree.getFromId( file.parentid );
                 value.uploading = false;
-                if (inodeTree.has(parentInode)){
-                    let parent = inodeTree.getFromInode(parentInode)
+                if (parent){
                     if (parent instanceof GFolder){
-                        value.location = false;
+                        //value.location = false;
                         uploadTree.set(inode, value);
 
                         q.push(
