@@ -554,7 +554,7 @@ class GFolder {
 
             logger.info( `Starting to upload file ${fileName} ` );
             if (upFile.location) {
-              location = upFile.location;
+              const location = upFile.location;
               getNewRangeEnd(location, size, cbNewEnd);
             } else {
               getUploadResumableLink(folder.id, fileName, size, mime, cbNewLink);
