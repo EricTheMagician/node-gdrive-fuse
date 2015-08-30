@@ -17,9 +17,9 @@
   "dependencies": {
     "MD5": "^1.2.1",
     "fs-extra": "^0.23.1",
-    "fusejs": "~1.2.1",
+    "fusejs": "^1.2.2",
     "googleapis": "^2.1.1",
-    "mmmagic": "~0.3.15",
+    "mmmagic": "^0.3.16",
     "queue": "^3.1.0",
     "request": "^2.60.0",
     "sqlite3": "^3.0.8",
