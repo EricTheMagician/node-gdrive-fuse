@@ -250,6 +250,7 @@ class GFile extends EventEmitter{
       clearTimeout(f.to)
       f.to = setTimeout(openedFileCallCloseTimeout, cacheTimeout);
       cb(null, f.fd);
+      openedFiles.set(`${file.id}-${start}`, f);
       return;
     }else{
       let end = Math.min(start + config.chunkSize, file.size ) - 1;
@@ -266,7 +267,7 @@ class GFile extends EventEmitter{
             fs.open( path, 'r', function openfile_callback(err,fd){
               if (err){
                 if (err.code == "EMFILE"){
-                  file.open(start, cb)
+                  file.open(start, cb);
                 }else{
                   logger.error("there was an handled error while opening files for reading");
                   logger.error(err);
@@ -293,7 +294,7 @@ class GFile extends EventEmitter{
                 opened.to = setTimeout(openedFileCallCloseTimeout, cacheTimeout)
                 openedFiles.set(`${file.id}-${start}`, opened);
 
-                return
+                return;
               }
 
               openedFiles.set(`${file.id}-${start}`, {fd: fd, to: setTimeout(openedFileCallCloseTimeout, cacheTimeout) });
@@ -555,7 +556,7 @@ function initialize_path(path, type){
         count += 1
         totalSize += size
 
-        if(count > 750){
+        if(count > 25000){
           q.push( queue_fn(totalSize, cmd))
           count = 0
           totalSize = 0
@@ -587,7 +588,7 @@ function delete_files(){
   if( !delete_once){
     delete_once = true;
     logger.info( "deleting files to make space in the cache" );
-    logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB` );
+    logger.info( `current size of cache is: ${totalDownloadSize/1024/102/1024} GB` );
 
     db.all("SELECT * from files ORDER BY atime, size ASC", function delete_files_callback(err, rows){
       _delete_files_(0,0,rows);
@@ -600,72 +601,72 @@ function _delete_files_(start,end, rows){
   var count = end - start + 1
   if( totalDownloadSize >= (0.8*maxCache) ){
     fs.unlink( pth.join(downloadLocation, row.name), function unlink_delete_file_callback(err){
-      if(!err)
+      if(!err){
         // if there is an error, it usually is because there was a file that was in the db that was already deleted
-      totalDownloadSize -= row.size
+        totalDownloadSize -= row.size;
+      }
 
-      if (count > 200){
-        var cmd = "DELETE FROM files WHERE name in ("
-          for( var i = start; i < end; i++){
-            row = rows[i];
-            cmd += `'${row.name}',`
+      if (count > 2000){
+        let cmd = "DELETE FROM files WHERE name in (";
+        for( var i = start; i < end; i++){
+          row = rows[i];
+          cmd += `'${row.name}',`;
+        }
+        cmd += `'${rows[end].name}')`;
+
+        db.run( cmd, function remove_rows_from_database_after_delete(err){
+          if (err){
+            logger.error( "There was an error with database while deleting files" )
+            logger.err( err )
+            logger.info( "finsihed deleting files by error" )
+            logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB` )
+            delete_once = false
+            return
           }
-          cmd += `'${rows[end].name}')`
 
-db.run( cmd, function remove_rows_from_database_after_delete(err){
-  if (err){
-    logger.error( "There was an error with database while deleting files" )
-    logger.err( err )
-    logger.info( "finsihed deleting files by error" )
+          end += 1;
+          if (end == rows.length){
+            logger.info( "finsihed deleting files by delelting all files")
+            logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB`)
+            delete_once = false
+          }else{
+            _delete_files_(end, end, rows);
+          }
+        });
+
+
+      }else{
+        end += 1
+        if (end == rows.length){
+          logger.info( "finsihed deleting files by delelting all files");
+          logger.debug( "and then running the database cmd");
+          logger.info( `current size of cache is: ${totalDownloadSize/1024/1024/1024} GB`);
+          delete_once = false;
+        }else{
+          _delete_files_(start, end, rows)
+        }
+      }
+    });
+  }else{
+    if (end > start){
+      var cmd = "DELETE FROM files WHERE name in ("
+        for (var i = start; i < end; i++){
+          row = rows[i];
+          cmd += `'${row.name}',`;
+        }
+        cmd += `'${rows[end].name}')`;
+
+      db.run( cmd, function remove_rows_from_database_after_delete(err){
+        if (err){
+          logger.error( "There was an error with database while final deleting files")
+          logger.error( err)
+        }
+      });
+      }
+    logger.info( "finished deleting files" )
     logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB` )
     delete_once = false
-    return
   }
-
-  end += 1
-  if (end == rows.length){
-    logger.info( "finsihed deleting files by delelting all files")
-    logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB`)
-    delete_once = false
-  }else{
-    _delete_files_(end, end, rows);
-  }
-});
-
-
-}else{
-  end += 1
-  if (end == rows.length){
-    logger.info( "finsihed deleting files by delelting all files")
-    logger.debug( "and then running the database cmd")
-    logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB`)
-    delete_once = false
-  }
-  else{
-    _delete_files_(end, end, rows)
-  }
-}
-});
-}else{
-  if (end > start){
-    var cmd = "DELETE FROM files WHERE name in ("
-      for (var i = start; i < end; i++){
-        row = rows[i]
-        cmd += `'${row.name}',`
-      }
-      cmd += `'${rows[end].name}')`
-
-db.run( cmd, function remove_rows_from_database_after_delete(err){
-  if (err){
-    logger.error( "There was an error with database while final deleting files")
-    logger.error( err)
-  }
-});
-logger.info( "finished deleting files" )
-logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB` )
-delete_once = false
-}
-}
 
 }
 
