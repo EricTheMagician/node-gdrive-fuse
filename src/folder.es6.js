@@ -52,21 +52,27 @@ function getNewRangeEnd(location, fileSize, cb){
       "Content-Range": `bytes */${fileSize}`
     }
   };
-  request.post(location)
-  .on('response', function(resp){
-    debugger;
-    console.log(resp.statusCode);
-
+  request.post(options, function requestGetNewRangeEndCallback(err, resp, body){
     if(resp.statusCode >= 200  && resp.statusCode < 300){
-      console.log(resp.statusCode);
-      debugger;
-    }
-    // #if the link is dead or bad
-    if( resp.statusCode == 404 || resp.statusCode == 410 || resp.statusCode == 401){
-      // logger.debug "the link is no longer valid"
-      cb(resp.statusCode, -1);
+      const json = JSON.parse(body);
+      const header = resp.headers;
+      const range = resp.headers.range || resp.headers.Range;
+      if(!range){ //sometimes, it doesn't return the range, so assume it is 0.
+        // logger.error resp.headers
+        // logger.error res
+        cb(resp.statusCode, -1);
+        return;
+      }
+
+      const end = getRangeEnd(range);
+      cb(null,end);
       return;
     }
+
+    // unhandle error
+    logger.debug("unhandled error with getting a new range end", resp.statusCode);
+    cb(resp.statusCode, -1);
+    return;
 
 
 
