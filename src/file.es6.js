@@ -28,12 +28,13 @@ const openedFiles = new Map();
 const downloadTree = new Map();
 const buf0 = new Buffer(0);
 
-
 /*
 ######################################
 ######### Create File Class ##########
 ######################################
 */
+
+const baseUrlForDownload = "https://www.googleapis.com/drive/v2/files/"
 
 class GFile extends EventEmitter{
 
@@ -56,7 +57,14 @@ class GFile extends EventEmitter{
     this.mode = mode;
   }
 
-  static download(url, start,end, size, saveLocation, cb ){
+  __download(start,end, cb ){
+
+    /* private function where the actual downloading is done */
+    const file = this;
+    const url = file.downloadUrl;
+    const saveLocation = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
+    const size = file.size;
+
     if(config.accessToken == null){
       logger.debug("access token was null when downloading files");
       cb("expiredUrl");
@@ -64,105 +72,152 @@ class GFile extends EventEmitter{
     }
 
     const options ={
-      url: url,
+      // url: url,
+      url: `${baseUrlForDownload}${file.id}?alt=media`,
       encoding: null,
       headers:{
-        "Authorization": `Bearer ${config.accessToken.access_token}`,
+        "Authorization": `Bearer ${oauth2Client.credentials.access_token}`,
+
         "Range": `bytes=${start}-${end}`,
       }
     };
 
-    const ws = fs.createWriteStream(saveLocation);
-    ws.on('error', function downloadWriteStreamError(err){
-      logger.error("There was an error with writing during the download");
-      logger.error(err);
-      if (err.code == "EMFILE"){
-        logger.debug( "There was an error with downloading files: EMFILE" );
-        logger.debug( err );
-      }
-      cb(err);
-      this.end();
-      return;
-    });
-    var once = false;
     try{
-      request(options)
-      .on( 'response', function requestResponseCallback(resp){
-        if(resp.statusCode === 401 || resp.statusCode === 403 ){
-          if (!once){
-            once = true;
-            setTimeout(
-                function expiredUrlTimeout(){
-                  cb("expiredUrl");
-                }
-                , 2000);
-          }
-          ws.end();
-          this.end();
-          return;
+      request(options, function downloadRequestCallback(err, resp, body ){
+        if(err){
+          logger.error("There was an error with downloading");
+          logger.error(err);
+          cb(err);
         }
-        if(resp.statusCode >= 500){
-          if(!once){
-            once = true;
-            setTimeout(
-                function requestResponseCallback500(){
-                  cb(500);
-                }
-                , 1000);
-          }
-          ws.end();
-          this.end();
-          return;
-        }
-      })
-      .on( 'error', function writeStreamErrorCallback(err){
-        if (!once){
-          once = true;
-          logger.error( "error" );
-          logger.error( err );
-          logger.error( err.code );
-          if (err.code == "EMFILE"){
-            logger.debug( "There was an error with downloading files: EMFILE" );
-            logger.debug( err );
-          }
 
-          cb(err);
-        }
-        this.end();
-        ws.end();
-      })
-      .pipe(ws)
-      .on('error', function pipeDownloadStreamErrorCallback(err){
-        logger.error("There was an error with piping during the download");
-        logger.error(err);
-        if (err.code == "EMFILE"){
-          logger.debug("There was an error with downloading files: EMFILE");
-          logger.debug(err);
-        }
-        if(!once){
-          once = true;
-          cb(err);
-        }
-        this.end();
-        ws.end();
-      })
-      .on('close', function pipeStreamCloseCallback(){
-        if(!once){
-          once = true
-          let base = pth.basename(saveLocation);
-          let chunkSize = end-start + 1;
-          addNewFile(base,'downloading', chunkSize )
-          cb(null)
-        }
-        this.end();
-        ws.end()
-      })
-      return;
+        // make sure the body is a buffer
+        if(Buffer.isBuffer(body)){
+
+          //make sure the buffer is the right size
+          if(body.length == (end-start+1)){
+            fs.writeFile(saveLocation,body, function writeFileCallback(err, bytesWritten){
+              let base = pth.basename(saveLocation);
+              addNewFile(base,'downloading', body.length );
+              cb(null);
+            });
+
+            return;
+          }else {
+
+            try{
+          
+              const error = JSON.parse(body).error;
+              if( error.code == 401 ){
+                cb(error.message);
+                return;
+              } 
+          
+            }catch(e){
+              cb(err);
+            }
+
+          }
+        } 
+        debugger;
+
+
+      });
     }catch(e){
-      logger.error("There was an uncaught error while downloading" );
-      logger.error( e );
-      ws.end();
+        logger.error("There was an uncaught error while downloading" );
+        logger.error( e );      
     }
+
+    // const ws = fs.createWriteStream(saveLocation);
+    // ws.on('error', function downloadWriteStreamError(err){
+    //   logger.error("There was an error with writing during the download");
+    //   logger.error(err);
+    //   if (err.code == "EMFILE"){
+    //     logger.debug( "There was an error with downloading files: EMFILE" );
+    //     logger.debug( err );
+    //   }
+    //   cb(err);
+    //   this.end();
+    //   return;
+    // });
+    // var once = false;
+    // try{
+    //   request(options)
+    //   .on( 'response', function requestResponseCallback(resp){
+    //     if(resp.statusCode === 401 || resp.statusCode === 403 ){
+    //       if (!once){
+    //         once = true;
+    //         setTimeout(
+    //             function expiredUrlTimeout(){
+    //               cb("expiredUrl");
+    //             }
+    //             , 2000);
+    //       }
+    //       ws.end();
+    //       this.end();
+    //       return;
+    //     }
+    //     if(resp.statusCode >= 500){
+    //       if(!once){
+    //         once = true;
+    //         setTimeout(
+    //             function requestResponseCallback500(){
+    //               cb(500);
+    //             }
+    //             , 1000);
+    //       }
+    //       ws.end();
+    //       this.end();
+    //       return;
+    //     }
+    //   })
+    //   .on( 'error', function writeStreamErrorCallback(err){
+    //     if (!once){
+    //       once = true;
+    //       logger.error( "error" );
+    //       logger.error( err );
+    //       logger.error( err.code );
+    //       if (err.code == "EMFILE"){
+    //         logger.debug( "There was an error with downloading files: EMFILE" );
+    //         logger.debug( err );
+    //       }
+
+    //       cb(err);
+    //     }
+    //     this.end();
+    //     ws.end();
+    //   })
+    //   .pipe(ws)
+    //   .on('error', function pipeDownloadStreamErrorCallback(err){
+    //     logger.error("There was an error with piping during the download");
+    //     logger.error(err);
+    //     if (err.code == "EMFILE"){
+    //       logger.debug("There was an error with downloading files: EMFILE");
+    //       logger.debug(err);
+    //     }
+    //     if(!once){
+    //       once = true;
+    //       cb(err);
+    //     }
+    //     this.end();
+    //     ws.end();
+    //   })
+    //   .on('close', function pipeStreamCloseCallback(){
+    //     if(!once){
+    //       once = true
+    //       let base = pth.basename(saveLocation);
+    //       let chunkSize = end-start + 1;
+    //       addNewFile(base,'downloading', chunkSize )
+    //       cb(null)
+    //     }
+    //     this.end();
+    //     ws.end()
+    //   })
+    //   return;
+    // }catch(e){
+    //   logger.error("There was an uncaught error while downloading" );
+    //   logger.error( e );
+    //   ws.end();
+    // }
     return;
   }
   getAttrSync(){
@@ -200,13 +255,13 @@ class GFile extends EventEmitter{
         if (!downloadTree.has(`${file.id}-${start}`)){
           logger.silly(`starting to recurse ${file.name}-${start}`);
           downloadTree.set(`${file.id}-${start}`, 1);
-          GFile.download(file.downloadUrl, start,end, file.size, path, function recursiveDownloadCallback(err){
+          file.__download(start,end, function recursiveDownloadCallback(err){
             if(err){
-              if(err != "expiredUrl"){
+              if( ! (err === "expiredUrl" || err === "Invalid Credentials") ){
                 logger.error(`There was an error while during recursiveDownloadCallback`);
                 logger.error(err);
               }
-              // GFile.download(file.downloadUrl, start,end, file.size, path,recursiveDownloadCallback);
+              // file.__download(start,end,recursiveDownloadCallback);
             }
             downloadTree.delete(`${file.id}-${start}`);
             file.emit( 'downloaded', start);
@@ -449,19 +504,21 @@ return;
     const chunkStart = Math.floor((start)/config.chunkSize) * config.chunkSize;
     const chunkEnd = Math.min( Math.ceil(end/config.chunkSize) * config.chunkSize, file.size)-1; //and make sure that it's not bigger than the actual file
     const nChunks = (chunkEnd - chunkStart)/config.chunkSize;
-    const path = pth.join(downloadLocation, `${file.id}-${chunkStart}-${chunkEnd}`);
 
     function downloadSingleChunkCallback(err){      
+
+      function retryDownloadChunkOnErr(url){
+        file.__download(chunkStart, chunkEnd, downloadSingleChunkCallback);
+      }
+
       function emitDownloadCallbackTimeout(){
         file.emit('downloaded', chunkStart);
       }
       if (err){
         if (err === "expiredUrl"){
-          file.updateUrl(
-            function updateUrlFromDownloadCallback(url){
-              GFile.download(url, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
-            }
-          );
+          file.updateUrl( retryDownloadChunkOnErr );          
+        } else if (err === "Invalid Credentials"){
+          common.refreshAccessToken(retryDownloadChunkOnErr);
         }else{
           logger.error( "there was an error downloading file");
           logger.error( err);
@@ -482,7 +539,7 @@ return;
       }else{
         logger.debug( `starting to download ${file.name}, chunkStart: ${chunkStart}` );
         downloadTree.set(`${file.id}-${chunkStart}`, 1);
-        GFile.download(file.downloadUrl, chunkStart, chunkEnd, file.size, path, downloadSingleChunkCallback);
+        file.__download(chunkStart, chunkEnd, downloadSingleChunkCallback);
       }
 
     }else if(nChunks < 2){
@@ -588,7 +645,7 @@ function delete_files(){
   if( !delete_once){
     delete_once = true;
     logger.info( "deleting files to make space in the cache" );
-    logger.info( `current size of cache is: ${totalDownloadSize/1024/102/1024} GB` );
+    logger.info( `current size of cache is: ${totalDownloadSize/1024/1024/1024} GB` );
 
     db.all("SELECT * from files ORDER BY atime, size ASC", function delete_files_callback(err, rows){
       _delete_files_(0,0,rows);
@@ -619,7 +676,7 @@ function _delete_files_(start,end, rows){
             logger.error( "There was an error with database while deleting files" )
             logger.err( err )
             logger.info( "finsihed deleting files by error" )
-            logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB` )
+            logger.info( `current size of cache is: ${totalDownloadSize/1024/1024/1024} GB` )
             delete_once = false
             return
           }
@@ -627,7 +684,7 @@ function _delete_files_(start,end, rows){
           end += 1;
           if (end == rows.length){
             logger.info( "finsihed deleting files by delelting all files")
-            logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB`)
+            logger.info( `current size of cache is: ${totalDownloadSize/1024/1024/1024} GB`)
             delete_once = false
           }else{
             _delete_files_(end, end, rows);
@@ -664,7 +721,7 @@ function _delete_files_(start,end, rows){
       });
       }
     logger.info( "finished deleting files" )
-    logger.info( `current size of cache is: ${totalDownloadSize/1024/1024} GB` )
+    logger.info( `current size of cache is: ${totalDownloadSize/1024/1024/1024} GB` )
     delete_once = false
   }
 
