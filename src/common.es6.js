@@ -84,6 +84,7 @@ function refreshAccessToken(cb){
 		}
 
 		config.accessToken = tokens;
+		oauth2Client.setCredentials( tokens );
 	    fs.outputJson('config.json', config, function writeConfigCallback(err) {
 	      if (err) {
 	        logger.debug("failed to save config");            
