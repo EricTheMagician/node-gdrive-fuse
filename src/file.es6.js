@@ -72,8 +72,8 @@ class GFile extends EventEmitter{
     }
 
     const options ={
-      // url: url,
-      url: `${baseUrlForDownload}${file.id}?alt=media`,
+      url: file.downloadUrl,
+      // url: `${baseUrlForDownload}${file.id}?alt=media`,
       encoding: null,
       headers:{
         "Authorization": `Bearer ${oauth2Client.credentials.access_token}`,
@@ -106,19 +106,23 @@ class GFile extends EventEmitter{
 
             try{
           
+              if( body.length == 0 && resp.statusCode == 403){
+                cb("expiredUrl");
+                return;
+              }
+
               const error = JSON.parse(body).error;
               if( error.code == 401 ){
                 cb(error.message);
                 return;
               } 
-          
+
             }catch(e){
               cb(err);
             }
 
           }
         } 
-        debugger;
 
 
       });
@@ -283,7 +287,7 @@ class GFile extends EventEmitter{
       let opened = openedFiles.get(`${file.id}-${start}`);
       if(opened){
         if(!opened.fd ){
-          debugger;
+          // debugger;
           logger.debug( "opened.fd was false");
           logger.debug( file);
           logger.debug( opened);
