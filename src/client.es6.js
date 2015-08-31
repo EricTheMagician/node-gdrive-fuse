@@ -318,9 +318,9 @@ function parseChanges(items){
       try{
         if( i.deleted || i.file.labels.trashed){ // check if it is deleted
             let object = inodeTree.getFromId(i.fileId);
-            if( inodeTree.getFromId(object) ){ // check to see if the file was not already removed from folderTree
+            if( object ){ // check to see if the file was not already removed from folderTree
                 logger.debug(`${i.file.title} was deleted`);
-                inodeTree.delete(inode.inode);
+                inodeTree.delete(object.inode);
 
             }else{
                 try{
