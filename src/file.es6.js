@@ -597,7 +597,7 @@ function delete_files(){
 }
 
 function _delete_files_(start,end, rows){
-  const row = rows[end]
+  var row = rows[end]
   var count = end - start + 1
   if( totalDownloadSize >= (0.8*maxCache) ){
     fs.unlink( pth.join(downloadLocation, row.name), function unlink_delete_file_callback(err){
