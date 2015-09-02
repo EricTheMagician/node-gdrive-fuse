@@ -604,7 +604,7 @@ function initialize_path(path, type){
   fs.readdir( path, function initialize_path_callback(err, files){
     var count = 0
     var totalSize = 0
-    const basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
+    const basecmd = "INSERT OR IGNORE INTO files (name, atime, type, size) VALUES "
     var cmd = basecmd
     for( let file of files){
       const expectedSize = file.match(regexPattern)
@@ -742,10 +742,11 @@ function addNewFile(file, type, size){
   q.start();
 }
 
-db.run(  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT, atime INT)", function init_database_callback(err){
+db.run(  "CREATE TABLE IF NOT EXISTS gdrive.files (size INT, name TEXT unique, type INT, atime INT)", function init_database_callback(err){
   if (err){
     logger.log (err)
   }
+
   logger.info( "Opened a connection to the database" );
   // initialize_db()
   initialize_path( downloadLocation, "downloading");
