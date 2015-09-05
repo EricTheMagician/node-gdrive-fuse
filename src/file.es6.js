@@ -16,9 +16,8 @@ const oauth2Client = common.oauth2Client;
 const refreshAccessToken = common.refreshAccessToken
 const maxCache = common.maxCache;
 
-const sqlite3 = require('sqlite3');
 const queue = require('queue');
-const db = new sqlite3.Database(pth.join(dataLocation,'sqlite.db'));
+const db = common.database;
 const q = queue({concurrency: 1, timeout: 7200000 });
 let totalDownloadSize = 0;
 const regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
@@ -360,16 +359,16 @@ class GFile extends EventEmitter{
               cb(null, fd);
               return;
             });
-}else{
-  cb(null, false);
-}
-return;
-});
-}catch(e){
-  cb(null, false)
-}
-}
-}
+          }else{
+            cb(null, false);
+          }
+          return;
+        });
+      }catch(e){
+        cb(null, false)
+      }
+    }
+  }
 
 
 

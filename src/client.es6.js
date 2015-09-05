@@ -19,6 +19,7 @@ const logger = common.logger;
 const google = common.google;
 const drive = common.GDrive;
 const oauth2Client = common.oauth2Client;
+const db = common.database;
 
 const inodeTree = require('./inodetree.js');
 

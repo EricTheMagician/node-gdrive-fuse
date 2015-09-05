@@ -7,6 +7,7 @@
 const fs = require('fs-extra');
 const pth = require('path');
 const winston = require('winston');
+const sqlite3 = require('sqlite3');
 
 var config = {};
 if(fs.existsSync('config.json'))
@@ -95,10 +96,13 @@ function refreshAccessToken(cb){
 	  });
 }
 
+const db = new sqlite3.Database(pth.join(dataLocation,'sqlite.db'));
+
 
 var currentLargestInode = 1;
 
 module.exports = {
+	database: db,
 	refreshAccessToken: refreshAccessToken,
 	logger: logger,
 	downloadLocation: downloadLocation,
