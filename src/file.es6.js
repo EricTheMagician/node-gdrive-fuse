@@ -741,7 +741,7 @@ function addNewFile(file, type, size){
   q.start();
 }
 
-db.run(  "CREATE TABLE IF NOT EXISTS gdrive.files (size INT, name TEXT unique, type INT, atime INT)", function init_database_callback(err){
+db.run(  "CREATE TABLE IF NOT EXISTS files (size INT, name TEXT unique, type INT, atime INT)", function init_database_callback(err){
   if (err){
     logger.log (err)
   }
