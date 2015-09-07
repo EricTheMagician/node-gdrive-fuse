@@ -105,7 +105,7 @@ class GFile extends EventEmitter{
 
             try{
           
-              if( body.length == 0 && resp.statusCode == 403){
+              if( body.length == 0 && (resp.statusCode >= 400 || resp.statusCode < 500){
                 cb("expiredUrl");
                 return;
               }
