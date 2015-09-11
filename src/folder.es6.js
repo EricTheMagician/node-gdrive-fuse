@@ -408,13 +408,13 @@ class GFolder {
 
 
   upload(fileName, inode, cb) {
-    var folder = this;
-    var upFile = uploadTree.get(inode);
+    const folder = this;
+    const upFile = uploadTree.get(inode);
     if (!upFile) {
       cb({code: "ENOENT"});
       return;
     }
-    var filePath = pth.join(uploadLocation, upFile.cache);
+    const  filePath = pth.join(uploadLocation, upFile.cache);
     // if the file is already being uploaded, don't try again.
     if ( upFile.uploading) {
       logger.debug(`${fileName} is already being uploaded`);
@@ -437,7 +437,7 @@ class GFolder {
         return;
       }
 
-      var size = stats.size;
+      const size = stats.size;
 
       // sometimes, the operating system will create a file of size 0. Simply delete it.
 

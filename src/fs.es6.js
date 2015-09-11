@@ -390,11 +390,7 @@ class GDriveFS extends fuse.FileSystem{
      */
     rmdir(context, parentInode, name, reply) {
         const parent = inodeTree.getFromInode(parentInode);
-        logger.debug( `removing
-      folder
-      ${name}
-      ` )
-        ;
+        logger.debug( `removing folder ${name}` );
 
         // make sure the actual directory exists
         for (let childInode of parent.children) {
@@ -532,7 +528,6 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     unlink(context, parentInode, name, reply){
-        logger.debug( `removing file ${name}`);
         const parent = inodeTree.getFromInode( parentInode );
 
         for( let childInode of parent.children ){
@@ -557,6 +552,7 @@ class GDriveFS extends fuse.FileSystem{
             }
 
             //now we are pretty sure that the inode is the correct one
+            logger.debug( `removing file ${name}`);
             parent.children.splice( parent.children.indexOf(childInode), 1)
             inodeTree.delete( childInode );
             inodeTree.saveFolderTree();
