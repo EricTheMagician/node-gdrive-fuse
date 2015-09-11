@@ -849,13 +849,10 @@ function moveToDownload (file, fd, uploadedFileLocation, start,cb){
 
 //function to create a callback for file uploading
 function uploadCallback(inode, cb){
-
     return function (err, result){
-        const file = inodeTree.getFromInode(inode)
-        const parent = inodeTree.getFromId(file.parentid)
         if(err){
             if (err === "invalid mime"){
-                logger.debug(`the mimetype of ${path} was invalid`);
+                logger.debug(`the mimetype of ${inode} was invalid`);
                 cb();
                 return
             }
@@ -881,6 +878,8 @@ function uploadCallback(inode, cb){
             q.start()
         }
 
+        const file = inodeTree.getFromInode(inode)
+        const parent = inodeTree.getFromId(file.parentid)
         const upFile = uploadTree.get(inode)
 
         if(!upFile){ //#make sure uploaded file is still in the uploadTree
