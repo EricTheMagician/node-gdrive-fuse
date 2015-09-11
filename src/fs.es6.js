@@ -397,7 +397,7 @@ class GDriveFS extends fuse.FileSystem{
         ;
 
         // make sure the actual directory exists
-        for (childInode of parent.children) {
+        for (let childInode of parent.children) {
             const folder = inodeTree.getFromInode(childInode);
             if (folder.name === name) {
 
@@ -759,6 +759,7 @@ class GDriveFS extends fuse.FileSystem{
         //make sure the parent inode exists
         if( !inodeTree.has(parentInode)){
             reply.err(PosixError.ENOENT);
+            return;
         }
 
         const parent = inodeTree.getFromInode( parentInode );
