@@ -612,6 +612,7 @@ if(!config.accessToken){
         oauth2Client.getToken(code, function getTokenCallback(err,tokens){
             oauth2Client.setCredentials(tokens);
             config.accessToken = tokens;
+            common.config.accessToken = tokens;
             logger.info("Access Token Set")
             loadFolderTree();
 
