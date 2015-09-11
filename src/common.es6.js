@@ -18,6 +18,9 @@ if( !config.advancedChunks)
   config.advancedChunks = 5;
 if(!config.chunkSize)
   config.chunkSize = 1024*1024*16;
+if(!config.refreshDelay)
+	config.refreshDelay = 60000;
+
 var maxCache;
 if(config.maxCacheSize){
    maxCache =  config.maxCacheSize * 1024 * 1024;
