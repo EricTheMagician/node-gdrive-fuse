@@ -365,7 +365,7 @@ function getLargestChangeId(cb){
     drive.changes.list(opts, getLargestChangeIdCallback);
 }
 
-function loadPageChange(start, items, cb){
+function loadPageChange(start, items, attempt, cb){
 
     const opts ={
         maxResults: 500,
@@ -378,7 +378,10 @@ function loadPageChange(start, items, cb){
         }else{
             logger.debug( "There was an error while loading changes" );
             logger.debug( err );
-            cb(err, largestChangeId, items, start);
+
+            if(err){
+                setTimeout( function(){loadPageChange(start, items, attempt + 1, cb);}, Math.random(config.refreshDelay)+config.refreshDelay * attempt);
+            }
         }
     });
 }
@@ -391,8 +394,7 @@ function loadChanges(cb){
     function loadChangesCallback(err, newId, items, pageToken){
         largestChangeId = newId
         if(pageToken){
-            // drive.changes.list
-            loadPageChange(pageToken, items, loadChangesCallback);
+            loadPageChange(pageToken, items, 1, loadChangesCallback);
         }else{
             parseChanges(items);
         }
