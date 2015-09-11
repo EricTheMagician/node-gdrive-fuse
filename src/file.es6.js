@@ -601,6 +601,11 @@ function queue_fn(size, cmd){
 }
 function initialize_path(path, type){
   fs.readdir( path, function initialize_path_callback(err, files){
+    if(err){
+      logger.error("There was an error while initializing the file cache database");
+      logger.error(err);
+      return;
+    }
     var count = 0
     var totalSize = 0
     const basecmd = "INSERT OR IGNORE INTO files (name, atime, type, size) VALUES "
