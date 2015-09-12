@@ -401,7 +401,7 @@ function loadChanges(cb){
     }
 
 
-    loadPageChange(id, [], loadChangesCallback);
+    loadPageChange(id, [], 1, loadChangesCallback);
 
 }
 
