@@ -50,8 +50,8 @@ class GFile extends EventEmitter{
     this.parentid = parentid;
     this.name = name;
     this.size = size;
-    this.ctime = ctime;
-    this.mtime = mtime;
+    this.ctime = ctime/1000;
+    this.mtime = mtime/1000;
     this.permission = permission;
     this.mode = mode;
   }
