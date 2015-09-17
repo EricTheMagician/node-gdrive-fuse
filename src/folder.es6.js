@@ -374,8 +374,8 @@ class GFolder {
     this.id = id;
     this.parentid = parentid;
     this.name = name;
-    this.ctime = ctime/1000; 
-    this.mtime = mtime/1000;
+    this.ctime = ctime; 
+    this.mtime = mtime;
     this.permission = permission;
     this.children = children;
     this.mode = mode;
@@ -386,8 +386,8 @@ class GFolder {
       mode: this.mode,
       size: 4096, //standard size of a directory
       nlink: this.children.length + 1,
-      mtime: this.mtime,
-      ctime: this.ctime,
+      mtime: this.mtime/1000,
+      ctime: this.ctime/1000,
       inode: this.inode
     };
     return attr;
@@ -398,8 +398,8 @@ class GFolder {
       mode: this.mode,
       size: 4096, //standard size of a directory
       nlink: this.children.length + 1,
-      mtime: this.mtime,
-      ctime: this.ctime,
+      mtime: this.mtime/1000,
+      ctime: this.ctime/1000,
       inode: this.inode
     };
     cb(0, attr);

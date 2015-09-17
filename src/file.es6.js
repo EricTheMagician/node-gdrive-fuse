@@ -50,8 +50,8 @@ class GFile extends EventEmitter{
     this.parentid = parentid;
     this.name = name;
     this.size = size;
-    this.ctime = ctime/1000;
-    this.mtime = mtime/1000;
+    this.ctime = ctime;
+    this.mtime = mtime;
     this.permission = permission;
     this.mode = mode;
   }
@@ -228,8 +228,8 @@ class GFile extends EventEmitter{
       mode: this.mode,
       size: this.size,
       nlink: 1,
-      mtime: this.mtime,
-      ctime: this.ctime,
+      mtime: this.mtime/1000,
+      ctime: this.ctime/1000,
       inode: this.inode
     }
     return attr;
@@ -240,8 +240,8 @@ class GFile extends EventEmitter{
       mode: this.mode,
       size: this.size,
       nlink: 1,
-      mtime: this.mtime,
-      ctime: this.ctime,
+      mtime: this.mtime/1000,
+      ctime: this.ctime/1000,
       inode: this.inode
     };
     cb(0,attr);
