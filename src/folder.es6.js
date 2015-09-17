@@ -374,8 +374,8 @@ class GFolder {
     this.id = id;
     this.parentid = parentid;
     this.name = name;
-    this.ctime = ctime;
-    this.mtime = mtime;
+    this.ctime = ctime/1000; 
+    this.mtime = mtime/1000;
     this.permission = permission;
     this.children = children;
     this.mode = mode;

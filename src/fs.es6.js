@@ -136,7 +136,7 @@ class GDriveFS extends fuse.FileSystem{
         // console.log a.getTime(),m.getTime()
         // attrs.atime = a.getTime()
         // attrs.mtime = m.getTime()
-        file.mtime = m.getTime()/1000
+        file.mtime = m.getTime()
         if (attrs.hasOwnProperty("size")){
             file.size = attrs.size
         }
@@ -360,9 +360,9 @@ class GDriveFS extends fuse.FileSystem{
                         reply.err(errnoMap.EIO);
                         return;
                     }else{
-                        const now = (new Date).getTime()/1000
+                        const now = (new Date).getTime()
 
-                        const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime()/1000, (new Date(res.modifiedDate)).getTime()/1000, res.editable, [])
+                        const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
                         const attr = folder.getAttrSync();
                         let entry = {
                             inode: attr.inode,
@@ -443,7 +443,7 @@ class GDriveFS extends fuse.FileSystem{
             }
         }
 
-        const now = (new Date).getTime()/1000;
+        const now = (new Date).getTime();
 
         const file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
         let inode = inodeTree.insert( file );
@@ -485,7 +485,7 @@ class GDriveFS extends fuse.FileSystem{
 
             //for childInode in parent.children #TODO: if file exists, delete it first
             //  parent.children.push name
-            const now = (new Date).getTime()/1000;
+            const now = (new Date).getTime();
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
             const file = new GFile(null, null, parent.id, name, 0, now, now, true);
@@ -894,13 +894,13 @@ function uploadCallback(inode, cb){
             file.downloadUrl = result.downloadUrl
             file.id = result.id
             file.size = parseInt(result.fileSize)
-            file.ctime = (new Date(result.createdDate)).getTime()/1000
-            file.mtime =  (new Date(result.modifiedDate)).getTime()/1000
+            file.ctime = (new Date(result.createdDate)).getTime()
+            file.mtime =  (new Date(result.modifiedDate)).getTime()
         }else{
             logger.debug(`${file.name} folderTree did not exist`);
             common.currentLargestInode++;
             let inode = common.currentLargestInode;
-            const file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime()/1000, (new Date(result.modifiedDate)).getTime()/1000, inode, true)
+            const file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)
             inodeTree.insert(file)
         }
         // update parent
