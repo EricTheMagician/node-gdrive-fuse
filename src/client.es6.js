@@ -85,7 +85,7 @@ function getPageFiles(pageToken, total, cb)
             let title = item.title.replace(/\0/g,'');
 
 
-            cmd += `( "${item.id}", "${pid}", "${title}", ${(new Date(item.createdDate)).getTime()}, ${(new Date(item.modifiedDate)).getTime()}, ${is_folder}, ${is_root}, ${size}, ${is_editable}, "${download_url}"),`;
+            cmd += `( "${item.id}", "${pid}", "${title}", ${(new Date(item.createdDate)).getTime()/1000}, ${(new Date(item.modifiedDate)).getTime()/1000}, ${is_folder}, ${is_root}, ${size}, ${is_editable}, "${download_url}"),`;
         }
         cmd = cmd.substring(0, cmd.length-1);
         numberOfInsertionsWhileInsertingIntoDatabse++;
@@ -175,7 +175,7 @@ function parseFilesFolders (){
         logger.info("Parinsg data, looking for root foolder");
     }
 
-    const now = (new Date).getTime()
+    const now = (new Date).getTime()/1000
 
     // # google does not return the list of files and folders in a particular order.
     // # so find the root folder first,
@@ -437,8 +437,8 @@ function parseChanges(items){
         if(f){
             logger.debug( `${f.name} was updated`);
 
-            f.ctime = (new Date(cfile.createdDate)).getTime()
-            f.mtime = (new Date(cfile.modifiedDate)).getTime()
+            f.ctime = (new Date(cfile.createdDate)).getTime()/1000
+            f.mtime = (new Date(cfile.modifiedDate)).getTime()/1000
             if(f.name != cfile.title){
                 logger.info( `${f.name} was renamed to ${cfile.title}`);
                 f.name = cfile.title;
@@ -475,10 +475,10 @@ function parseChanges(items){
         const node = common.currentLargestInode;
         if( cfile.mimeType == 'application/vnd.google-apps.folder'){
             logger.debug (`${cfile.title} is a new folder`);
-            inodeTree.insert(new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable ));
+            inodeTree.insert(new GFolder(cfile.id, parentId, cfile.title, (new Date(cfile.createdDate)).getTime()/1000, (new Date(cfile.modifiedDate)).getTime()/1000, cfile.editable ));
         }else{
             logger.debug  (`${cfile.title} is a new file`)
-            inodeTree.insert(new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime(), (new Date(cfile.modifiedDate)).getTime(), cfile.editable))
+            inodeTree.insert(new GFile(cfile.downloadUrl, cfile.id, parentId, cfile.title, parseInt(cfile.fileSize), (new Date(cfile.createdDate)).getTime()/1000, (new Date(cfile.modifiedDate)).getTime()/1000, cfile.editable))
         }
       }catch(error){
               logger.debug("There was an error while parsing charges");
@@ -563,7 +563,7 @@ function getParentsOfFoldersWithUnkownParents(foldersWithUnkownParents,cb){
                 }
             }
 
-            const folder =  new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime(), (new Date(f.modifiedDate)).getTime(), f.editable , []);
+            const folder =  new GFolder(f.id, pid, f.title, (new Date(f.createdDate)).getTime()/1000, (new Date(f.modifiedDate)).getTime()/1000, f.editable , []);
 
             inodeTree.insert( folder);
 
