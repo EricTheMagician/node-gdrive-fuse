@@ -553,14 +553,14 @@ class GFolder {
                 var start = end + 1;
                 logger.debug(`got new range end for ${inode}: ${end}`);
                 // once new range end is obtained, start uploading in chunks
-                uploadData(location, filePath, start, size, mime, cbUploadData);
+                uploadData(upFile.location, filePath, start, size, mime, cbUploadData);
               }
             }
 
             logger.info( `Starting to upload file ${fileName} ` );
             if (upFile.location) {
-              const location = upFile.location;
-              getNewRangeEnd(location, size, cbNewEnd);
+              // const location = upFile.location;
+              getNewRangeEnd(upFile.location, size, cbNewEnd);
             } else {
               getUploadResumableLink(folder.id, fileName, size, mime, cbNewLink);
             }
