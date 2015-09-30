@@ -19,6 +19,7 @@ class InodeTree {
 		this.map = new Map();
 		this.idToInode = new Map();
 		this.currentLargestInode = 0;
+		this.saving = false;
 	}
 
 	insert(value){
@@ -42,7 +43,7 @@ class InodeTree {
 			}
 
 			this.idToInode.set(value.id, value);
-
+			this.saveFolderTree()
 		
 			return this.currentLargestInode;
 		}
@@ -127,6 +128,11 @@ class InodeTree {
 	}
 
 	saveFolderTree(){
+
+		if( this.saving){
+			return;
+		}
+		this.saving = true;
 	    logger.debug( "saving folder tree");
 	    const toSave = {};
 	    for( let key of this.map.keys()){
@@ -153,7 +159,9 @@ class InodeTree {
 	        toSave[key] = saved;
 	    }
 
-	    fs.writeJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(){});
+	    fs.writeJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(){
+	    	this.saving = false;
+	    });
 	
 	}
 
