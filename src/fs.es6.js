@@ -688,7 +688,11 @@ class GDriveFS extends fuse.FileSystem{
 
     access(context, inode, mask, reply){
         // console.log('Access was called!');
-        reply.err(0);
+        if(inodeTree.has(inode)){
+            reply.err(0);
+            return;
+        }
+        reply.err(errnoMap.EACCESS);
         return;
     }
 
