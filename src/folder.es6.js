@@ -53,8 +53,7 @@ function getNewRangeEnd(location, fileSize, cb){
     }
   };
   request.post(options, function requestGetNewRangeEndCallback(err, resp, body){
-    if(resp.statusCode >= 200  && resp.statusCode < 300){
-      const json = JSON.parse(body);
+    if( resp.statusCode == 308  ){
       const header = resp.headers;
       const range = resp.headers.range || resp.headers.Range;
       if(!range){ //sometimes, it doesn't return the range, so assume it is 0.
