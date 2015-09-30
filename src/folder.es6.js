@@ -386,8 +386,8 @@ class GFolder {
       mode: this.mode,
       size: 4096, //standard size of a directory
       nlink: this.children.length + 1,
-      mtime: this.mtime/1000,
-      ctime: this.ctime/1000,
+      mtime: parseInt(this.mtime/1000),
+      ctime: parseInt(this.ctime/1000),
       inode: this.inode
     };
     return attr;
@@ -398,8 +398,8 @@ class GFolder {
       mode: this.mode,
       size: 4096, //standard size of a directory
       nlink: this.children.length + 1,
-      mtime: this.mtime/1000,
-      ctime: this.ctime/1000,
+      mtime: parseInt(this.mtime/1000),
+      ctime: parseInt(this.ctime/1000),
       inode: this.inode
     };
     cb(0, attr);
