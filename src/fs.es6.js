@@ -363,6 +363,7 @@ class GDriveFS extends fuse.FileSystem{
                         const now = (new Date).getTime()
 
                         const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
+                        inodeTree.insert(folder);
                         const attr = folder.getAttrSync();
                         let entry = {
                             inode: attr.inode,
@@ -372,7 +373,6 @@ class GDriveFS extends fuse.FileSystem{
                             entry_timeout: 5
                         };
                         reply.entry(entry);
-                        inodeTree.saveFolderTree();
                     }
                 });
             }else{
