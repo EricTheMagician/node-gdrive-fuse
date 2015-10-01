@@ -868,6 +868,7 @@ function uploadCallback(inode, cb){
 
 
             cb();
+            const file = inodeTree.getFromInode(inode);
             logger.debug(`Retrying upload: "${file.name}".`);
             q.push(
                 function uploadFunctionQueued(_cb){
