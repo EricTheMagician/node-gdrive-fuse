@@ -1123,7 +1123,7 @@ function start(count){
                 });
 
                 logger.log('info', `mount point: ${config.mountPoint}`);
-                setTimeout(resumeUpload, 8000);
+                setTimeout(resumeUpload, 120000);
                 return;
             });
         }catch(e){
