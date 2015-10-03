@@ -264,7 +264,11 @@ class GDriveFS extends fuse.FileSystem{
         function readDataCallback(dataBuf){
             if(!once){
                 once = true;
-                reply.buffer(dataBuf, dataBuf.length);
+                if(Buffer.isBuffer(dataBuf)){
+                    reply.buffer(dataBuf, dataBuf.length);
+                }else{
+                    reply.err(errnoMap.ENOENT);
+                }
             }
         }
 

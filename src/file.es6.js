@@ -487,6 +487,11 @@ class GFile extends EventEmitter{
     };
     GDrive.files.get( data, function updateUrlCallback(err, res){
       if (err){
+        if(err.code == 404){
+          logger.error(`The file "${file.name}" could not be found on Google's server. It's likely to have been deleted.`)
+          cb(null);
+          return;
+        }
         logger.error( `There was an error while getting an updated url for ${file.name}` );
         logger.error( err );
         file.updateUrl(cb);
@@ -511,7 +516,13 @@ class GFile extends EventEmitter{
     function downloadSingleChunkCallback(err){      
 
       function retryDownloadChunkOnErr(url){
-        file.__download(chunkStart, chunkEnd, downloadSingleChunkCallback);
+        if(url){
+          file.__download(chunkStart, chunkEnd, downloadSingleChunkCallback);
+        }else{
+          downloadTree.delete(`${file.id}-${chunkStart}`)
+          file.emit("downloaded", chunkStart);
+          cb(null)
+        }
       }
 
       function emitDownloadCallbackTimeout(){
