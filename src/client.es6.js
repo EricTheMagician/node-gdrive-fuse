@@ -388,7 +388,7 @@ function loadPageChange(start, items, attempt, cb){
 
 
 function loadChanges(cb){
-    const id = largestChangeId;
+    const id = largestChangeId + 1;
     logger.debug(`Getting changes from Google Drive. The last change id was ${largestChangeId}.`)
 
     function loadChangesCallback(err, newId, items, pageToken){
