@@ -267,7 +267,7 @@ class GDriveFS extends fuse.FileSystem{
                 if(Buffer.isBuffer(dataBuf)){
                     reply.buffer(dataBuf, dataBuf.length);
                 }else{
-                    reply.err(errnoMap.ENOENT);
+                    reply.err(errnoMap.EIO);
                 }
             }
         }
@@ -884,6 +884,11 @@ function uploadCallback(inode, cb){
         }
 
         const file = inodeTree.getFromInode(inode)
+        if(!file){
+            logger.error(`inode ${inode} was not found in inodetree anymore`);
+            uploadTree.delete(inode);
+            cb();
+        }
         const parent = inodeTree.getFromId(file.parentid)
         const upFile = uploadTree.get(inode)
 
