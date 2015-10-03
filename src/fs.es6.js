@@ -483,13 +483,13 @@ class GDriveFS extends fuse.FileSystem{
         if (parent){ //make sure parent exists
             logger.debug( `creating file ${name}`);
 
+            const now = (new Date).getTime();
             const file = new GFile(null, null, parent.id, name, 0, now, now, true);
             const cache = file.getCacheName();
             const systemPath = pth.join(uploadLocation, cache);
 
             //for childInode in parent.children #TODO: if file exists, delete it first
             //  parent.children.push name
-            const now = (new Date).getTime();
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
             const inode = inodeTree.insert(file)
@@ -949,12 +949,13 @@ function recurseResumeUploadingFilesFromUploadFolder(inode, files){
         if(files.has(cache)){
             const upFile = {
                 cache: cache,
-                uploading: false
+                uploading: false,
+                released: true
             };
             files.delete(cache);
 
             /* make sure that this inode is not already in the upload tree */
-            if( uploadTree.has(inode) ){
+            if( !uploadTree.has(inode) ){
 
                 /* make sure that the file is the same size as what's been reported in the inodeTree */
                 fs.stat(pth.join(uploadLocation,cache), function(err, stat){
