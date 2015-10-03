@@ -884,6 +884,8 @@ function uploadCallback(inode, cb){
 
         const file = inodeTree.getFromInode(inode)
         if(!file){
+            // TODO: Sometimes, a file is not found. Although, it shouldn't have been deleted.
+            debugger;
             logger.error(`inode ${inode} was not found in inodetree anymore`);
             uploadTree.delete(inode);
             cb();
@@ -934,6 +936,83 @@ function uploadCallback(inode, cb){
         });
 
     };
+}
+
+function recurseResumeUploadingFilesFromUploadFolder(inode, files){
+    const file = inodeTree.getFromInode(inode)
+
+    /* make sure that the inode is a file */
+    if( file instanceof GFile ){        
+        const cache = file.getCacheName();
+
+        /* ensure that this file is in the list of files to be checked */
+        if(files.has(cache)){
+            const upFile = {
+                cache: cache,
+                uploading: false
+            };
+            files.delete(cache);
+
+            /* make sure that this inode is not already in the upload tree */
+            if( uploadTree.has(inode) ){
+
+                /* make sure that the file is the same size as what's been reported in the inodeTree */
+                fs.stat(pth.join(uploadLocation,cache), function(err, stat){
+                    if(stat.size == file.size ){
+                        const parent = inodeTree.getFromId(file.parentid);
+
+                        // ensure that the parent is a folder
+                        if(parent instanceof GFolder){
+
+                            logger.debug("a lost uploading file was found: ", file.name );
+
+                            // everything is good now, so we can enqueue the uploading
+                            uploadTree.set( inode, upFile );
+                            q.push(
+                                function uploadQueueFunction(cb){
+                                    if( parent instanceof GFile){
+                                        logger.debug(`While uploading, ${name} was a file - ${parent}`);
+                                        cb();
+                                        return;
+                                    }
+                                    parent.upload(file.name, inode, uploadCallback(inode,cb))
+                                    return
+                                }
+                            );
+
+                            q.start();
+                        }
+                    }
+                });
+            }
+
+        }
+    }
+
+    if( files.size > 0 && inode > 0){
+        setImmediate( function (){
+            recurseResumeUploadingFilesFromUploadFolder(inode - 1, files);
+        });
+    }else{
+        saveUploadTree();
+    }
+    
+}
+
+function resumeUploadingFilesFromUploadFolder(){
+    /*
+    
+    sometimes, the uploadTree.json file will get corrupted.
+    as a safeguard, read the files list from the upload data folder and try to find 
+    the associated inode and restart the upload.
+
+    */
+
+    fs.readdir(uploadLocation, function (err, files){
+        const filesToBeUploaded = new Set(files);
+
+        recurseResumeUploadingFilesFromUploadFolder(inodeTree.currentLargestInode, filesToBeUploaded);
+    });
 }
 
 // resume file uploading
@@ -989,6 +1068,8 @@ function resumeUpload(){
         saveUploadTree();
 
     }
+
+    setTimeout(resumeUploadingFilesFromUploadFolder, 5000);
 
 }
 
