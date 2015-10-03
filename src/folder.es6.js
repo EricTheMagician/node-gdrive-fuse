@@ -325,13 +325,16 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
   ).on('error', function uploadErrorCallback(err){
     logger.error( "error after piping" );
     logger.error( err );
+
     function uploadErrorCallbackGetNewRange(err,end){
       cb( err, {
         rangeEnd: end
       });
     }
-
-    getNewRangeEnd(location, fileSize, uploadErrorCallbackGetNewRange);
+    if(!once){
+      once = true;
+      getNewRangeEnd(location, fileSize, uploadErrorCallbackGetNewRange);
+    }
   });
 
 }
