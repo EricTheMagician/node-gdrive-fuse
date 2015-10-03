@@ -4,7 +4,6 @@ const fs = require( 'fs-extra' );
 const pth = require( 'path' );
 const fuse = require( 'fusejs' );
 const os = require( 'os' );
-const MD5 = require( 'MD5' );
 const PosixError = fuse.PosixError;
 
 const inodeTree = require('./inodetree.js');
@@ -457,7 +456,7 @@ class GDriveFS extends fuse.FileSystem{
         const attr = file.getAttrSync();
 
         const upFile ={
-            cache: MD5(parent.id + name),
+            cache: file.getCacheName(),
             uploading: false
         }
         uploadTree.set( inode, upFile);
@@ -484,7 +483,8 @@ class GDriveFS extends fuse.FileSystem{
         if (parent){ //make sure parent exists
             logger.debug( `creating file ${name}`);
 
-            const cache = MD5(parent.id + name);
+            const file = new GFile(null, null, parent.id, name, 0, now, now, true);
+            const cache = file.getCacheName();
             const systemPath = pth.join(uploadLocation, cache);
 
             //for childInode in parent.children #TODO: if file exists, delete it first
@@ -492,7 +492,6 @@ class GDriveFS extends fuse.FileSystem{
             const now = (new Date).getTime();
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
-            const file = new GFile(null, null, parent.id, name, 0, now, now, true);
             const inode = inodeTree.insert(file)
 
             logger.debug( `create: parentid: ${parent.id} -- inode ${inode}`);

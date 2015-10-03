@@ -22,6 +22,9 @@ const q = queue({concurrency: 1, timeout: 7200000 });
 let totalDownloadSize = 0;
 const regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
 
+const MD5 = require( 'MD5' );
+
+
 // opened files
 const openedFiles = new Map();
 const downloadTree = new Map();
@@ -580,6 +583,10 @@ class GFile extends EventEmitter{
       cb(buf0);
     }
 
+  }
+
+  getCacheName(){
+    return MD5(this.parentid + this.name);
   }
 }
 
