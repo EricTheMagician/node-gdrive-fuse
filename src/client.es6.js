@@ -357,7 +357,7 @@ function getLargestChangeId(cb){
     };
     function getLargestChangeIdCallback(err, res){
         if( !err){
-            largestChangeId = parseInt(res.largestChangeId) + 1;
+            largestChangeId = parseInt(res.largestChangeId);
             fs.outputJson(pth.join(dataLocation,"largestChangeId.json"), {largestChangeId:largestChangeId}, function(){});
         }
         cb();
@@ -374,7 +374,7 @@ function loadPageChange(start, items, attempt, cb){
 
     drive.changes.list( opts, function loadPageChangeCallback(err, res){
         if(!err){
-            cb(err, res.largestChangeId, items.concat(res.items), res.nextPageToken);
+            cb(err, parseInt(res.largestChangeId), items.concat(res.items), res.nextPageToken);
         }else{
             logger.debug( "There was an error while loading changes" );
             logger.debug( err );
