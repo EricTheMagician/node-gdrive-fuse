@@ -128,11 +128,11 @@ class InodeTree {
 	}
 
 	saveFolderTree(){
-
+		const self = this;
 		if( this.saving){
 			return;
 		}
-		this.saving = true;
+		self.saving = true;
 	    logger.debug( "saving folder tree");
 	    const toSave = {};
 	    for( let key of this.map.keys()){
@@ -163,7 +163,7 @@ class InodeTree {
 	    	if(err){
 	    		logger.error("There was an error while saving inodeTree");
 	    	}
-	    	this.saving = false;
+	    	self.saving = false;
 	    });
 	
 	}
