@@ -159,7 +159,10 @@ class InodeTree {
 	        toSave[key] = saved;
 	    }
 
-	    fs.writeJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(){
+	    fs.writeJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(err){
+	    	if(err){
+	    		logger.error("There was an error while saving inodeTree");
+	    	}
 	    	this.saving = false;
 	    });
 	
