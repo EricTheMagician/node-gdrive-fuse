@@ -483,16 +483,27 @@ class GDriveFS extends fuse.FileSystem{
         if (parent){ //make sure parent exists
             logger.debug( `creating file ${name}`);
 
+            // check to see if a file exists with the same name in the folder tree
+            for (let childInode of parent.children){ 
+                // TODO: if file exists, delete it first
+                const obj = inodeTree.getFromInode(childInode);
+                if(obj instanceof GFile){
+                    if(obj.name === name){
+                        reply.err(PosixError.EEXIST);
+                        return;
+                    }
+                }
+            }
             const now = (new Date).getTime();
             const file = new GFile(null, null, parent.id, name, 0, now, now, true);
             const cache = file.getCacheName();
             const systemPath = pth.join(uploadLocation, cache);
 
-            //for childInode in parent.children #TODO: if file exists, delete it first
-            //  parent.children.push name
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
-            const inode = inodeTree.insert(file)
+            const inode = inodeTree.insert(file);
+            parent.children.push(inode);
+
 
             logger.debug( `create: parentid: ${parent.id} -- inode ${inode}`);
             logger.info (`adding a new file ${name} to folder ${parent.name}`);
@@ -959,6 +970,11 @@ function recurseResumeUploadingFilesFromUploadFolder(inode, files){
 
                 /* make sure that the file is the same size as what's been reported in the inodeTree */
                 fs.stat(pth.join(uploadLocation,cache), function(err, stat){
+                    if(err){
+                        logger.debug("There was an error while stating lost upload");
+                        logger.debug(err);
+                        return;
+                    }
                     if(stat.size == file.size ){
                         const parent = inodeTree.getFromId(file.parentid);
 
