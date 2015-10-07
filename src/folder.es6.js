@@ -70,7 +70,8 @@ function getNewRangeEnd(location, fileSize, cb){
 
     // unhandle error
     logger.debug("unhandled error with getting a new range end", resp.statusCode);
-    cb(resp.statusCode, -1);
+
+    setImmediate( function(){cb(resp.statusCode, -1)});
     return;
 
 
@@ -239,7 +240,9 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
     }
   };
   function uploadGetNewRangeEndCallback(err,end){
-    cb(err, { rangeEnd: end});
+    setImmediate( 
+      function(){cb(err, { rangeEnd: end});}
+    );
   }
   function uploadRequestCallback(err, resp, body){
 
@@ -254,7 +257,7 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
 
       getNewRangeEnd(location, fileSize,
           function uploadGetNewRangeEndCallbackAferError(err,end){
-            logger.debug (end);
+            logger.debug(end);
             cb( err, {
               statusCode: resp.statusCode,
               rangeEnd: end
@@ -319,13 +322,18 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
 
   var once = false;
 
-  fs.createReadStream( fileLocation, readStreamOptions)
-      .pipe(
+  const rstream = fs.createReadStream( fileLocation, readStreamOptions);
+  rstream.on('error', function(err){
+    this.end();
+  });
+
+  rstream.pipe(
       request(requestOptions, uploadRequestCallback)
-  ).on('error', function uploadErrorCallback(err){
+  )
+  .on('error', function uploadErrorCallback(err){
     logger.error( "error after piping" );
     logger.error( err );
-
+    this.end();
     function uploadErrorCallbackGetNewRange(err,end){
       cb( err, {
         rangeEnd: end
