@@ -900,6 +900,7 @@ function uploadCallback(inode, cb){
             logger.error(`inode ${inode} was not found in inodetree anymore`);
             uploadTree.delete(inode);
             cb();
+            return; 
         }
         const parent = inodeTree.getFromId(file.parentid)
         const upFile = uploadTree.get(inode)
