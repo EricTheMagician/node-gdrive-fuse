@@ -69,6 +69,10 @@ class InodeTree {
 		return this.idToInode.get(id);
 	}
 
+	mapInodeToId(inode,id){
+		return this.idToInode.set(inode,id);
+	}
+
 	loadFolderTree( callback ){
 		const jsonFile =  pth.join(dataLocation, 'inodeTree.json');
 		const self = this;
