@@ -64,7 +64,7 @@ function getNewRangeEnd(location, fileSize, cb){
       }
 
       const end = getRangeEnd(range);
-      cb(null,end);
+      setImmediate( function(){cb(null,end)});
       return;
     }
 
@@ -327,13 +327,12 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
     this.end();
   });
 
-  rstream.pipe(
-      request(requestOptions, uploadRequestCallback)
-  )
-  .on('error', function uploadErrorCallback(err){
+  const reqstream =       request(requestOptions, uploadRequestCallback);
+  reqstream.on('error', function uploadErrorCallback(err){
     logger.error( "error after piping" );
     logger.error( err );
     this.end();
+    rstream.end();
     function uploadErrorCallbackGetNewRange(err,end){
       cb( err, {
         rangeEnd: end
@@ -344,6 +343,11 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
       getNewRangeEnd(location, fileSize, uploadErrorCallbackGetNewRange);
     }
   });
+
+
+  rstream.pipe(
+    reqstream
+  );
 
 }
 
