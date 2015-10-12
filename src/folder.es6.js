@@ -332,7 +332,11 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
     logger.error( "error after piping" );
     logger.error( err );
     this.end();
-    rstream.end();
+    try{
+      rstream.end();
+    }catch(e){
+      logger.error(e);
+    }
     function uploadErrorCallbackGetNewRange(err,end){
       cb( err, {
         rangeEnd: end
