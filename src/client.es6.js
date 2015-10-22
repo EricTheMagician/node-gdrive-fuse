@@ -145,7 +145,7 @@ function getAllFiles(){
             inodeTree.saveFolderTree();
             // findFoldersWithUnknownParents();
             // inodeTree.saveFolderTree();
-            // getLargestChangeId(function(){});
+            getLargestChangeId(function(){});
             if(require.main != module)
                 setTimeout(loadChanges, 90000);
         }
