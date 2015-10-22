@@ -109,13 +109,15 @@ function getPageFiles(pageToken, total, cb)
 }
 
 
-const number_to_parse_per_call = 50000;
+const number_to_parse_per_call = 5000;
 function queryDatabaseAndParseFiles(offset){
     const cmd = `SELECT * from folder_tree_creation ORDER BY is_root DESC, is_folder DESC LIMIT ${number_to_parse_per_call} OFFSET ${offset}`;
     db.all( cmd, function callback(err, rows){
         if(err){
             logger.error(cmd);
             logger.error(err);
+            setImmediate( ()=> { queryDatabaseAndParseFiles(offset) } );
+            return;
         }
         if(rows.length == 0){
             inodeTree.saveFolderTree();
