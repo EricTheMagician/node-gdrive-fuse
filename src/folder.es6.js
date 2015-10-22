@@ -324,14 +324,14 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
 
   const rstream = fs.createReadStream( fileLocation, readStreamOptions);
   rstream.on('error', function(err){
-    this.end();
+    rstream.end();
   });
 
   const reqstream =       request(requestOptions, uploadRequestCallback);
   reqstream.on('error', function uploadErrorCallback(err){
     logger.error( "error after piping" );
     logger.error( err );
-    this.end();
+    reqstream.end();
     try{
       rstream.unpipe();
       rstream.pause();
