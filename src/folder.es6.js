@@ -333,7 +333,8 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
     logger.error( err );
     this.end();
     try{
-      rstream.end();
+      rstream.unpipe();
+      rstream.pause();
     }catch(e){
       logger.error(e);
     }
@@ -344,7 +345,9 @@ function uploadData(location, fileLocation, start, fileSize, mime, cb){
     }
     if(!once){
       once = true;
-      getNewRangeEnd(location, fileSize, uploadErrorCallbackGetNewRange);
+      setImmediate( function(){
+        getNewRangeEnd(location, fileSize, uploadErrorCallbackGetNewRange);
+      });
     }
   });
 
