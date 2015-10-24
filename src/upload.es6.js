@@ -198,10 +198,45 @@ class UploadingFile {
 		}
 	}
 	postUploadRenaming(){
-		
+		/* only rename if the parent or the filename is different from the new one */
+		if(this.newName != this.filename || this.parentid != this.newParent){
+			const self = this;
+			const file = this.file;
+			const params = {
+				resource:{
+					title: this.newName
+				},
+				fileId: this.file.id,
+				modifiedDate: true
+			};
+			
+
+			if( file.parentid != this.newParent ){
+				params.addParents = this.newParent;
+				params.removeParents =  this.parentid;
+			}
+			
+			GDrive.files.patch( params, function filesPatchCallback(err){
+				if(err){
+					logger.error(`There was an error with renaming file (${file.name}) after it was finished uploading`);
+					logger.debug(self);
+					logger.debug(file);
+				}
+			});
+			
+		}
 	}
 	postUploadDeleting(){
-		
+		if(this.toBeDeleted){
+			const self = this;
+			const file = self.file;
+			GDrive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
+				if (err){
+					logger.error( `after uploading: unable to remove file ${file.name} with id ${file.id}` );
+				}
+			});                
+
+		}
 	}
 	postUploadProcessing(fd, start,cb){
 		const self = this;

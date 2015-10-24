@@ -729,9 +729,8 @@ class GDriveFS extends fuse.FileSystem{
                     fileId: child.id,
                     modifiedDate: true
                 };
+                
                 if( newParentInode != oldParentInode ){
-                    const newParent = inodeTree.getFromInode(newParentInode);
-                    const oldParent = parent;
                     if( !newParent ){
                         reply.err (PosixError.ENOENT);
                         return;
@@ -745,21 +744,36 @@ class GDriveFS extends fuse.FileSystem{
                 }
 
                 child.name = newName;
-                console.log ("before google api");
-                drive.files.patch( params, function filesPatchCallback(err){
-                    console.log("after google api");
-                    if (err){
-                        logger.error( `There was an error with renaming file ${child.name}` );
-                        logger.error( err );
-                        reply.err (PosixError.EIO);
-                        return
-                    }
-                    reply.err(0);
-                    if (newParentInode != oldParentInode){
-                        newParent.children.push (childInode);
-                        oldParent.children.splice( oldParent.children.indexOf(childInode), 1 );
-                    }
-                });
+                
+                // simple check to determine if the child has been uploaded.
+                if(child.id){
+                    drive.files.patch( params, function filesPatchCallback(err){
+                        if (err){
+                            logger.error( `There was an error with renaming file ${child.name}` );
+                            logger.error( err );
+                            reply.err (PosixError.EIO);
+                            return
+                        }
+                        reply.err(0);
+                        if (newParentInode != oldParentInode){
+                            const newParent = inodeTree.getFromInode(newParentInode);
+                            const oldParent = parent;
+                            newParent.children.push (childInode);
+                            oldParent.children.splice( oldParent.children.indexOf(childInode), 1 );
+                        }
+                    });
+                }else{
+                    const newParent = inodeTree.getFromInode(newParentInode);
+                    const oldParent = parent;
+                    const upCache = uploadTree.get(child.inode);
+                    
+                    upCache.newName = newName;                    
+                    upCache.newParent = newParent.id;
+
+                    newParent.children.push (childInode);
+                    oldParent.children.splice( oldParent.children.indexOf(childInode), 1 );
+
+                }
                 return;
             }
         }
