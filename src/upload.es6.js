@@ -608,7 +608,7 @@ class UploadingFile {
 		/*
 		make sure that the name of the inode is the same as the uploading file or it's new name.
 		*/
-		if( this.file.name === this.newName){
+		if( this.file.name === this.newName || this.file.name === this.filename ){
 			const parent = inodeTree.getFromId(this.parentid);
 			const file = inodeTree.findChildByNameFromParentId(this.parentid, this.newName);
 			if( file == null ){
