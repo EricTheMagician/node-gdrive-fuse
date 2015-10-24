@@ -94,14 +94,14 @@ class GDriveFS extends fuse.FileSystem{
             }else if (object instanceof GFolder){
                 const size = Math.max( requestedSize , object.children.length * 256);
                 // size = requestedSize
-                const parent = inodeTree.getFromId(object.parentid);
+                // const parent = inodeTree.getFromId(object.parentid);
                 var totalSize = 0;
                 // totalSize += reply.addDirEntry('.', requestedSize, {inode: object.inode}, offset);
                 // totalSize += reply.addDirEntry('..', requestedSize, {inode: parent.inode}, offset);
                 for( let child of object.children ){
                     const cnode = inodeTree.getFromInode(child);
                     if(cnode){
-                        const attr = cnode.getAttrSync();
+                        // const attr = cnode.getAttrSync();
                         //console.log( cnode.name, cnode.inode);
                         const len = reply.addDirEntry(cnode.name, size, cnode, offset);
                         totalSize += len
@@ -168,7 +168,7 @@ class GDriveFS extends fuse.FileSystem{
                     }
                     return;
                 }else{
-                    reply(errerrnoMap.EISDIR);
+                    reply(PosixError.EISDIR);
                     return;
                 }
             }else{
@@ -364,8 +364,6 @@ class GDriveFS extends fuse.FileSystem{
                         reply.err(errnoMap.EIO);
                         return;
                     }else{
-                        const now = (new Date).getTime()
-
                         const folder = new GFolder(res.id, res.parents[0].id, name, (new Date(res.createdDate)).getTime(), (new Date(res.modifiedDate)).getTime(), res.editable, [])
                         inodeTree.insert(folder);
                         const attr = folder.getAttrSync();
@@ -407,7 +405,7 @@ class GDriveFS extends fuse.FileSystem{
                     if (folder.children.length == 0) {
                         drive.files.trash({fileId: folder.id}, function removeDirCallback(err, res) {
                             if (err) {
-                                logger.error( `unable to remove folder ${path}`);
+                                logger.error( `unable to remove folder ${folder.name}`);
                                 reply.err(errnoMap.EIO);
                                 return;
                             }
@@ -629,7 +627,6 @@ class GDriveFS extends fuse.FileSystem{
                     saveUploadTree();
 
                     const file =   inodeTree.getFromInode(inode);
-                    const parent = inodeTree.getFromId(file.parentid);
                     /*
                      three cases:
                      if file size is 0: delete it and don't upload
@@ -682,8 +679,8 @@ class GDriveFS extends fuse.FileSystem{
 
     getxattr(context, parentInode, name, size, position, reply){
         console.log('GetXAttr was called!');
-        const parent = inodeToPath.get(parentInode)
-        for( childInode of parent.children){
+        const parent = inodeTree.getFromInode(parentInode)
+        for( let childInode of parent.children){
             if(inodeTree.getFromInode(childInode).name === name){
                 reply.err(0);
                 return;
@@ -737,6 +734,8 @@ class GDriveFS extends fuse.FileSystem{
                 };
                 
                 if( newParentInode != oldParentInode ){
+                    const newParent = inodeTree.getFromInode(newParentInode);
+
                     if( !newParent ){
                         reply.err (PosixError.ENOENT);
                         return;

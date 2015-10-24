@@ -62,9 +62,7 @@ class GFile extends EventEmitter{
 
     /* private function where the actual downloading is done */
     const file = this;
-    const url = file.downloadUrl;
     const saveLocation = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
-    const size = file.size;
 
     if(config.accessToken == null){
       logger.debug("access token was null when downloading files");
@@ -251,7 +249,6 @@ class GFile extends EventEmitter{
 
   recursive(start,end){
     const file = this;
-    const path = pth.join(downloadLocation, `${file.id}-${start}-${end}`);
     if(start >= file.size){
       return;
     }
