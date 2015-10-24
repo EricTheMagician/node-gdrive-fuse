@@ -196,6 +196,10 @@ class InodeTree {
 
 
 	}
+	
+	mapIdToObject(id,obj){
+		return this.idToInode.set(id,obj);
+	}
   
   findChildByNameFromParentId(parentid,childName){
 		const parent = this.getFromId(parentid);

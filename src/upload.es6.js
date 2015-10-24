@@ -221,6 +221,7 @@ class UploadingFile {
 					logger.error(`There was an error with renaming file (${file.name}) after it was finished uploading`);
 					logger.debug(self);
 					logger.debug(file);
+					setImmediate( self.postUploadRenaming.bind(self) );
 				}
 			});
 			
@@ -534,6 +535,7 @@ class UploadingFile {
 		file.size = parseInt(result.fileSize)
 		file.ctime = (new Date(result.createdDate)).getTime()
 		file.mtime =  (new Date(result.modifiedDate)).getTime()
+		inodeTree.mapIdToObject(file.id, file);
 		uploadTree.delete(file.inode);
     	saveUploadTree();
         fs.open(upFile.uploadedFileLocation, 'r', (err,fd)=>{
