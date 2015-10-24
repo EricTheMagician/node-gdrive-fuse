@@ -569,7 +569,7 @@ class GDriveFS extends fuse.FileSystem{
             }
 
             //now we are pretty sure that the inode is the correct one
-            logger.debug( `removing file ${name}`);
+            logger.debug( `fs: removing file ${name}`);
             parent.children.splice( parent.children.indexOf(childInode), 1)
             inodeTree.delete( childInode );
             inodeTree.saveFolderTree();

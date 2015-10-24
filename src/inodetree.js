@@ -203,6 +203,7 @@ class InodeTree {
 
 		for(let childInode of parent.children){
 			const file = this.getFromInode(childInode);
+			if(!file){continue;}
 			if(file.name === childName){
 				return file;
 			}

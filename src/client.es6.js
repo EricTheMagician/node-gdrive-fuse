@@ -116,7 +116,7 @@ function queryDatabaseAndParseFiles(offset){
         if(err){
             logger.error(cmd);
             logger.error(err);
-            setImmediate( ()=> { queryDatabaseAndParseFiles(offset) } );
+            setImmediate( queryDatabaseAndParseFiles, offset );
             return;
         }
         if(rows.length == 0){
@@ -125,7 +125,7 @@ function queryDatabaseAndParseFiles(offset){
         }
         __items_to_parse_from_google__ = __items_to_parse_from_google__.concat(rows); 
         parseFilesFolders();
-        queryDatabaseAndParseFiles(offset + number_to_parse_per_call);
+        setImmediate(queryDatabaseAndParseFiles, offset + number_to_parse_per_call);
 
     });
 

@@ -383,7 +383,7 @@ class GFile extends EventEmitter{
     let nChunks = (chunkEnd - chunkStart)/config.chunkSize;
     function _readAheadFn(){
       if (readAhead){
-        if (chunkStart <= start < (chunkStart + 131072)){
+        if (chunkStart <= start && start < (chunkStart + 131072)){
           file.recursive( Math.floor(file.size / config.chunkSize) * config.chunkSize, file.size-1);
           for(let i = 1; i<= config.advancedChunks; i++ ){
             file.recursive(chunkStart + i * config.chunkSize, chunkEnd + i * config.chunkSize);
@@ -395,7 +395,7 @@ class GFile extends EventEmitter{
     function listenCallback(cStart){
       if (!__once__){
         // #logger.silly "listen callback #{file.id}-#{chunkStart},#{cStart}"
-        if ( cStart <= start < (cStart + config.chunkSize-1)  ){
+        if ( cStart <= start && start < (cStart + config.chunkSize-1)  ){
           // #logger.debug "once #{ __once__ } -- #{cStart} -- #{start}"
           __once__ = true;
           file.removeListener( 'downloaded', listenCallback);
