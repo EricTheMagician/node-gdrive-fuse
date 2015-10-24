@@ -21,6 +21,23 @@ if(!config.chunkSize)
 if(!config.refreshDelay)
 	config.refreshDelay = 60000;
 
+// setup winston logger
+const transports = [new (winston.transports.File)({
+  filename: '/tmp/GDriveF4JS.log',
+  level:'debug' ,
+  maxsize: 10485760, //10mb
+  maxFiles: 3
+})];
+if(config.debug)
+  transports.push(new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true }));
+else
+  transports.push(new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true }));
+
+const logger = new (winston.Logger)({
+  transports: transports
+});
+
+//setup max cache size
 var maxCache;
 if(config.maxCacheSize){
    maxCache =  config.maxCacheSize * 1024 * 1024;
@@ -29,6 +46,11 @@ if(config.maxCacheSize){
   logger.info( "defaulting to a 10 GB cache");
    maxCache = 10737418240;
 }
+
+// setup an event emitter that is used to signal loading status
+const EventEmitter = require('events');
+const commonStatus = new EventEmitter();
+
 
 
 // setup oauth client
@@ -51,22 +73,6 @@ function printDate(){
   const d = new Date();
   return `${d.getFullYear()}-${d.getMonth()+1}-${d.getDate()}T${d.getHours()}:${d.getMinutes()}::${d.getSeconds()}`;
 }
-// setup winston logger
-
-const transports = [new (winston.transports.File)({
-  filename: '/tmp/GDriveF4JS.log',
-  level:'debug' ,
-  maxsize: 10485760, //10mb
-  maxFiles: 3
-})];
-if(config.debug)
-  transports.push(new (winston.transports.Console)({ level: 'debug', timestamp: printDate,colorize: true }));
-else
-  transports.push(new (winston.transports.Console)({ level: 'info', timestamp: printDate,colorize: true }));
-
-const logger = new (winston.Logger)({
-  transports: transports
-});
 
 var lockRefresh = false;
 function refreshAccessToken(cb){
@@ -83,7 +89,7 @@ function refreshAccessToken(cb){
 		{
 			// logger.debug "There was an error with refreshing access token"
 			// logger.debug err
-			refreshAccessToken(cb);
+			setImmediate(refreshAccessToken,cb);
 			return;
 		}
 
@@ -94,13 +100,12 @@ function refreshAccessToken(cb){
 	        logger.debug("failed to save config");            
 	      } 
 	      lockRefresh = false;
-	      cb();
+	      setImmediate(cb);
 	    });
 	  });
 }
 
 const db = new sqlite3.Database(pth.join(dataLocation,'sqlite.db'));
-
 
 var currentLargestInode = 1;
 
@@ -116,6 +121,6 @@ module.exports = {
 	google: google,
 	GDrive: GDrive,
 	maxCache: maxCache,
-	currentLargestInode:currentLargestInode
-
+	currentLargestInode:currentLargestInode,
+	commonStatus: commonStatus
 }

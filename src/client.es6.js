@@ -146,6 +146,7 @@ function getAllFiles(){
             // findFoldersWithUnknownParents();
             // inodeTree.saveFolderTree();
             getLargestChangeId(function(){});
+            common.commonStatus.emit('ready');
             if(require.main != module)
                 setTimeout(loadChanges, 90000);
         }
@@ -305,6 +306,7 @@ function loadFolderTreeCallback(err){
         return;
     }
     const changeFile = pth.join(dataLocation,'largestChangeId.json');
+    common.commonStatus.emit('ready');
     fs.exists( changeFile, function checkLargestChangeIdJsonExistsCallback(exists){
         if (exists){
             fs.readJson(changeFile, function readLargestChangedIdCallback(err, data){
@@ -631,4 +633,4 @@ if(!config.accessToken){
     loadFolderTree();
 }
 
-module.exports.loadChanges = loadChanges
+module.exports.loadChanges = loadChanges;

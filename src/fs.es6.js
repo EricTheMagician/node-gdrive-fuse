@@ -12,15 +12,19 @@ const inodeTree = require('./inodetree.js');
 const client = require('./client.es6.js');
 
 const folder = require("./folder.es6.js");
-const uploadTree = folder.uploadTree;
 const GFolder = folder.GFolder;
-const saveUploadTree = folder.saveUploadTree;
+
 const f = require("./file.es6.js");
 const GFile = f.GFile;
 const addNewFile = f.addNewFile;
 const queue_fn = f.queue_fn;
-const queue = require('queue');
 
+
+let upload = require('./upload.es6.js');
+const UploadingFile = upload.UploadingFile;
+const uploadTree = upload.uploadTree;
+const saveUploadTree = upload.saveUploadTree;
+const uploadQueue = upload.uploadQueue;
 const exec = require('child_process').exec;
 
 const common = require('./common.es6.js');
@@ -30,9 +34,6 @@ const uploadLocation = common.uploadLocation;
 const downloadLocation = common.downloadLocation;
 const logger = common.logger;
 const drive = common.GDrive
-
-const q = queue({concurrency: config.maxConcurrentUploads || 4, timeout: 7200000 }) // default to 4 concurrent uploads
-
 
 // http://lxr.free-electrons.com/source/include/uapi/asm-generic/errno-base.h#L23
 const errnoMap = {
@@ -184,8 +185,8 @@ class GDriveFS extends fuse.FileSystem{
                     if (file.size == 0){
                         // logger.debug(`${path} size was 0`);
                         if (uploadTree.has(inode)){
-                            const cache = uploadTree.get(inode).cache;
-                            fs.open( pth.join(uploadLocation, cache), 'w+', function openFileForWritingCallback(err,fd){
+                            const cache = uploadTree.get(inode).uploadedFileLocation;
+                            fs.open( cache, 'w+', function openFileForWritingCallback(err,fd){
                                 if (err){
                                     logger.debug( "could not open file for writing" );
                                     logger.debug( err );
@@ -448,30 +449,28 @@ class GDriveFS extends fuse.FileSystem{
 
         const now = (new Date).getTime();
 
-        const file = new GFile(null, null, parent.id, name, 0, now, now, inode, true)
+        const file = new GFile(null, null, parent.id, name, 0, now, now, true)
         let inode = inodeTree.insert( file );
 
         logger.debug (`mknod: parentid: ${parent.id} -- inode ${inode}` );
         logger.info  (`adding a new file ${name} to folder ${parent.name}` );
         const attr = file.getAttrSync();
 
-        const upFile ={
-            cache: file.getCacheName(),
-            uploading: false
-        }
+        const upFile = new UploadingFile(inode, name, parent.id, false, function(err, location){
+            const entry = {
+                inode: attr.inode,
+                generation: 2,
+                attr: attr
+                //attr_timeout: 30,
+                //entry_timeout: 60
+            };
+    
+            reply.entry(entry);            
+        });
+
         uploadTree.set( inode, upFile);
         saveUploadTree();
 
-
-        entry = {
-            inode: attr.inode,
-            generation: 2,
-            attr: attr
-            //attr_timeout: 30,
-            //entry_timeout: 60
-        };
-
-        reply.entry(entry);
         return;
     }
     
@@ -496,8 +495,6 @@ class GDriveFS extends fuse.FileSystem{
             }
             const now = (new Date).getTime();
             const file = new GFile(null, null, parent.id, name, 0, now, now, true);
-            const cache = file.getCacheName();
-            const systemPath = pth.join(uploadLocation, cache);
 
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
@@ -507,31 +504,37 @@ class GDriveFS extends fuse.FileSystem{
 
             logger.debug( `create: parentid: ${parent.id} -- inode ${inode}`);
             logger.info (`adding a new file ${name} to folder ${parent.name}`);
-
             inodeTree.saveFolderTree();
-
-            fs.open( systemPath, 'w', function createOpenFileCallback(err, fd){
-                if (err){
-                    logger.error( `unable to create file ${inode} -- ${name}, ${err}` );
-                    reply.err(errnoMap[err.code]);
+            
+            const upFile = new UploadingFile(inode, name, parent.id, false, function(err, location){
+                if(err){
+                    logger.error(`There was an error ensuring that ${pth.dirname(location)} existed`);
+                    logger.error(err);
+                    reply(-err.errno);                    
                     return;
                 }
-                fileInfo.file_handle = fd;
-                logger.debug( "setting upload Tree" );
-                const upFile = {
-                    cache: cache,
-                    uploading: false
-                };
-                uploadTree.set( inode, upFile );
-                saveUploadTree()
-                const attr = {
-                    inode: inode, //#parent.inode,
-                    generation: 1,
-                    attr:file
-                };
-                reply.create( attr, fileInfo );
-                return;
+
+                fs.open( location, 'w', function createOpenFileCallback(err, fd){
+                    if (err){
+                        logger.error( `unable to create file ${inode} -- ${name}, ${err}` );
+                        reply.err(-err.errno);
+                        return;
+                    }
+                    fileInfo.file_handle = fd;
+                    logger.debug( "setting upload Tree" );
+
+                    const attr = {
+                        inode: inode, //#parent.inode,
+                        generation: 1,
+                        attr:file.getAttrSync()
+                    };
+                    reply.create( attr, fileInfo );
+                    return;
+                  });
+                
             });
+            uploadTree.set( inode, upFile );
+
         }else{
             reply.err( errnoMap.ENOENT );
         };
@@ -571,17 +574,24 @@ class GDriveFS extends fuse.FileSystem{
             inodeTree.delete( childInode );
             inodeTree.saveFolderTree();
 
-            drive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
-                if (err){
-                    logger.debug( `unable to remove file ${file.name}` );
-                }
-                reply.err(0) //TODO: handle case when google fails to delete a file
-            });
+            /*
+            A non-nulll id is required to delete a file from google.
+            If it's null, it's likely that it's in the upload tree.
+            So let it finish uploading and then move it to trash
+            */ 
 
-            if (uploadTree.has( childInode )){
-                const cache = uploadTree.get(childInode).cache;
-                uploadTree.delete(childInode)
-                fs.unlink(pth.join(uploadLocation,cache), function unlinkDeleteFileCallback(err){});
+            if(file.id){
+                drive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
+                    if (err){
+                        logger.debug( `unable to remove file ${file.name}` );
+                    }
+                    reply.err(0) //TODO: handle case when google fails to delete a file
+                });                
+            }else if (uploadTree.has( childInode )){
+                    const upFile = uploadTree.get(childInode);
+                    upFile.toBeDeleted = true;
+            }else{
+                logger.error(`fs: unhandled error while deleting ${name}`)
             }
 
             return;
@@ -627,21 +637,11 @@ class GDriveFS extends fuse.FileSystem{
 
 
                     if( 0 < file.size &&  file.size <= 10485760){ //10MB
-                        parent.upload( file.name, inode, uploadCallback(inode, function(){})    );
-                    }else if(file.size >  10485760 ){}
-                    q.push(
-                        function uploadQueueFunction(cb){
-                            if( parent instanceof GFile){
-                                logger.debug(`While uploading, ${name} was a file - ${parent}`);
-                                cb();
-                                return;
-                            }
-                            parent.upload(file.name, inode, uploadCallback(inode,cb))
-                            return
-                        }
-                    );
-
-                    q.start()
+                        upCache.upload( ()=>{} );
+                    }else if(file.size >  10485760 ){
+                        uploadQueue.push(upCache.upload.bind(upCache));    
+                        uploadQueue.start()
+                    }
                 }else{
                     uploadTree.delete(inode);
                     saveUploadTree();
@@ -800,358 +800,57 @@ class GDriveFS extends fuse.FileSystem{
     }
 }
 
-
-function moveToDownload (file, fd, uploadedFileLocation, start,cb){
-
-    const end = Math.min(start + config.chunkSize, file.size)-1
-    const savePath = pth.join(config.cacheLocation, 'download', `${file.id}-${start}-${end}`);
-    const rstream = fs.createReadStream(uploadedFileLocation, {fd: fd, autoClose: false, start: start, end: end})
-    const wstream = fs.createWriteStream(savePath)
-
-    rstream.on('end',  function moveToDownloadReadStream(){
-
-        start += config.chunkSize;
-        wstream.end();
-        if (start < file.size){
-            moveToDownload(file, fd, uploadedFileLocation, start, cb);
-            return;
+function start(){
+    try{
+        logger.info('attempting to start f4js');
+        var add_opts;
+        var command;
+        switch (os.type()){
+            case 'Linux':
+                add_opts = ["-o", "allow_other", ]
+                command = `umount -f ${config.mountPoint}`
+                break;
+            case 'Darwin':
+                add_opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc"];
+                command = `diskutil umount force ${config.mountPoint}`
+                break
+            default:
+                add_opts = []
+                command = `fusermount -u ${config.mountPoint}`
         }
-        fs.close( fd, function moveToDownloadFinishCopying(err){
-            if(err){
-                logger.error( `There was an error closing file ${fd} - ${file.id} - ${file.name} after moving upload file to download` );
-                logger.error( err );
+
+        const debug = false;
+
+        exec( command, function unmountCallback(err, data){
+            try{
+                fs.ensureDirSync(config.mountPoint);
+            }catch(e){
+                logger.error("could not ensure the mountpoint existed.");
+                process.exit(1)
             }
-            var start = 0
-            var end = Math.min(start + config.chunkSize, file.size)-1
-            var totalSize = 0
-            var count = 0
-            const basecmd = "INSERT OR REPLACE INTO files (name, atime, type, size) VALUES "
-            var cmd = basecmd
-            while(start < file.size){
-                var size = end - start + 1
-                count += 1
-                totalSize += size
-                if(count > 750){
-                    cmd += `('${file.id}-${start}-${end}',${Date.now()},'downloading',${size})`
-                    queue_fn(totalSize, cmd)(function(){});
-                    cmd = basecmd;
-                    count = 0;
-                    totalSize = 0;
-                }else{
-                    cmd += `('${file.id}-${start}-${end}',${Date.now()},'downloading',${size}),`
-                }
-                start += config.chunkSize;
-                end = Math.min(start + config.chunkSize, file.size)-1
-            }
-            queue_fn(totalSize,cmd.slice(0,-1))(function(){});
             if (err){
-                logger.debug(`unable to close file after transffering ${uploadedFile}`);
-                cb();
-                return;
+                logger.error( "unmount error:", err);
             }
-            fs.unlink( uploadedFileLocation, function deleteUploadedFile(err){
-                if (err){
-                    logger.error( `unable to remove file ${uploadedFile}`)
-                }
-                cb();
+            if (data){
+                logger.info( "unmounting output:", data);
+            }
+            const opts =  ["GDrive", "-o",  "allow_other", config.mountPoint];
+
+            if(debug){
+                opts.push("-d");
+            }
+            
+            fuse.fuse.mount({
+                filesystem: GDriveFS,
+                options: opts.concat(add_opts)
             });
-        });
-    });
 
-    rstream.pipe(wstream);
-}
-
-//function to create a callback for file uploading
-function uploadCallback(inode, cb){
-    return function (err, result){
-        if(err){
-            if (err === "invalid mime"){
-                logger.debug(`the mimetype of ${inode} was invalid`);
-                cb();
-                return
-            }
-            if(err === "uploading"){
-                cb();
-                return;
-            }
-            if(err.code === "ENOENT"){
-                uploadTree.delete(inode);
-                cb();
-                return;
-            }
-
-
-            cb();
-            const file = inodeTree.getFromInode(inode);
-            logger.debug(`Retrying upload: "${file.name}".`);
-            q.push(
-                function uploadFunctionQueued(_cb){
-                    parent.upload(file.name, inode , uploadCallback(inode,_cb));
-                    return;
-                }
-            );
-            q.start()
-        }
-
-        const file = inodeTree.getFromInode(inode)
-        if(!file){
-            // TODO: Sometimes, a file is not found. Although, it shouldn't have been deleted.
-            debugger;
-            logger.error(`inode ${inode} was not found in inodetree anymore`);
-            uploadTree.delete(inode);
-            cb();
-            return; 
-        }
-        const parent = inodeTree.getFromId(file.parentid)
-        const upFile = uploadTree.get(inode)
-
-        if(!upFile){ //#make sure uploaded file is still in the uploadTree
-            cb();
+            logger.log('info', `mount point: ${config.mountPoint}`);
             return;
-        }
-        const uploadedFileLocation = pth.join( uploadLocation, upFile.cache);
-
-        logger.info( `successfully uploaded ${file.name}`);
-
-        uploadTree.delete(inode);
-        saveUploadTree();
-        if (inodeTree.has(inode)){
-            const file = inodeTree.getFromInode(inode);
-            inodeTree.mapInodeToId(inode, result.id);
-            logger.debug(`${file.name} already existed in inodeTree`);
-            file.downloadUrl = result.downloadUrl
-            file.id = result.id
-            file.size = parseInt(result.fileSize)
-            file.ctime = (new Date(result.createdDate)).getTime()
-            file.mtime =  (new Date(result.modifiedDate)).getTime()
-        }else{
-            logger.debug(`${file.name} folderTree did not exist`);
-            common.currentLargestInode++;
-            let inode = common.currentLargestInode;
-            const file = new GFile(result.downloadUrl, result.id, result.parents[0].id, result.title, parseInt(result.fileSize), (new Date(result.createdDate)).getTime(), (new Date(result.modifiedDate)).getTime(), inode, true)
-            inodeTree.insert(file)
-        }
-        // update parent
-        if( !(file.inode in parent.children)){
-            parent.children.push(file.inode)
-        }
-        inodeTree.saveFolderTree();
-
-        // move the file to download folder after finished uploading
-        fs.open( uploadedFileLocation, 'r', function openFileAfterUploadCallback(err,fd){
-            if(err){
-                logger.debug( `could not open ${uploadedFileLocation} for copying file from upload to uploader` );
-                logger.debug( err );
-                return;
-            }
-
-            moveToDownload(file, fd, uploadedFileLocation, 0, cb)
         });
-
-    };
-}
-
-function recurseResumeUploadingFilesFromUploadFolder(inode, files){
-    const file = inodeTree.getFromInode(inode)
-
-    /* make sure that the inode is a file */
-    if( file instanceof GFile ){        
-        const cache = file.getCacheName();
-
-        /* ensure that this file is in the list of files to be checked */
-        if(files.has(cache)){
-            const upFile = {
-                cache: cache,
-                uploading: false,
-                released: true
-            };
-            files.delete(cache);
-
-            /* make sure that this inode is not already in the upload tree */
-            if( !uploadTree.has(inode) ){
-
-                /* make sure that the file is the same size as what's been reported in the inodeTree */
-                fs.stat(pth.join(uploadLocation,cache), function(err, stat){
-                    if(err){
-                        logger.debug("There was an error while stating lost upload");
-                        logger.debug(err);
-                        return;
-                    }
-                    if(stat.size == file.size ){
-                        const parent = inodeTree.getFromId(file.parentid);
-
-                        // ensure that the parent is a folder
-                        if(parent instanceof GFolder){
-
-                            logger.debug("a lost uploading file was found: ", file.name );
-
-                            // everything is good now, so we can enqueue the uploading
-                            uploadTree.set( inode, upFile );
-                            q.push(
-                                function uploadQueueFunction(cb){
-                                    if( parent instanceof GFile){
-                                        logger.debug(`While uploading, ${name} was a file - ${parent}`);
-                                        cb();
-                                        return;
-                                    }
-                                    parent.upload(file.name, inode, uploadCallback(inode,cb))
-                                    return
-                                }
-                            );
-
-                            q.start();
-                        }
-                    }
-                });
-            }
-
-        }
-    }
-
-    if( files.size > 0 && inode > 0){
-        setImmediate( function (){
-            recurseResumeUploadingFilesFromUploadFolder(inode - 1, files);
-        });
-    }else{
-        saveUploadTree();
-    }
-    
-}
-
-function resumeUploadingFilesFromUploadFolder(){
-    /*
-    
-    sometimes, the uploadTree.json file will get corrupted.
-    as a safeguard, read the files list from the upload data folder and try to find 
-    the associated inode and restart the upload.
-
-    */
-
-    fs.readdir(uploadLocation, function (err, files){
-        const filesToBeUploaded = new Set(files);
-
-        recurseResumeUploadingFilesFromUploadFolder(inodeTree.currentLargestInode, filesToBeUploaded);
-    });
-}
-
-// resume file uploading
-function resumeUpload(){
-    // uploadWork = null
-    if (uploadTree.size > 0){
-        logger.info( "resuming file uploading" );
-        for(let inode of uploadTree.keys()){
-
-            if( !inodeTree.has(inode) ){
-                uploadTree.delete(inode);
-                continue;
-            }
-            let file = inodeTree.getFromInode(inode);
-
-            // check to see if the file was released by the filesystem
-            // if it wasn't released by the filesystem, it means that the file was not finished transfering
-            let value = uploadTree.get(inode);
-            if(value.released){
-                let parent = inodeTree.getFromId( file.parentid );
-                value.uploading = false;
-                if (parent){
-                    if (parent instanceof GFolder){
-                        //value.location = false;
-                        uploadTree.set(inode, value);
-
-                        q.push(
-                            function resumeUploadQueueFunction(cb){
-                                parent.upload(file.name, inode, uploadCallback(inode,cb));
-                            }
-                        )
-                        q.start();
-                        continue;
-                    }else{
-                        logger.debug(`While resuming uploads, ${parent} was not a folder`);
-                    }
-                }
-            }else{
-                inodeTree.delete(inode)
-                uploadTree.delete(inode)
-                let parentInode = inodeTree.getFromId(value.parentid);
-                let parent = inodeTree.getFromInode(parentInode)
-                if (parent){
-                    let idx = parent.children.indexOf(inode);
-                    if (idx > 0){
-                        parent.children.splice(idx, 1);
-                    }
-                }
-                let path = pth.join(uploadLocation, value.cache);
-                fs.unlink(path, function(){});
-            }
-        };
-        saveUploadTree();
-
-    }
-
-    setTimeout(resumeUploadingFilesFromUploadFolder, 5000);
-
-}
-
-function start(count){
-    if( inodeTree.map.size > 1){
-        try{
-            logger.info('attempting to start f4js');
-            var add_opts;
-            var command;
-            switch (os.type()){
-                case 'Linux':
-                    add_opts = ["-o", "allow_other", ]
-                    command = `umount -f ${config.mountPoint}`
-                    break;
-                case 'Darwin':
-                    add_opts = ["-o",'daemon_timeout=0', "-o", "noappledouble", "-o", "noubc"];
-                    command = `diskutil umount force ${config.mountPoint}`
-                    break
-                default:
-                    add_opts = []
-                    command = `fusermount -u ${config.mountPoint}`
-            }
-            if( process.version < '0.11.0'){
-                opts.push( "-o", "allow_other")
-            }
-
-            const debug = false;
-
-            exec( command, function unmountCallback(err, data){
-                try{
-                    fs.ensureDirSync(config.mountPoint);
-                }catch(e){
-                    logger.error("could not ensure the mountpoint existed.");
-                    process.exit(1)
-                }
-                if (err){
-                    logger.error( "unmount error:", err);
-                }
-                if (data){
-                    logger.info( "unmounting output:", data);
-                }
-                const opts =  ["GDrive", "-o",  "allow_other", config.mountPoint];
-                // opts.push "-s"
-                // opts.push "-f"
-
-                // opts.push "-mt"
-                // opts.push("-d")
-                fuse.fuse.mount({
-                    filesystem: GDriveFS,
-                    options: opts.concat(add_opts)
-                });
-
-                logger.log('info', `mount point: ${config.mountPoint}`);
-                setTimeout(resumeUpload, 120000);
-                return;
-            });
         }catch(e){
             logger.log( "error", `Exception when starting file system: ${e}`);
         }
-    }else{
-        setTimeout(start, 500);
-    }
 }
 
-
-start(0)
+common.commonStatus.once('ready', start)

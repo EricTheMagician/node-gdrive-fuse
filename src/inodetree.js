@@ -72,7 +72,7 @@ class InodeTree {
 	mapInodeToId(inode,id){
 		return this.idToInode.set(inode,id);
 	}
-
+	
 	loadFolderTree( callback ){
 		const jsonFile =  pth.join(dataLocation, 'inodeTree.json');
 		const self = this;
@@ -136,6 +136,8 @@ class InodeTree {
 		if( this.saving){
 			return;
 		}
+		logger.info("saving folder tree");
+		
 		self.saving = true;
 	    logger.debug( "saving folder tree");
 	    const toSave = {};
@@ -193,6 +195,20 @@ class InodeTree {
 		}
 
 
+	}
+  
+  findChildByNameFromParentId(parentid,childName){
+		const parent = this.getFromId(parentid);
+		if(!parent){return null;}
+
+		for(let childInode of parent.children){
+			const file = this.getFromInode(childInode);
+			if(file.name === childName){
+				return file;
+			}
+		}
+		
+		return null;
 	}
 
 

@@ -16,14 +16,13 @@ const oauth2Client = common.oauth2Client;
 const refreshAccessToken = common.refreshAccessToken
 const maxCache = common.maxCache;
 
+const inodeTree = require('./inodetree.js');
+
 const queue = require('queue');
 const db = common.database;
 const q = queue({concurrency: 1, timeout: 7200000 });
 let totalDownloadSize = 0;
 const regexPattern = /^[a-zA-Z0-9-]*-([0-9]*)-([0-9]*)$/;
-
-const MD5 = require( 'MD5' );
-
 
 // opened files
 const openedFiles = new Map();
@@ -247,7 +246,7 @@ class GFile extends EventEmitter{
       ctime: parseInt(this.ctime/1000),
       inode: this.inode
     };
-    cb(0,attr);
+    setImmediate(cb,0,attr);
   }
 
   recursive(start,end){
@@ -343,7 +342,7 @@ class GFile extends EventEmitter{
                 let opened = openedFiles.get(`${file.id}-${start}`);
                 clearTimeout(opened.to)
 
-                cb(null, opened.fd)
+                setImmediate( cb, null, opened.fd);
                 fs.close(fd, function close_already_opened_file_callback(err){
                   if (err){
                     logger.error( "There was an error closing an already opened file" )
@@ -359,16 +358,16 @@ class GFile extends EventEmitter{
               }
 
               openedFiles.set(`${file.id}-${start}`, {fd: fd, to: setTimeout(openedFileCallCloseTimeout, cacheTimeout) });
-              cb(null, fd);
+              setImmediate(cb,null, fd);
               return;
             });
           }else{
-            cb(null, false);
+            setImmediate(cb, null, false);
           }
           return;
         });
       }catch(e){
-        cb(null, false)
+        setImmediate(cb, null, false);
       }
     }
   }
@@ -417,7 +416,7 @@ class GFile extends EventEmitter{
       {
         logger.silly(`download tree has ${file.id}-${chunkStart}`);
         file.on('downloaded', listenCallback);
-        _readAheadFn();
+        setImmediate( _readAheadFn);
         return;
       }
   
@@ -427,7 +426,7 @@ class GFile extends EventEmitter{
         //fd can returns false if the file does not exist yet
         if(err || fd == false){
           file.download(start, end, readAhead, cb);
-          _readAheadFn();
+          setImmediate(_readAheadFn);
           return;
         }
 
@@ -444,7 +443,7 @@ class GFile extends EventEmitter{
             }
             cb(buffer.slice(0,bytesRead));
           });
-          _readAheadFn();
+          setImmediate(_readAheadFn);
         }catch(e){
           logger.error( "There was an error while reading file. Retrying");
           logger.error( e);
@@ -471,7 +470,7 @@ class GFile extends EventEmitter{
           cb( Buffer.concat([buffer1, buffer2]) );
         }
 
-        file.read( start2, end, true, callback2_multiple_chunks);
+        setImmediate(file.read, start2, end, true, callback2_multiple_chunks);
       });
 
     }else{
@@ -585,9 +584,6 @@ class GFile extends EventEmitter{
 
   }
 
-  getCacheName(){
-    return MD5(this.parentid + this.name);
-  }
 }
 
 /*
