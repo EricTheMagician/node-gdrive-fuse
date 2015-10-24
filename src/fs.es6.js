@@ -588,10 +588,12 @@ class GDriveFS extends fuse.FileSystem{
                     reply.err(0) //TODO: handle case when google fails to delete a file
                 });                
             }else if (uploadTree.has( childInode )){
-                    const upFile = uploadTree.get(childInode);
-                    upFile.toBeDeleted = true;
+                const upFile = uploadTree.get(childInode);
+                upFile.toBeDeleted = true;
+                reply.err(0)
             }else{
                 logger.error(`fs: unhandled error while deleting ${name}`)
+                reply.err(PosixError.EIO);
             }
 
             return;
@@ -776,7 +778,7 @@ class GDriveFS extends fuse.FileSystem{
 
                     newParent.children.push (childInode);
                     oldParent.children.splice( oldParent.children.indexOf(childInode), 1 );
-
+                    reply.err(0);
                 }
                 return;
             }
