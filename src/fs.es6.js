@@ -720,6 +720,7 @@ class GDriveFS extends fuse.FileSystem{
 
         for( let childInode of parent.children){
             const child = inodeTree.getFromInode(childInode);
+            if(!child){continue;}
             if (child.name === oldName){
                 // move to new folder if required
                 const params = {
