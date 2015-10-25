@@ -228,15 +228,8 @@ class UploadingFile {
 		}
 	}
 	postUploadDeleting(){
-		if(this.toBeDeleted){
-			const self = this;
-			const file = self.file;
-			GDrive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
-				if (err){
-					logger.error( `after uploading: unable to remove file ${file.name} with id ${file.id}` );
-				}
-			});                
-
+		if(this.toBeDeleted){			
+			setImmediate(this.file.unlink(()=>{}).bind(this));
 		}
 	}
 	postUploadProcessing(fd, start,cb){
