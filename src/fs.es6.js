@@ -579,12 +579,13 @@ class GDriveFS extends fuse.FileSystem{
             */ 
 
             if(file.id){
-                drive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
-                    if (err){
-                        logger.debug( `unable to remove file ${file.name}` );
-                    }
-                    reply.err(0) //TODO: handle case when google fails to delete a file
-                });                
+                file.unlink( (err)=>{
+                   if(err){
+                       reply.err(PosixError.EIO);
+                   }else{
+                       reply.err(0);
+                   }
+                });
             }else if (uploadTree.has( childInode )){
                 const upFile = uploadTree.get(childInode);
                 upFile.toBeDeleted = true;

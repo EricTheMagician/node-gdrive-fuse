@@ -580,6 +580,20 @@ class GFile extends EventEmitter{
     }
 
   }
+  
+  unlink(callback){
+    const file = this;
+    GDrive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
+      if (err){
+        logger.debug( `unable to remove file ${file.name}` );
+        setImmediate(file.unlink.bind(file), callback);
+        return;
+      }
+      callback();
+      
+    });                
+
+  }
 
 }
 
