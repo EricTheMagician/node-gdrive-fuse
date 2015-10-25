@@ -209,7 +209,9 @@ class UploadingFile {
 					}else{
 						//delete empty folders
 						fs.rmdir(pth.join(uploadLocation, folder), (err)=>{
-							logger.debug(`upload: error removing empty folder ${parent.id} from upload folder`)
+							if(err){
+								logger.debug(`upload: error removing empty folder ${parent.id} from upload folder`);
+							}
 						})
 					}
 				});
