@@ -589,7 +589,10 @@ class GFile extends EventEmitter{
         setImmediate(file.unlink.bind(file), callback);
         return;
       }
-      callback();
+      
+			if(callback != null && typeof(callback) == 'function'){
+				setImmediate(callback);	
+			}			
       
     });                
 
