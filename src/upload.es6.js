@@ -142,6 +142,7 @@ class UploadingFile {
 				*/
 
 				fs.readdir( pth.join(uploadLocation, folder), function(err, files){
+					if(err){return;}
 					if( files.length > 0){
 						for( let fileName of files ){
 							let file = inodeTree.findChildByNameFromParentId(parent.id,fileName);
@@ -170,6 +171,11 @@ class UploadingFile {
 
 							}
 						}
+					}else{
+						//delete empty folders
+						fs.rmdir(pth.join(uploadLocation, folder), (err)=>{
+							logger.debug(`upload: error removing empty folder ${parent.id} from upload folder`)
+						})
 					}
 				});
 				
