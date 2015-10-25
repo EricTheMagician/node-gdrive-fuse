@@ -783,6 +783,7 @@ class GDriveFS extends fuse.FileSystem{
 
                     newParent.children.push (childInode);
                     oldParent.children.splice( oldParent.children.indexOf(childInode), 1 );
+                    upCache.move_cache();
                     reply.err(0);
                 }
                 return;

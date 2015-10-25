@@ -119,6 +119,31 @@ class UploadingFile {
 					
 	}		
 	
+	move_cache(){
+		/* 
+		if the GFile that underlies this upload should be moved, 
+		move it if it is not currently being uploaded.		
+		*/
+		const upFile = this;
+
+		if(!upFile.uploading){
+			/* make sure that it should be moved */
+			const filename = pth.basename(upFile.uploadedFileLocation);
+			const parentid = pth.basename(pth.dirname(upFile.uploadedFileLocation));
+			
+			if(filename != upFile.filename || parentid != this.parentid){
+				const newPath = pth.join(uploadLocation, upFile.newParent, upFile.newName);
+				fs.move(upFile.uploadedFileLocation, newPath, (err)=>{
+					if(err){
+						logger.debug("upload: There was an error while moving file after a rename");
+					}else{
+						upFile.uploadedFileLocation = newPath;
+					}
+				})
+			}
+		}
+	}
+	
 	static resumeUploadingFilesFromUploadFolder(callback){
 		/*	
 		sometimes, the uploadTree.json file will get corrupted.
@@ -157,6 +182,16 @@ class UploadingFile {
 									*/									
 								});
 										
+							}else if(file.id){
+
+								/* 
+								if it has already been uploaded, the id will be non null.
+								the file should be moved to download folder 
+								*/
+								
+								const upFile = new UploadingFile(file.inode, file.name, file.parent.id, true, null);
+								upFile.postUploadProcessing();
+
 							}else{								
 
 								/* 
@@ -356,6 +391,7 @@ class UploadingFile {
 			}else if(resp.statusCode == 200){
 				upFile.uploadUrl = resp.headers.location;
 				upFile.__uploadData__(0, callback);
+				saveUploadTree();
 			}else{
 				callback(resp.statusCode);
 			}
@@ -402,7 +438,7 @@ class UploadingFile {
 	
 			// unhandled case
 			logger.debug("unhandled error with getting a new range end", resp.statusCode);
-			setImmediate( upFile.getUploadResumableLink.bind(upFile), callback);
+			setImmediate( upFile.getUploadResumableLink.bind(upFile), callback);			
 			return;
 	
 	
