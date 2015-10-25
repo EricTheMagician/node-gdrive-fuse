@@ -467,7 +467,7 @@ class GFile extends EventEmitter{
           cb( Buffer.concat([buffer1, buffer2]) );
         }
 
-        setImmediate(file.read, start2, end, true, callback2_multiple_chunks);
+        setImmediate(file.read.bind(file), start2, end, true, callback2_multiple_chunks);
       });
 
     }else{
