@@ -396,7 +396,7 @@ class UploadingFile {
 	
 			// unhandled case
 			logger.debug("unhandled error with getting a new range end", resp.statusCode);
-			setImmediate( callback, resp.statusCode, -1);
+			setImmediate( upFile.getUploadResumableLink.bind(upFile), callback);
 			return;
 	
 	
@@ -462,7 +462,6 @@ class UploadingFile {
       }
     };
     
-	debugger;
     let once = false;
     
     // read the data

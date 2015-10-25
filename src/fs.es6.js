@@ -437,7 +437,7 @@ class GDriveFS extends fuse.FileSystem{
 
         const parent = inodeTree.getFromInode(parentInode);
 
-        for(childInode in parent.children){ //TODO: if file exists, delete it first
+        for(let childInode in parent.children){ //TODO: if file exists, delete it first
             const child = inodeTree.getFromInode(childInode);
             if (child && child.name === name){
                 reply.err(PosixError.EEXIST);
@@ -567,7 +567,7 @@ class GDriveFS extends fuse.FileSystem{
             }
 
             if(file instanceof GFolder){
-                reply.err (errnoMap.EISDIR);
+                reply.err(errnoMap.EISDIR);
                 return;
             }
 
