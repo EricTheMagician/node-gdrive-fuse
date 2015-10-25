@@ -475,6 +475,10 @@ class GDriveFS extends fuse.FileSystem{
 
 
     create(context, parentInode, name, mode, fileInfo, reply){
+        /* 
+        the expected behaviour for the file is to first delete it if it exists
+        and then create it
+        */ 
         const parent = inodeTree.getFromInode(parentInode);
 
         if (parent){ //make sure parent exists
@@ -482,12 +486,13 @@ class GDriveFS extends fuse.FileSystem{
 
             // check to see if a file exists with the same name in the folder tree
             for (let childInode of parent.children){ 
-                // TODO: if file exists, delete it first
                 const obj = inodeTree.getFromInode(childInode);
                 if(obj instanceof GFile){
                     if(obj.name === name){
-                        reply.err(PosixError.EEXIST);
-                        return;
+                        obj.unlink();
+                        
+                        // continue instead of break in case multiple files with the same name exist
+                        continue;
                     }
                 }
             }

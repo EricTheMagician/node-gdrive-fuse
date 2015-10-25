@@ -590,12 +590,32 @@ class GFile extends EventEmitter{
         return;
       }
       
+      /* remove cached files after unlinking */
+      file.__remove_cached_files__();
+      
 			if(callback != null && typeof(callback) == 'function'){
 				setImmediate(callback);	
 			}			
       
     });                
-
+  }
+  
+  __remove_cached_files__(){
+    /* this function will try to unlink itself from the cached download directory */
+    const file = this;
+    var size = 0;
+    while( size < file.size){
+      let start = size;
+      let end = Math.min(size + config.chunkSize, file.size) - 1;
+      let path = pth.join(downloadLocation,`${file.id}-${start}-${end}`);
+      fs.unlink(path, (err)=>{
+        if(!err){
+          totalDownloadSize -= (end-start+1);
+        }
+      })
+      
+      size += config.chunkSize;
+    }
   }
 
 }
