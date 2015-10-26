@@ -403,6 +403,7 @@ class UploadingFile {
 
 	getNewRangeEnd(callback){
 		const upFile = this;
+        const file = upFile.file;
 		
 		/* 
 		ensure that the uploadUrl is not null. if it is, get a new resumable link
@@ -434,6 +435,7 @@ class UploadingFile {
 				}
 			
 				const end = getRangeEnd(range);
+                logger.info(`upload: got a new range for file ${file.name} --- ${end}`);
 				setImmediate( upFile.__uploadData__.bind(upFile), end, callback);
 				return;
 			}
