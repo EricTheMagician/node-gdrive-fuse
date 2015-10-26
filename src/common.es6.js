@@ -5,7 +5,6 @@
 ######################################
 */
 
-// require('longjohn')
 const fs = require('fs-extra');
 const pth = require('path');
 const winston = require('winston');
@@ -22,6 +21,8 @@ if(!config.chunkSize)
   config.chunkSize = 1024*1024*16;
 if(!config.refreshDelay)
 	config.refreshDelay = 60000;
+if(config.longjohn)
+    require('longjohn')
 
 // setup winston logger
 const transports = [new (winston.transports.File)({
