@@ -272,7 +272,7 @@ class UploadingFile {
 	}
 	postUploadDeleting(){
 		if(this.toBeDeleted){			
-			setImmediate(this.file.unlink(()=>{}).bind(this));
+			setImmediate(this.file.unlink.bind(this));
 		}
 	}
 	postUploadProcessing(fd, start,cb){
