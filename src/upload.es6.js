@@ -659,6 +659,23 @@ class UploadingFile {
 			}
 		}
 	}
+    
+    unlink(){
+        /* 
+        if an uploading file is being deleted,
+        try to move it to cache before actually deleting it 
+        */
+        const self = this; 
+        if(self.file.id){
+            this.move_cache();
+        }else{
+            fs.unlink(this.uploadedFileLocation, (err)=>{
+                if(err){
+                    logger.error(`upload: unable to remove file from delete method (${self.uploadedFileLocation}`);
+                }
+            })
+        }
+    }
 	
 };
 

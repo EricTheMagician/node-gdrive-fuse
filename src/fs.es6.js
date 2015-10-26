@@ -633,6 +633,12 @@ class GDriveFS extends fuse.FileSystem{
                     saveUploadTree();
 
                     const file =   inodeTree.getFromInode(inode);
+                    if(!file){
+                        // if the file has already been deleted.       
+                        uploadTree.delete(inode);
+                        upCache.unlink();                
+                        return;
+                    }
                     /*
                      three cases:
                      if file size is 0: delete it and don't upload
