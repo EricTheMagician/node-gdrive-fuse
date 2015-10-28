@@ -502,8 +502,6 @@ class GDriveFS extends fuse.FileSystem{
             logger.debug( `adding file "${name}" to folder "${parent.name}"`);
 
             const inode = inodeTree.insert(file);
-            parent.children.push(inode);
-
 
             logger.debug( `create: parentid: ${parent.id} -- inode ${inode}`);
             logger.info (`adding a new file ${name} to folder ${parent.name}`);
