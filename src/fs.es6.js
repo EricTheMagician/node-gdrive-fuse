@@ -55,9 +55,15 @@ const errnoMap = {
  ####### Filesystem Handler Functions ###########
  ################################################
  */
+
+const ReplyMap = new Map();
+const ReplySet = new WeakSet();
+
 class GDriveFS extends fuse.FileSystem{
 
     getattr(context, inode, reply){
+        // const this = this;        
+        ReplyMap.set(reply, ()=>{logger.debug("retrying this function call", "getattr");this.getattr(context,inode,reply)} )
         if (inodeTree.has(inode)){
             inodeTree.getFromInode(inode).getAttr(
                 function getAttrCallback(status, attr){
@@ -71,10 +77,12 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     opendir(context, inode, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying this function call", "opendir");this.opendir(context,inode,fileInfo, reply)} );
         reply.open(fileInfo);
     }
 
     releasedir(context, inode, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying releasedir");this.releasedir(context,inode, fileInfo, reply)});
         // console.log('Releasedir was called!');
         // console.log(fileInfo);
         reply.err(0);
@@ -87,6 +95,7 @@ class GDriveFS extends fuse.FileSystem{
      *     and names is the result in the form of an array of file names (when err === 0).
      */
     readdir(context, inode, requestedSize, offset, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug(`retrying readdir (context, ${inode}, ${requestedSize}, ${offset}, ${fileInfo}, reply)`);this.readdir(context,inode,requestedSize, offset, fileInfo, reply)} )
         if(inodeTree.has(inode)){
             const object = inodeTree.getFromInode(inode);
             if(object instanceof GFile){
@@ -122,6 +131,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     setattr(context, inode, attrs, reply){
+        ReplyMap.set(reply, ()=>{logger.info("retrying setattr"); this.setattr(context, inode, attrs, reply)});
         logger.debug( `setting attr for ${inode}`);
         logger.silly(attrs);
         const file = inodeTree.getFromInode(inode);
@@ -154,6 +164,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     open(context, inode, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying open");this.open(context, inode, fileInfo,reply)});
         const self = this;
         const flags = fileInfo.flags;
         if (flags.rdonly){ //read only
@@ -259,6 +270,8 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     read(context, inode, len, offset, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying read");this.read(context, inode, len, offset, fileInfo, reply)});
+
         // logger.silly( `reading file ${path} - ${offset}:${len}`);
         var once = false
         function readDataCallback(dataBuf){
@@ -295,6 +308,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     write(context, inode, buffer, position, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying write");this.write(context, inode, buffer, position, fileInfo, reply)});
 
         // path = inodeToPath.get inode
         // logger.silly( `writing to file ${path} - position: ${position}, length: ${buffer.length}"
@@ -324,6 +338,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     flush(context, inode, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying flush");this.flush(context, inode, fileInfo, reply)});
         reply.err(0);
     }
 
@@ -334,6 +349,7 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     mkdir(context, parentInode, name, mode, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying mkdir");this.mkdir(context, parentInode, name, mode, reply)});
         // parentPath = inodeToPath.get parentInode
         // path = pth.join parentPath, name
         // logger.debug(`creating folder ${path}");
@@ -391,6 +407,7 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     rmdir(context, parentInode, name, reply) {
+        ReplyMap.set(reply, ()=>{logger.debug("retrying rmdir");this.rmdir(context, parentInode, name,reply)});
         const parent = inodeTree.getFromInode(parentInode);
         logger.debug( `removing folder ${name}` );
 
@@ -434,7 +451,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     mknod(context, parentInode, name, mode, rdev, reply){
-
+        ReplyMap.set(reply, ()=>{logger.debug("retrying context");this.mknod(context, parentInode, name, mode, rdev,reply)}); 
         const parent = inodeTree.getFromInode(parentInode);
 
         for(let childInode in parent.children){ //TODO: if file exists, delete it first
@@ -479,6 +496,7 @@ class GDriveFS extends fuse.FileSystem{
         the expected behaviour for the file is to first delete it if it exists
         and then create it
         */ 
+        ReplyMap.set(reply, ()=>{logger.debug("retrying create");this.create(context, parentInode, name, mode, fileInfo,reply)});
         const parent = inodeTree.getFromInode(parentInode);
 
         if (parent){ //make sure parent exists
@@ -546,6 +564,7 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     unlink(context, parentInode, name, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying unlink");this.unlink(context, parentInode, name,reply)});
         const parent = inodeTree.getFromInode( parentInode );
 
         for( let childInode of parent.children ){
@@ -612,6 +631,7 @@ class GDriveFS extends fuse.FileSystem{
      * cb: a callback of the form cb(err), where err is the Posix return code.
      */
     release(context, inode, fileInfo, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying release");this.release(context, inode, fileInfo, reply)});
         logger.silly(`closing file ${inode}`);
         if (uploadTree.has (inode) ){
             logger.debug(`${inode} was in the upload tree`);
@@ -672,6 +692,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     statfs(context, inode, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying statfs");this.statfs(context, inode,reply)});
         reply.statfs( {
             bsize: Math.floor(config.chunkSize/2),
             iosize: Math.floor(config.chunkSize/2),
@@ -688,6 +709,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     getxattr(context, parentInode, name, size, position, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying getxattr");this.getxattr(context, parentInode, name, position, reply)});
         console.log('GetXAttr was called!');
         const parent = inodeTree.getFromInode(parentInode)
         for( let childInode of parent.children){
@@ -700,6 +722,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     listxattr(context, inode, size, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying listxattr");this.listxattr(context, inode, size, reply)});
         console.log("listxattr called");
         const obj = inodeTree.getFromInode(inode);
         if (obj){
@@ -710,6 +733,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     access(context, inode, mask, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying access");this.access(context, inode, mask, reply)});
         // console.log('Access was called!');
         if(inodeTree.has(inode)){
             reply.err(0);
@@ -720,6 +744,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     rename(context, oldParentInode, oldName, newParentInode, newName, reply){
+        ReplyMap.set(reply, ()=>{logger.debug("retrying rename");this.rename(context, oldParentInode, oldName, newParentInode, newName, reply)});
         //find the currrent child
         const parent = inodeTree.getFromInode(oldParentInode);
         if(!parent){
@@ -799,7 +824,7 @@ class GDriveFS extends fuse.FileSystem{
     }
 
     lookup(context, parentInode, name, reply){
-
+        ReplyMap.set(reply, ()=>{logger.debug("retrying lookup");this.lookup(context, parentInode, name,reply)});
         //make sure the parent inode exists
         if( !inodeTree.has(parentInode)){
             reply.err(PosixError.ENOENT);
@@ -829,6 +854,24 @@ class GDriveFS extends fuse.FileSystem{
 
     }
 }
+
+setInterval( ()=>{
+    for(const key of ReplyMap.keys()){
+        if(key.hasReplied){
+            ReplyMap.delete(key);
+        }else{            
+            if( ReplySet.has(key) ){
+                throw new Error("reply not resolved after one attempt");
+            }else{
+                logger.info("key reply: ", key.hasReplied);
+                setImmediate(ReplyMap.get(key))
+                console.trace();
+                ReplySet.add(key);
+                
+            }
+        }
+    }
+}, 62432)
 
 function start(){
     try{
