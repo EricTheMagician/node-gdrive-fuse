@@ -43,7 +43,7 @@ class InodeTree {
 			}
 
 			this.idToInode.set(value.id, value);
-			this.saveFolderTree()
+			setImmediate( this.saveFolderTree.bind(this) );
 		
 			return this.currentLargestInode;
 		}
@@ -193,6 +193,8 @@ class InodeTree {
 		if(idx < 0){
 			newParent.children.push(f.inode);
 		}
+        
+        setImmediate( this.saveFolderTree.bind(this) );    
 
 
 	}
