@@ -66,12 +66,23 @@ function saveUploadTree(){
     }
 
     logger.debug("saving upload tree");
-    fs.outputJson( pth.join(config.cacheLocation, 'data','uploadTree.json'), toSave, function unlockSavingUploadTree(err){
-      if(err){
-        logger.error("There was an error saving the upload tree");
-        logger.error(err);
-      }
-      lockUploadTree = false;
+    const before = pth.join(config.cacheLocation, 'data','uploadTree.json.partial');
+    fs.outputJson( before, toSave, function unlockSavingUploadTree(err){
+        if(err){
+            logger.error("There was an error saving the upload tree");
+            logger.error(err);
+            lockUploadTree = false;
+        }else{
+            
+            const after = pth.join(config.cacheLocation, 'data','uploadTree.json');
+            fs.rename( before, after, (err)=>{
+                if(err){
+                    logger.error("There was an error while moving partial uploadTree");
+                }
+                lockUploadTree = false;
+            });
+        }
+
     });
   }
 }

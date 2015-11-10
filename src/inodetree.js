@@ -164,12 +164,22 @@ class InodeTree {
 
 	        toSave[key] = saved;
 	    }
-
-	    fs.writeJson(pth.join(dataLocation,'inodeTree.json'), toSave,  function saveFolderTreeCallback(err){
+        
+        const before = pth.join(dataLocation,'inodeTree.json.partial');
+	    fs.writeJson(before, toSave,  function saveFolderTreeCallback(err){
 	    	if(err){
 	    		logger.error("There was an error while saving inodeTree");
-	    	}
-	    	self.saving = false;
+                self.saving = false;
+	    	}else{
+                const after = pth.join(dataLocation, 'inodeTree.json');
+                fs.rename( before, after, (err)=>{
+                    if(err){
+                        logger.error("There was an error while moving partial inodeTree");
+                    }
+                    self.saving = false;
+                })             
+            }
+            
 	    });
 	
 	}
