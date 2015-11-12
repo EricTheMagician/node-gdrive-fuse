@@ -581,24 +581,26 @@ class GFile extends EventEmitter{
 
   }
   
-  unlink(callback){
-    const file = this;
-    GDrive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
-      if (err){
-        logger.debug( `unable to remove file ${file.name}` );
-        setImmediate(file.unlink.bind(file), callback);
-        return;
-      }
+    unlink(callback){
+        const file = this;
+        console.trace()
+        GDrive.files.trash( {fileId: file.id}, function deleteFileCallback(err, res){
+            if (err){
+                logger.debug( `unable to remove file ${file.name}` );        
+                logger.debug( err );
+                // setImmediate(file.unlink.bind(file), callback);
+                // return;
+            }
+            
+            /* remove cached files after unlinking */
+            setImmediate(file.__remove_cached_files__.bind(file));
+            
+            if(callback != null && typeof(callback) == 'function'){                
+                setImmediate(callback);	
+            }			
       
-      /* remove cached files after unlinking */
-      file.__remove_cached_files__();
-      
-			if(callback != null && typeof(callback) == 'function'){
-				setImmediate(callback);	
-			}			
-      
-    });                
-  }
+        });                
+    }
   
   __remove_cached_files__(){
     /* this function will try to unlink itself from the cached download directory */

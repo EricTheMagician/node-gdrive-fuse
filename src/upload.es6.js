@@ -358,6 +358,12 @@ class UploadingFile {
 
 		const upFile = this;
 		const file = upFile.file;
+        
+        // ensure that file size is at least > 0
+        if( file.size <= 0){
+            callback( "file size was 0");            
+            return;
+       }
 		const data = {
 			"parents": [{"id": upFile.file.parentid}],
 			"title": file.name
@@ -634,7 +640,7 @@ class UploadingFile {
 	}
 	
 	static fromJson(value){
-		const self = new UploadingFile();
+		const self = new UploadingFile(value.inode, value.filename,value.parentid, value.released, null);
 		self.filename = value.filename;
 		self.parentid = value.parentid;
 		self.released = value.released;
@@ -669,6 +675,14 @@ class UploadingFile {
 				this.file = file;
 			}
 		}
+        
+        /* get an updated file size if the current file size is 0 */
+        if( this.file.size == 0){
+            const self = this;
+            fs.stat(self.uploadedFileLocation, (err,stat)=>{
+                self.file.size = stat.size;
+            })
+        }
 	}
     
     unlink(){
@@ -692,22 +706,28 @@ class UploadingFile {
 
 //load upload Tree
 if( fs.existsSync(pth.join(config.cacheLocation, 'data','uploadTree.json')) ){
-	commonStatus.once('ready', ()=>{
-		logger.info( "loading upload tree" );
-		fs.readJson( pth.join(config.cacheLocation, 'data','uploadTree.json'), function readUploadTreeCallback(err, data){
-			try{
-				for( let key of Object.keys(data) ){
-					let value = data[key];
-					value.uploading = false;
-					uploadTree.set( parseInt(key), UploadingFile.fromJson(value));
-				}
-			}catch (error){
-				logger.error("There was an error parsing upload tree");
-				logger.error(error);
-			}
-			UploadingFile.resumeUploadingFilesFromUploadFolder();
-			saveUploadTree();
-		});		
+    commonStatus.once('ready', ()=>{
+        logger.info( "loading upload tree" );
+        fs.readJson( pth.join(config.cacheLocation, 'data','uploadTree.json'), function readUploadTreeCallback(err, data){
+                        
+            for( let key of Object.keys(data) ){
+                try{
+                    let value = data[key];
+                    value.uploading = false;
+                    const upFile = UploadingFile.fromJson(value);
+                    uploadTree.set( parseInt(key),upFile );
+                    uploadQueue.push( (done)=>{upFile.upload(done)});
+                    uploadQueue.start()
+                }catch(error){
+                    logger.error("There was an error parsing upload tree");
+                    logger.error(error);
+                    logger.error(key);
+                }
+    
+            }
+            UploadingFile.resumeUploadingFilesFromUploadFolder();
+            saveUploadTree();
+            });		
 	});
 
 }
