@@ -41,19 +41,13 @@ class GFolder {
       ctime: parseInt(this.ctime/1000),
       inode: this.inode
     };
+    if(!attr.mode) attr.mode = 16895;
     return attr;
   }
 
   getAttr(cb) {
-    const attr = {
-      mode: this.mode,
-      size: 4096, //standard size of a directory
-      nlink: this.children.length + 1,
-      mtime: parseInt(this.mtime/1000),
-      ctime: parseInt(this.ctime/1000),
-      inode: this.inode
-    };
-    cb(0, attr);
+    const attr = this.getAttrSync();
+    setImmediate(cb,0, attr);
 
   }
   

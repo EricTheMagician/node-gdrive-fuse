@@ -232,18 +232,12 @@ class GFile extends EventEmitter{
       ctime: parseInt(this.ctime/1000),
       inode: this.inode
     }
+    if(!attr.mode)attr.mode = 33279;
     return attr;
   }
 
   getAttr(cb){
-    const attr = {
-      mode: this.mode,
-      size: this.size,
-      nlink: 1,
-      mtime: parseInt(this.mtime/1000),
-      ctime: parseInt(this.ctime/1000),
-      inode: this.inode
-    };
+    const attr = this.getAttrSync();
     setImmediate(cb,0,attr);
   }
 
