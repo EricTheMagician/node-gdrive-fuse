@@ -228,8 +228,8 @@ class GFile extends EventEmitter{
       mode: this.mode,
       size: this.size,
       nlink: 1,
-      mtime: parseInt(this.mtime/1000),
-      ctime: parseInt(this.ctime/1000),
+      mtime: Math.floor(this.mtime/1000),
+      ctime: Math.floor(this.ctime/1000),
       inode: this.inode
     }
     if(!attr.mode)attr.mode = 33279;

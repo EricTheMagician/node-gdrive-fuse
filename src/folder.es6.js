@@ -37,8 +37,8 @@ class GFolder {
       mode: this.mode,
       size: 4096, //standard size of a directory
       nlink: this.children.length + 1,
-      mtime: parseInt(this.mtime/1000),
-      ctime: parseInt(this.ctime/1000),
+      mtime: Math.floor(this.mtime/1000),
+      ctime: Math.floor(this.ctime/1000),
       inode: this.inode
     };
     if(!attr.mode) attr.mode = 16895;
