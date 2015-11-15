@@ -23,6 +23,8 @@ if(!config.refreshDelay)
 	config.refreshDelay = 60000;
 if(config.longjohn)
     require('longjohn')
+if(!config.mountPoint)
+    config.mountPoint = '/tmp/mnt'
 
 // setup winston logger
 const transports = [new (winston.transports.File)({
