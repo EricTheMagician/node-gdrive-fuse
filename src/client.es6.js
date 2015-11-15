@@ -97,26 +97,28 @@ function getPageFiles(pageToken, total, cb)
         }
         cmd = cmd.substring(0, cmd.length-1);
         numberOfInsertionsWhileInsertingIntoDatabse++;
+        databaseInsertionCmd(cmd);        
+        cb(null, total + resp.items.length, resp.nextPageToken);
+
+    })
+}
+
+function databaseInsertionCmd(cmd){
         db.run(cmd, function insertInToDBFromParsingFiles(err){
-            numberOfInsertionsWhileInsertingIntoDatabse--;
-            if(err > 0){
+            if(err){
                 if(resp.items.length > 0){
                     logger.error(cmd);
                     logger.error("There was an error with inserting files in to the parsing database");
                     logger.error(err);                
                     return;
                 }
+                setTimeout(retryDatabaseInsertion, 2532, cmd);
+                return;
             }
-
-
+            numberOfInsertionsWhileInsertingIntoDatabse--;
         });
-        
-        cb(null, total + resp.items.length, resp.nextPageToken);
 
-    })
 }
-
-
 const number_to_parse_per_call = 5000;
 function queryDatabaseAndParseFiles(offset){
     if(numberOfInsertionsWhileInsertingIntoDatabse > 0){
