@@ -119,6 +119,11 @@ function getPageFiles(pageToken, total, cb)
 
 const number_to_parse_per_call = 5000;
 function queryDatabaseAndParseFiles(offset){
+    if(numberOfInsertionsWhileInsertingIntoDatabse > 0){
+        setTimeout(queryDatabaseAndParseFiles, 1000, offset);
+        return;
+    }
+
     const cmd = `SELECT * from folder_tree_creation ORDER BY is_root DESC, is_folder DESC LIMIT ${number_to_parse_per_call} OFFSET ${offset}`;
     db.all( cmd, function callback(err, rows){
         if(err){
@@ -128,7 +133,11 @@ function queryDatabaseAndParseFiles(offset){
             return;
         }
         if(rows.length == 0){
+            getLargestChangeId(function(){});
+            common.commonStatus.emit('ready');
             inodeTree.saveFolderTree();
+            if(require.main != module)
+                setTimeout(loadChanges, 90000);
             return;
         }
         __items_to_parse_from_google__ = __items_to_parse_from_google__.concat(rows); 
@@ -150,13 +159,11 @@ function getAllFiles(){
             // logger.log 'info', "Finished downloading folder structure from google"
             queryDatabaseAndParseFiles(0);
             // logger.debug __items_to_parse_from_google__
-            inodeTree.saveFolderTree();
+            // inodeTree.saveFolderTree();
             // findFoldersWithUnknownParents();
             // inodeTree.saveFolderTree();
-            getLargestChangeId(function(){});
-            common.commonStatus.emit('ready');
-            if(require.main != module)
-                setTimeout(loadChanges, 90000);
+            // if(require.main != module)
+            //     setTimeout(loadChanges, 90000);
         }
 
     }
