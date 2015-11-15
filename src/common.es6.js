@@ -42,7 +42,7 @@ const logger = new (winston.Logger)({
   transports: transports
 });
 
-//setup max cache size
+
 var maxCache;
 if(config.maxCacheSize){
    maxCache =  config.maxCacheSize * 1024 * 1024;

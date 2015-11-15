@@ -63,8 +63,16 @@ function getPageFiles(pageToken, total, cb)
             if( item.mimeType === "application/vnd.google-apps.folder" ){
                 is_folder = 1;
             }else{                
-                size = item.fileSize;
-                download_url = item.downloadUrl;
+                if(item.fileSize){
+                    size = item.fileSize;
+                    download_url = item.downloadUrl;
+                }else{
+                    /*
+                    if it gets too here, it means it's probably a google document. 
+                    Skip it for now until we can figure out how to handle the file size for that document.
+                    */
+                    continue;
+                }
             }
 
             let pid = "NULL";
