@@ -1,3 +1,5 @@
+Due to personal circumstances, this project is no longer maintained.
+
 #GDriveF4JS
 
 ##Information
