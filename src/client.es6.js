@@ -443,6 +443,11 @@ function parseChanges(items){
 
             f.ctime = (new Date(cfile.createdDate)).getTime()
             f.mtime = (new Date(cfile.modifiedDate)).getTime()
+
+            if(f.size != cfile.fileSize) {
+                logger.info( `${f.name} has changed in size. Was ${f.size}. Now ${cfile.fileSize}` );
+                f.size = parseInt(cfile.fileSize);
+            }
             if(f.name != cfile.title){
                 logger.info( `${f.name} was renamed to ${cfile.title}`);
                 f.name = cfile.title;
