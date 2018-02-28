@@ -1,4 +1,5 @@
-#Due to personal circumstances, this project is no longer maintained.
+#This project is no longer maintained.
+#Checkout my other project: https://github.com/thejinx0r/DriveFS
 
 #GDriveF4JS
 
